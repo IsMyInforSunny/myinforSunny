@@ -1,0 +1,4 @@
+import { ArrowUpRight, Sun } from 'lucide-react';
+export function Brand(){return <a href="/" className="brand" aria-label="내 정보 맑음? 홈"><span className="brand-icon"><Sun size={23} strokeWidth={1.8}/></span><span>내 정보 맑음<span className="brand-question">?</span></span></a>;}
+export function Header({active='home'}:{active?:'home'|'analyze'|'methodology'}){return <header className="site-header"><div className="container nav-inner"><Brand/><nav aria-label="주요 메뉴"><a className={active==='analyze'?'active':''} href="/analyze">정보 분석</a><a className={active==='methodology'?'active':''} href="/methodology">분석 기준</a><a href="/analyze?example=mixed" className="nav-cta">예시 체험 <ArrowUpRight size={15}/></a></nav></div></header>;}
+export function Footer(){return <footer className="site-footer"><div className="container footer-inner"><Brand/><p>판단은 나에게, 근거는 더 가까이.</p><span>2026 디지털새싹 · 내 정보 맑음?</span></div></footer>;}

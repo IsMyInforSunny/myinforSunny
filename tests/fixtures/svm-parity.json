@@ -1,0 +1,80 @@
+{
+  "head": {
+    "schemaVersion": "svm-head-1.0",
+    "task": "expression_binary",
+    "labels": [
+      "clear",
+      "flagged"
+    ],
+    "releaseStatus": "synthetic-test-only",
+    "encoderVersion": "synthetic-2d-v1",
+    "dimension": 2,
+    "scaler": {
+      "mean": [
+        0.0,
+        1.3877787807814457e-17
+      ],
+      "scale": [
+        2.5495097567963922,
+        0.25495097567963926
+      ]
+    },
+    "linear": {
+      "weights": [
+        0.5297682611524971,
+        0.5297682611524971
+      ],
+      "bias": 0.0
+    },
+    "calibration": {
+      "method": "held-out-logistic-sigmoid",
+      "weight": 1.0334733603095705,
+      "bias": 2.5380723162049532e-17
+    },
+    "abstain": {
+      "low": 0.35,
+      "high": 0.65
+    },
+    "trainingDataHash": "247d10e7e42a3a6b45e23ba0c1f07ba6ca8191fc10dbcb2e0b808a1f83dd12b2",
+    "splitHashes": {
+      "train": "380649094d1451f425e2de02dc6287581d06d14e5656199bc8c010f954f6ae8f",
+      "calibration": "3ed56a367772e60e52b5d389f9799fb91456eb69d5485de520cfa3cfdff8d75d",
+      "dev": "d89cb78a971398c8fee6b2e1c1644eadcfd5bed20c117b0e6f4b512db7365b98"
+    },
+    "configuration": {
+      "C": 1.0,
+      "class_weight": "balanced",
+      "random_state": 42
+    },
+    "limitations": [
+      "Binary expression head only",
+      "No product accuracy established",
+      "Abstention thresholds require dev selection",
+      "Human review provenance must be independently audited"
+    ]
+  },
+  "vectors": [
+    [
+      -3.0,
+      -0.3
+    ],
+    [
+      0.0,
+      0.0
+    ],
+    [
+      3.0,
+      0.3
+    ]
+  ],
+  "expectedMargins": [
+    -1.2467532467532467,
+    -2.883696167857549e-17,
+    1.2467532467532467
+  ],
+  "expectedProbabilities": [
+    0.21610913597240358,
+    0.5,
+    0.7838908640275963
+  ]
+}
