@@ -15,7 +15,7 @@ export function reliabilityReview(analysis:Pick<Analysis,'claims'>,verifications
    const relations=c.relations.filter(r=>validRelation(fetched.find(f=>f.id===r.referenceId),r));
    let outcome=c.outcome;
    if(outcome==='supported'&&!relations.some(r=>r.relation==='supports')||outcome==='contradicted'&&!relations.some(r=>r.relation==='contradicts')||outcome==='conflicting'&&!(relations.some(r=>r.relation==='supports')&&relations.some(r=>r.relation==='contradicts')))outcome='insufficient';
-   if(c.temporalFit==='mismatched'&&['supported','contradicted'].includes(outcome))outcome='insufficient';
+   if(c.temporalFit!=='matched'&&['supported','contradicted','conflicting'].includes(outcome))outcome='insufficient';
    latest.set(c.claimId,{...c,outcome,relations});
   }
   for(const r of fetched){const u=safeLink(r.url)!;u.hash='';sources.add(u.href);domains.add(u.hostname.replace(/^www\./,''));}
@@ -33,7 +33,7 @@ export function reliabilityReview(analysis:Pick<Analysis,'claims'>,verifications
  else if(complete.length<claims.length){status='partially_reviewed';label='일부 주장만 검토됨';}
  else if(supported===claims.length){status='supported_in_reviewed_scope';label='확인한 자료 범위에서 뒷받침됨';}
  else{status='needs_more_evidence';label='추가 조사가 필요함';}
- return {status,label,totalClaims:claims.length,completedClaims:complete.length,supported,contradicted,conflicting,insufficient,remaining:Math.max(0,claims.length-complete.length),sourceCount:sources.size,publisherDomainCount:domains.size,checks,scopeNote:'외부 조사는 추출한 주장과 실제 취득한 자료의 관계를 검토합니다. 기사 전체의 진실 확률이나 언론사 점수가 아니며, 도메인 수는 독립적인 근거의 수를 뜻하지 않습니다.'};
+ return {status,label,totalClaims:claims.length,completedClaims:complete.length,supported,contradicted,conflicting,insufficient,remaining:Math.max(0,claims.length-complete.length),sourceCount:sources.size,publisherDomainCount:domains.size,checks,scopeNote:'추출한 주장과 실제 취득한 자료의 관계를 검토합니다. 기사 전체의 진실 확률이나 언론사 점수가 아니며, 도메인 수는 독립적인 근거의 수를 뜻하지 않습니다.'};
 }
 
 /** A factual contradiction is not automatically a policy/opinion disagreement. */
@@ -41,7 +41,7 @@ export function verifiedRecommendations(verifications:ResearchVerification[]):Re
  const cards=new Map<string,Recommendation>();
  for(const v of verifications){for(const r of v.references){
   const u=safeLink(r.url);if(r.provenance!=='web_fetched'||!u)continue;
-  const relations=v.checks.flatMap(c=>c.execution==='completed'?c.relations:[]).filter(q=>q.referenceId===r.id&&validRelation(r,q));
+  const relations=v.checks.flatMap(c=>c.execution==='completed'&&c.temporalFit==='matched'?c.relations:[]).filter(q=>q.referenceId===r.id&&validRelation(r,q));
   const perspective=v.perspectiveChecks?.find(p=>p.referenceId===r.id&&p.start>=0&&p.end>p.start&&r.text.slice(p.start,p.end)===p.quote);
   const related=relations.find(q=>q.relation==='contradicts')??relations[0];
   let kind:Recommendation['kind'],reason:string,quote:string,start:number,end:number;

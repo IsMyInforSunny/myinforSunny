@@ -1,5 +1,11 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./design.css";
+import "./workspace.css";
+import "./reader-features.css";
+import "./source-observations.css";
+import "./canva-theme.css";
+import "./forecast.css";
 
 export const metadata: Metadata = {
   title: "내 정보 맑음? — 오늘의 정보 성분표",

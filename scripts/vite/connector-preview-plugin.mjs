@@ -54,12 +54,17 @@ export function connectorPreview() {
             deny: [
               ".env",
               ".env.*",
+              ".dev.vars",
+              ".dev.vars.*",
               "*.{crt,pem}",
               "**/.git/**",
               "**/.sites-runtime/**",
+              "**/.wrangler/**",
             ],
           },
-          watch: { ignored: ["**/.sites-runtime/**"] },
+          // Verification output can be briefly locked by Windows writers.
+          // It is never application source and must not trigger HMR watchers.
+          watch: { ignored: ["**/.sites-runtime/**", "**/docs/test-runs/**", "**/output/playwright/**", "**/.playwright-cli/**"] },
         },
       };
     },

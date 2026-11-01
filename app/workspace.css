@@ -1,0 +1,5 @@
+.workbench-tools{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:20px;padding:14px 0;border-block:1px solid var(--line)}
+.workbench-tools>span{font-size:13px;font-weight:650;color:#4c6351}.bias-explainer{padding:17px;background:#edf3e8;border-left:3px solid #366343;margin:4px 0 24px}.bias-explainer p{font-size:12px;line-height:1.8;margin-top:10px;color:#49604b}
+.workspace>div{min-width:0}.workspace .report-panel{min-width:0}.report-section,.report-overview,.claim-relations{overflow-wrap:anywhere}.axis-summary>div{min-width:0}.axis-summary span{overflow-wrap:anywhere}
+.article-map svg{max-width:100%}.popup-main{max-width:850px;margin:auto;padding:24px}.popup-main .workspace{grid-template-columns:1fr}.popup-main .workbench-tools{flex-wrap:wrap}
+@media(max-width:760px){.workbench-tools{align-items:flex-start;flex-direction:column;gap:10px}.workbench-tools>span{font-size:12px}.report-tabs{gap:12px}.popup-main{padding:18px}.axis-summary{grid-template-columns:1fr}.analysis-heading h1{font-size:31px}}

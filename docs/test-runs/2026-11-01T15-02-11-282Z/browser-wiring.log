@@ -1,0 +1,6 @@
+﻿### Result
+{"coordinate":"1.000\n범위 0–2 · 관측 입장 차이\n직접 지정한 입장과 잠정 기준선의 거리","researchConnected":true,"exportReady":true,"stale":true,"rawOptIn":3}
+### Ran Playwright code
+```js
+await (async page => { const coordinate = await page.getByRole('status', {name:'입장 차이의 절댓값',exact:true}).innerText(); const researchConnected = await page.locator('#related-review').isVisible(); await page.locator('.export-area > summary').click(); const exportReady = await page.getByRole('button',{name:'JSON 파일로 저장',exact:true}).isVisible(); await page.locator('.canva-input-disclosure > summary').click(); await page.locator('#body-input').fill('Public sample changed for a stale-result check.'); return {coordinate,researchConnected,exportReady,stale: await page.locator('.canva-dashboard-stale').isVisible(),rawOptIn: await page.locator('#analysis-details input[type=checkbox]').count()}; })(page);
+```

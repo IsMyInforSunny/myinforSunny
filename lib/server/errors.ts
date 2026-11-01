@@ -25,3 +25,4 @@ export function providerFailure(status:number,code?:string,type?:string):AppErro
   if(status===400)return new AppError(502,'PROVIDER_REQUEST_INVALID','AI 요청 설정을 확인해야 합니다.',false);
   return new AppError(503,'PROVIDER_UNAVAILABLE','AI 서비스에 일시적으로 연결하지 못했습니다.',status>=500);
 }
+

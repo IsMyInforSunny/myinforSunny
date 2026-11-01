@@ -14,6 +14,22 @@ const input=():ResearchInput=>{const a=demoAnalysis('conflict');return {sources:
 afterEach(()=>vi.restoreAllMocks());
 function planner(i:ResearchInput){return vi.spyOn(language,'structured').mockResolvedValue({queries:[{claimId:i.claims[0].id,label:'운영 시간',query:'school library closing time',purpose:'fact_check'}]});}
 describe('자동 조사 단계 연결 (모의 검색·모의 LLM, 실서비스 검증 아님)',()=>{
+ it('서로 다른 매체를 우선하고 같은 본문 전재 후보를 독립 근거로 늘리지 않는다',async()=>{
+  const i=input();planner(i);const c={...config,ALLOWED_RETRIEVAL_HOSTS:'news.example,second.example'};const plan=await planResearch(request(),i,c,AbortSignal.timeout(1000));
+  vi.spyOn(searchBudget,'reserveSearch').mockResolvedValue(undefined);
+  const articles=['https://news.example/a','https://news.example/b','https://second.example/c'].map((url,index)=>({id:`n${index}`,title:'가상 자료',url,publisherDomain:new URL(url).hostname,language:'Korean',provenance:'search_result' as const,stance:'not_checked' as const}));
+  vi.spyOn(news,'searchNews').mockResolvedValue({provider:'gdelt',query:'school library time',status:'success',articles,searchedAt:new Date().toISOString(),scopeNote:'모의'});
+  const text='도서관 운영 시간에 관한 가상 보도자료입니다. '.repeat(20);
+  const fetch=vi.spyOn(retrieval,'retrieve').mockImplementation(async(url,id)=>({id,url,text,provenance:'web_fetched',fetchedAt:'2026-11-01T00:00:00Z',truncated:false}));
+  const evidence=await discoverEvidence(request(),i,plan.token,0,c,AbortSignal.timeout(1000));
+  expect(fetch.mock.calls.map(call=>call[0])).toEqual(['https://news.example/a','https://second.example/c']);expect(evidence.references).toHaveLength(1);expect(evidence.attempts.some(a=>a.reason?.includes('중복 후보'))).toBe(true);
+ });
+ it('자료 발행일과 잘림 메타데이터를 서명된 발췌에 유지한다',async()=>{
+  const i=input();planner(i);const plan=await planResearch(request(),i,config,AbortSignal.timeout(1000));vi.spyOn(searchBudget,'reserveSearch').mockResolvedValue(undefined);
+  vi.spyOn(news,'searchNews').mockResolvedValue({provider:'firecrawl',query:'school library time',status:'success',articles:[{id:'n',title:'검색 제목',url:'https://news.example/a',publisherDomain:'news.example',language:'not_verified',provenance:'search_result',stance:'not_checked'}],searchedAt:new Date().toISOString(),scopeNote:'모의'});
+  vi.spyOn(retrieval,'retrieve').mockResolvedValue({id:'web_0_0',url:'https://news.example/a',text:'도서관은 오후 9시에 문을 닫는다.',title:'취득 제목',provenance:'web_fetched',publishedAt:'2025-03-01T00:00:00Z',fetchedAt:'2026-11-01T00:00:00Z',truncated:true,fullTextLength:9000});
+  const evidence=await discoverEvidence(request(),i,plan.token,0,config,AbortSignal.timeout(1000));expect(evidence.references[0]).toMatchObject({title:'취득 제목',publishedAt:'2025-03-01T00:00:00Z',truncated:true,fullTextLength:9000,extractionVersion:'firecrawl-markdown-1.0'});
+ });
  it('의견만 있는 글도 다른 입장을 찾고 사실 판정 건수는 늘리지 않는다',async()=>{
   const a=demoAnalysis('no_comments');const i:ResearchInput={sources:a.sources,claims:[],position:a.claims[0],transmissionConsent:true,researchConsent:true};
   const llm=vi.spyOn(language,'structured').mockResolvedValue({queries:[{claimId:i.position!.id,label:'나무와 통행 공간',query:'school trees walking space objections',purpose:'perspective'}]});

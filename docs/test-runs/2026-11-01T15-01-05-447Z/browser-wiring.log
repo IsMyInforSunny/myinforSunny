@@ -1,0 +1,7 @@
+﻿### Ran Playwright code
+```js
+await (async page => { await page.getByRole('button', {name: '가상 좌표 체험', exact: true}).click(); await page.getByRole('combobox', {name: '직접 지정한 입력 기사 입장', exact: true}).selectOption('1'); console.log(JSON.stringify({coordinate: await page.getByRole('status', {name:'입장 차이의 절댓값',exact:true}).innerText()})); await page.getByRole('button',{name:'기사 비교·추천 살펴보기',exact:true}).click(); console.log(JSON.stringify({researchConnected: await page.locator('#related-review').isVisible()})); })(page);
+```
+### Page
+- Page URL: http://127.0.0.1:5173/?example=supported
+- Page Title: 내 정보 맑음? — 오늘의 정보 성분표

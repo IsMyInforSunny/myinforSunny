@@ -43,13 +43,13 @@ export const verifyRequestSchema = z.discriminatedUnion('kind',[
   z.object({kind:z.literal('text'),parentAnalysisId:id.optional(),sources:z.array(sourceSchema).min(1).max(6),claims:z.array(claimSchema).min(1).max(1),references:z.array(referenceInputSchema).max(2),useWebSearch:z.literal(false),transmissionConsent:z.literal(true)}).strict(),
 ]);
 export type VerifyTextRequest = Omit<Extract<z.infer<typeof verifyRequestSchema>,{kind:'text'}>,'transmissionConsent'>;
-export type Reference = { id:string;provenance:'provided_text'|'web_fetched';text:string;url?:string;title?:string;publishedAt?:string;fetchedAt?:string;truncated:boolean;publisherGroup?:string };
+export type Reference = { id:string;provenance:'provided_text'|'web_fetched';text:string;url?:string;title?:string;publishedAt?:string;fetchedAt?:string;truncated:boolean;publisherGroup?:string;fullTextLength?:number;extractionVersion?:string };
 export const outcomeSchema = z.enum(['supported','contradicted','conflicting','insufficient','unchecked','inaccessible','not_applicable']);
 export type Outcome = z.infer<typeof outcomeSchema>;
 export type EvidenceRelation = { referenceId:string;quote:string;start:number;end:number;relation:'supports'|'contradicts'|'context';explanation:string };
 export type Check = { claimId:string;outcome:Outcome;execution:'completed'|'failed'|'skipped';relations:EvidenceRelation[];explanation:string;temporalFit:'matched'|'mismatched'|'unclear';limitations:string[] };
 export type Verification = {schemaVersion:'2.1';requestId:string;parentAnalysisId?:string;mode:'demo'|'live';status:'success'|'partial';versions:{rubric:string;prompt:string;model:string;retriever:string};scope:'provided_text'|'retrieved_documents'|'mixed';references:Reference[];checks:Check[];attempts:{url?:string;query?:string;status:string;reason?:string}[];warnings:{code:string;message:string}[];createdAt:string};
-export type Capabilities = {live:boolean;webSearch:boolean;webFetch:boolean;searchProviderName?:string;rubricVersion:string;limits:{body:number;comments:number;comment:number;claimsPerCheck:number};reason?:string};
+export type Capabilities = {searchProvider?:'gdelt'|'firecrawl';live:boolean;webSearch:boolean;webFetch:boolean;rubricVersion:string;limits:{body:number;comments:number;comment:number;claimsPerCheck:number};reason?:string};
 
 // Model output is a proposal: offsets and final indicators are always server-owned.
 const quoteCandidate=z.object({sentenceId:id,quote:text(8000)}).strict();

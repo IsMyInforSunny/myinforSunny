@@ -10,6 +10,7 @@ import {searchNews} from './news';
 import {allowedUrl,retrieve} from './retrieval';
 import {reserveSearch} from './search-budget';
 import {digest,readResearchToken,signResearchToken} from './research-token';
+import {normalizeSourceUrl,selectDiverseSources} from '../source-quality';
 
 type PlanData={planId:string;inputDigest:string;queries:ResearchQuery[];expiresAt:string};
 type EvidenceData={planId:string;inputDigest:string;claimId:string;references:RetrievedEvidence[];attempts:ResearchAttempt[];expiresAt:string};
@@ -56,17 +57,23 @@ export async function discoverEvidence(request:Request,input:ResearchInput,planT
  const result=await searchNews(query.query,config,signal);
  attempts.push({stage:'search',query:query.query,status:result.articles.length?'completed':'empty'});
  const hosts=config.ALLOWED_RETRIEVAL_HOSTS!.split(',').map(h=>h.trim()).filter(Boolean);
- for(const article of result.articles){
-  if(references.length>=2)break;
+ // Prefer a different publisher while retaining exact allowlist checks and a two-fetch ceiling.
+ const seenHosts=new Set<string>();const primary:typeof result.articles=[];const secondary:typeof result.articles=[];
+ for(const article of result.articles){const host=normalizeSourceUrl(article.url).host;if(host&&!seenHosts.has(host)){seenHosts.add(host);primary.push(article);}else secondary.push(article);}
+ let fetches=0;const fullSources:typeof references=[];
+ for(const article of [...primary,...secondary]){
+  if(fetches>=2)break;
   if(!allowedUrl(article.url,hosts)){attempts.push({stage:'fetch',url:article.url,status:'disallowed',reason:'본문 취득이 허용된 출처가 아닙니다.'});continue;}
   try{
-   const fetched=await retrieve(article.url,`web_${queryIndex}_${references.length}`,config,signal);
+   const fetched=await retrieve(article.url,`web_${queryIndex}_${fetches++}`,config,signal);
    if(!fetched){attempts.push({stage:'fetch',url:article.url,status:'inaccessible',reason:'공개 본문을 취득하지 못했습니다.'});continue;}
-   const excerpt=researchExcerpt(fetched.text,claim.text);
-   references.push({...fetched,provenance:'web_fetched',url:article.url,title:fetched.title||article.title,fetchedAt:fetched.fetchedAt!,publisherDomain:article.publisherDomain,text:excerpt.text,contentDigest:await digest(fetched.text),excerptStart:excerpt.start,excerptEnd:excerpt.end,fullTextLength:fetched.fullTextLength,extractionVersion:fetched.extractionVersion,truncated:fetched.truncated||excerpt.text.length<fetched.text.length});
+   fullSources.push({...fetched,provenance:'web_fetched',url:article.url,title:fetched.title||article.title,fetchedAt:fetched.fetchedAt!,publisherDomain:article.publisherDomain,contentDigest:await digest(fetched.text),excerptStart:0,excerptEnd:fetched.text.length,fullTextLength:fetched.fullTextLength??fetched.text.length,extractionVersion:result.provider==='firecrawl'?'firecrawl-markdown-1.0':'allowlisted-text-1.0'});
    attempts.push({stage:'fetch',url:article.url,status:'completed'});
   }catch{if(signal.aborted)throw new AppError(408,'REQUEST_ABORTED','조사를 취소했거나 제한 시간이 지났습니다.');attempts.push({stage:'fetch',url:article.url,status:'failed',reason:'자료 본문에 연결하지 못했습니다.'});}
  }
+ const selection=selectDiverseSources(fullSources,2);
+ for(const source of selection.selected){const excerpt=researchExcerpt(source.text,claim.text);references.push({...source,text:excerpt.text,excerptStart:excerpt.start,excerptEnd:excerpt.end,truncated:source.truncated||excerpt.text.length<source.text.length});}
+ for(const skipped of selection.skipped)if(skipped.reason==='duplicate_of_selected')attempts.push({stage:'fetch',url:fullSources.find(s=>s.id===skipped.id)?.url,status:'disallowed',reason:'다른 자료와 동일·유사한 본문인 중복 후보라 추가 근거에서 제외했습니다. 독립성은 확정하지 않습니다.'});
  const data:EvidenceData={planId:plan.planId,inputDigest:plan.inputDigest,claimId:query.claimId,references,attempts,expiresAt:plan.expiresAt};
  const ttl=Math.max(1,new Date(plan.expiresAt).getTime()-Date.now());
  return {schemaVersion:'evidence-1.0',planId:plan.planId,claimId:query.claimId,references,attempts,expiresAt:plan.expiresAt,token:await signResearchToken(request,config,'evidence',data,ttl)};
