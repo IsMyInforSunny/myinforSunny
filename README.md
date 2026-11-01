@@ -3,6 +3,8 @@
 작업 규칙은 [AGENTS.md](AGENTS.md), 설치·실행 방법은 [Windows 로컬 실행 안내](docs/LOCAL_DEVELOPMENT.md)를 따른다.
 `웹사이트-시작.cmd`를 실행하고 브라우저에서 `http://127.0.0.1:5173/`을 연다. 기본값은 키 없는 예시 모드다.
 
+코딩용 CLI의 BAZE/ChatGPT 실행 시 선택과 사용량 확인 범위는 [BAZE 전환 안내](docs/BAZE_CODEX_ROUTING.md)를 따른다. 실시간 사용량 자동 조회·진행 중 전환은 지원하지 않는다.
+
 # Canva UI 및 좌표 비교 업데이트
 
 [세션 복원 후 결과 연결·시점 판정 보완과 남은 작업](docs/RESUMED_WORK_2026-11-01.md)

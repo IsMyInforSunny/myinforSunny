@@ -1,0 +1,14 @@
+
+ RUN  v5.0.5 C:/Users/pp/Desktop/대회/디지털 새싹/디지털새싹_cmd
+
+(node:26152) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+ Test Files  31 passed | 1 skipped (32)
+      Tests  312 passed | 13 skipped (325)
+   Start at  00:59:36
+   Duration  8.32s (tests 50%, import 45%, transform 3%, worker 1%)
+
+    Isolate  32 workers spawned · ~408ms startup each (spawn + environment, per file)
+             at least ~1.46s faster with isolate: false — reuses workers across files instead of one per file
+

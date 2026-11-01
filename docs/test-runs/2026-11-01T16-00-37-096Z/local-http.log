@@ -1,0 +1,33 @@
+
+> naeinfo-clear@0.1.0 check:local
+> node scripts/check-local-runtime.mjs
+
+{
+  "check": "local HTTP routes, demo analysis and disabled external features",
+  "status": "passed",
+  "origin": "http://127.0.0.1:5173",
+  "pages": [
+    {
+      "route": "/",
+      "status": 200
+    },
+    {
+      "route": "/analyze",
+      "status": 200
+    },
+    {
+      "route": "/popup",
+      "status": 200
+    },
+    {
+      "route": "/methodology",
+      "status": 200
+    }
+  ],
+  "live": false,
+  "webSearch": false,
+  "webFetch": false,
+  "demoMode": "demo",
+  "disabledLiveRequestStatus": 503,
+  "privateConfigRequestStatus": 403
+}
