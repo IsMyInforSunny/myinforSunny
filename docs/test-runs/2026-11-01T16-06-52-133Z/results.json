@@ -1,0 +1,35 @@
+[
+  {
+    "name": "typecheck",
+    "command": [
+      "node",
+      "node_modules/typescript/bin/tsc",
+      "--noEmit"
+    ],
+    "started": "2026-11-01T16:06:52.136Z",
+    "durationMs": 5125,
+    "exitCode": 0
+  },
+  {
+    "name": "test",
+    "command": [
+      "node",
+      "node_modules/vitest/vitest.mjs",
+      "run"
+    ],
+    "started": "2026-11-01T16:06:57.263Z",
+    "durationMs": 6337,
+    "exitCode": 0
+  },
+  {
+    "name": "build",
+    "command": [
+      "node",
+      "scripts/run-framework.mjs",
+      "build"
+    ],
+    "started": "2026-11-01T16:07:03.602Z",
+    "durationMs": 12236,
+    "exitCode": 0
+  }
+]

@@ -1,6 +1,6 @@
 // Coding CLI routing only; never controls the website's Groq provider.
 export const MAX_USAGE_AGE_MS = 15 * 60 * 1000;
-export const THRESHOLD = 0.95;
+export const THRESHOLD = 0.90;
 /** @param {unknown} snapshot @param {number} now */
 export function decideProvider(snapshot, now = Date.now()) {
   const fallback = reason => ({provider: 'openai', reason});

@@ -1,0 +1,49 @@
+
+  vinext build  (Vite 8.0.13)
+
+(node:21100) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[1/5] analyze client references...
+[2Ktransforming...✓ 373 modules transformed.
+rendering chunks...
+✓ built in 2.69s
+[2/5] analyze server references...
+[2Ktransforming...✓ 200 modules transformed.
+rendering chunks...
+✓ built in 462ms
+[3/5] build rsc environment...
+[2Ktransforming...✓ 370 modules transformed.
+rendering chunks...
+computing gzip size...
+✓ built in 2.39s
+[4/5] build client environment...
+[2Ktransforming...✓ 1995 modules transformed.
+rendering chunks...
+computing gzip size...
+✓ built in 2.86s
+[5/5] build ssr environment...
+[2Ktransforming...✓ 206 modules transformed.
+rendering chunks...
+computing gzip size...
+✓ built in 693ms
+[0m
+  Route (app)
+  ┌ ? /                
+  ├ ? /analyze         
+  ├ λ /api/analyze     
+  ├ λ /api/capabilities
+  ├ λ /api/health      
+  ├ λ /api/news        
+  ├ λ /api/research    
+  ├ λ /api/verify      
+  ├ ? /methodology     
+  └ ? /popup           
+
+  λ API  ? Unknown
+
+  ? Some routes could not be classified. vinext currently uses static analysis
+    and cannot detect dynamic API usage (headers(), cookies(), etc.) at build time.
+    Automatic classification will be improved in a future release.
+
+  Build complete. Run `vinext start` to start the production server.
+

@@ -9,8 +9,8 @@ const statePath = join(local, 'baze-monthly-usage.json');
 const defaultSession = '01a195f9-e6c1-77a2-b5eb-497bebe37e34';
 const [command = 'status', ...rest] = process.argv.slice(2);
 const labels = {
-  below_threshold: '확인한 월간 크레딧 사용량이 95% 미만입니다.',
-  threshold_reached: '확인한 월간 크레딧 사용량이 95% 이상입니다.',
+  below_threshold: '확인한 월간 크레딧 사용량이 90% 미만입니다.',
+  threshold_reached: '확인한 월간 크레딧 사용량이 90% 이상입니다.',
   usage_unknown: '최신 BAZE 사용량이 등록되지 않았습니다.',
   usage_stale: '사용량 확인 후 15분이 지났거나 월간 갱신일이 도래했습니다.',
   usage_invalid: '사용량 기록이 유효하지 않습니다.',

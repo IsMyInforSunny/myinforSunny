@@ -19,21 +19,21 @@ describe('coding-provider routing from verified monthly credit snapshots', () =>
   it.each([
     [0, 20_000, 'factchat', 'below_threshold'],
     [11_445, 20_000, 'factchat', 'below_threshold'],
-    [18_999.99, 20_000, 'factchat', 'below_threshold'],
-    [19_000, 20_000, 'openai', 'threshold_reached'],
+    [17_999.99, 20_000, 'factchat', 'below_threshold'],
+    [18_000, 20_000, 'openai', 'threshold_reached'],
     [20_000, 20_000, 'openai', 'threshold_reached'],
     [21_000, 20_000, 'openai', 'threshold_reached'],
-    [4_749, 5_000, 'factchat', 'below_threshold'],
-    [4_750, 5_000, 'openai', 'threshold_reached'],
+    [4_499, 5_000, 'factchat', 'below_threshold'],
+    [4_500, 5_000, 'openai', 'threshold_reached'],
   ])('routes used=%s / limit=%s to %s without rounding the threshold', (used, limit, provider, reason) => {
     expect(decideProvider(snapshot({used, limit}), NOW)).toEqual({provider, reason});
   });
 
   it('keeps the declared monthly denominator across an ordinary Korean midnight', () => {
     const afterMidnightKst = Date.parse('2026-11-01T15:01:00.000Z');
-    expect(decideProvider(snapshot({renewalDate: '2026-12-01', used: 19_000}), afterMidnightKst))
+    expect(decideProvider(snapshot({renewalDate: '2026-12-01', used: 18_000}), afterMidnightKst))
       .toEqual({provider: 'openai', reason: 'threshold_reached'});
-    expect(decideProvider(snapshot({renewalDate: '2026-12-01', used: 18_999}), afterMidnightKst))
+    expect(decideProvider(snapshot({renewalDate: '2026-12-01', used: 17_999}), afterMidnightKst))
       .toEqual({provider: 'factchat', reason: 'below_threshold'});
   });
 
@@ -80,7 +80,7 @@ describe('coding-provider routing from verified monthly credit snapshots', () =>
 
   it('does not restore BAZE after midnight using an unchanged previous-cycle snapshot', () => {
     const midnightKst = Date.parse('2026-11-01T15:00:00.000Z');
-    expect(decideProvider(snapshot({used: 19_000}), midnightKst))
+    expect(decideProvider(snapshot({used: 18_000}), midnightKst))
       .toEqual({provider: 'openai', reason: 'usage_stale'});
   });
 
