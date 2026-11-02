@@ -34,10 +34,19 @@ function removeInertMarkup(html:string){
  * Unclosed excluded content is withheld rather than promoted into article text.
  */
 function removeExcludedRegions(html:string){
- const pattern=/<(\/?)(head|nav|footer|header|aside|form|button)(?=[\s/>])[^>]*>/gi;
+ // Consume every complete tag, including quoted attributes, so a literal
+ // "<body>" inside metadata cannot implicitly close the real head.
+ const pattern=/<(\/?)([A-Za-z][A-Za-z0-9:-]*)(?=[\s/>])(?:[^"'<>]|"[^"]*"|'[^']*')*>/g;
+ const excluded=new Set(['head','nav','footer','header','aside','form','button']);
  const stack:string[]=[],parts:string[]=[];let cursor=0;
  for(const match of html.matchAll(pattern)){
   const tag=match[2].toLowerCase(),closing=!!match[1],start=match.index!;
+  // HTML permits omitting </head> before the body. Do not apply this to
+  // unclosed advertising/menu regions, whose contents remain withheld.
+  if(!closing&&['body','article','main'].includes(tag)&&stack.length===1&&stack[0]==='head'){
+   stack.pop();cursor=start;
+  }
+  if(!excluded.has(tag))continue;
   if(!closing){
    if(!stack.length){parts.push(html.slice(cursor,start),' ');cursor=start+match[0].length;}
    if(!/\/\s*>$/.test(match[0]))stack.push(tag);

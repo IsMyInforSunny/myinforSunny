@@ -65,6 +65,16 @@ describe('허용 출처의 문서 해독과 본문 추출 — 모의 응답만 �
   expect(extractArticleDocument(html,true).text).toBe('본문 시작. 본문 끝.');
   expect(extractArticleDocument('<article>본문.<aside>닫히지 않은 광고',true).text).toBe('본문.');
  });
+ it('head 닫기 태그가 생략되어도 명백한 본문 시작 뒤의 기사를 보존한다',()=>{
+  for(const body of ['<body><article>공개 기사.</article></body>','<article>공개 기사.</article>','<main>공개 기사.</main>']){
+   expect(extractArticleDocument(`<html><head><title>공개 제목</title>${body}</html>`,true)).toEqual({title:'공개 제목',publishedAt:undefined,text:'공개 기사.'});
+  }
+ });
+ it('태그 속성의 가짜 본문 시작으로 head를 조기 해제하거나 미닫힌 광고를 복구하지 않는다',()=>{
+  const html='<head><meta name="example" content="<body><article>가짜 본문</article>"><meta name=\'other\' content=\'<main>가짜 영역</main>\'>표시하면 안 되는 머리글<body><article>공개 기사.</article></body>';
+  expect(extractArticleDocument(html,true).text).toBe('공개 기사.');
+  expect(extractArticleDocument('<article>본문.<aside>광고<body>광고 계속<main>추천 기사</main>',true).text).toBe('본문.');
+ });
  it('대소문자가 다른 HTML MIME도 본문으로 추출하고 길이·잘림을 정확히 기록한다',async()=>{
   const text='가상기사 본문 '.repeat(1200);const call=vi.fn().mockResolvedValue(new Response(`<article>${text}</article>`,{headers:{'content-type':'Text/HTML; Charset=UTF-8'}}));vi.stubGlobal('fetch',call);
   const ref=await retrieve('https://news.example/a','r1',{ALLOWED_RETRIEVAL_HOSTS:'news.example'},new AbortController().signal);
