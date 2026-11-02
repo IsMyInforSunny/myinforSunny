@@ -2,6 +2,7 @@ import type {Analysis, Check, Reference, Span} from './contracts';
 import type {ResearchVerification} from './research-contract';
 import {naturalSentences, validSpan} from './domain';
 import {currentResearch} from './current-research';
+import {canonicalArticleUrl} from './media-position';
 
 export type ReviewTone='unverified'|'supported'|'contradicted'|'conflicting'|'expression'|'fomo';
 export type ReviewAnnotation={id:string;tone:ReviewTone;label:string;reason:string;span:Span};
@@ -73,25 +74,43 @@ export function reviewSegments(text:string,annotations:ReviewAnnotation[]):Revie
 
 export type MapPoint={url:string;title:string;publisher:string;stance:'opposes_position'|'adds_context'|'supports_position';evidence:'supports'|'contradicts'|'mixed'|'unreviewed';quote:string;reason:string;position:string;claimCount:number};
 const normal=(v:string)=>v.trim().replace(/\s+/g,' ');
-function safeUrl(value:string|undefined){try{const u=new URL(value??'');const host=u.hostname.toLowerCase();return ['https:','http:'].includes(u.protocol)&&!u.username&&!u.password&&!u.port&&host.includes('.')&&!host.endsWith('.local')&&!host.endsWith('.localhost')&&!/^[\d.:[\]]+$/.test(host)?u:null;}catch{return null;}}
-/** Per-article coordinates are local to one explicit proposition, not fixed publisher ideology. */
-export function articleMapPoints(analysis:Analysis,results:ResearchVerification[]):MapPoint[]{
+/** Valid quoted observations, including contradictory classifications for the same article.
+ * Keep those contradictions available to the publisher module so it can count them as undetermined.
+ */
+export function articleMapObservations(analysis:Analysis,results:ResearchVerification[]):MapPoint[]{
  if(analysis.mode==='demo')return [];
  const positions=[analysis.proposition,...analysis.claims.filter(c=>c.kind==='opinion').map(c=>c.text)].filter((p):p is string=>!!p).map(normal);
  if(!positions.length)return [];
  const factual=new Set(analysis.claims.filter(c=>c.kind==='factual').map(c=>c.id));const articles=new Map<string,MapPoint>();
  for(const v of currentResearch(analysis,results)){
-  for(const ref of v.references){const url=safeUrl(ref.url);if(!url||ref.provenance!=='web_fetched')continue;
-   const p=v.perspectiveChecks?.find(p=>p.referenceId===ref.id&&positions.includes(normal(p.positionText))&&['supports_position','opposes_position','adds_context'].includes(p.stance)&&relationExists(ref,p));
-   if(!p)continue;
+  for(const ref of v.references){const article=canonicalArticleUrl(ref.url);if(!article||ref.provenance!=='web_fetched')continue;
+   const perspectives=v.perspectiveChecks?.filter(p=>p.referenceId===ref.id&&positions.includes(normal(p.positionText))&&['supports_position','opposes_position','adds_context'].includes(p.stance)&&relationExists(ref,p))??[];
+   if(!perspectives.length)continue;
    const latest=new Map(v.checks.map(c=>[c.claimId,c]));let supports=false,contradicts=false;const claimIds=new Set<string>();
    for(const check of latest.values()){
     if(!factual.has(check.claimId)||check.execution!=='completed'||check.temporalFit!=='matched'||!['supported','contradicted','conflicting'].includes(check.outcome))continue;
     const relations=check.relations.filter(r=>r.referenceId===ref.id&&relationExists(ref,r));
     for(const r of relations){if(r.relation==='supports'&&['supported','conflicting'].includes(check.outcome)){supports=true;claimIds.add(check.claimId);}if(r.relation==='contradicts'&&['contradicted','conflicting'].includes(check.outcome)){contradicts=true;claimIds.add(check.claimId);}}
    }
-   url.hash='';articles.set(url.href,{url:url.href,title:ref.title??url.hostname,publisher:url.hostname.replace(/^www\./,''),stance:p.stance as MapPoint['stance'],evidence:supports&&contradicts?'mixed':supports?'supports':contradicts?'contradicts':'unreviewed',quote:p.quote,reason:p.explanation,position:p.positionText,claimCount:claimIds.size});
+   const evidence:MapPoint['evidence']=supports&&contradicts?'mixed':supports?'supports':contradicts?'contradicts':'unreviewed';
+   for(const p of perspectives){
+    const position=normal(p.positionText),key=JSON.stringify([article.url,position,p.stance,evidence]);
+    if(!articles.has(key))articles.set(key,{url:article.url,title:ref.title??article.host,publisher:article.host,stance:p.stance as MapPoint['stance'],evidence,quote:p.quote,reason:p.explanation,position,claimCount:claimIds.size});
+   }
   }
  }
  return [...articles.values()];
+}
+
+/** Per-article map placements are local to one proposition. Conflicting placements are withheld,
+ * rather than allowing array order or the last reference to choose an article's position.
+ */
+export function articleMapPoints(analysis:Analysis,results:ResearchVerification[]):MapPoint[]{
+ const placements=new Map<string,{point:MapPoint;conflict:boolean}>();
+ for(const point of articleMapObservations(analysis,results)){
+  const key=JSON.stringify([point.url,point.position]),previous=placements.get(key);
+  if(!previous)placements.set(key,{point,conflict:false});
+  else if(previous.point.stance!==point.stance||previous.point.evidence!==point.evidence)previous.conflict=true;
+ }
+ return [...placements.values()].filter(p=>!p.conflict).map(p=>p.point);
 }

@@ -56,10 +56,13 @@ export const MEDIA_POSITION_NOTE='관찰된 입장 차이이며 보정된 편향
 const CODE:Record<MapPoint['stance'],number>={opposes_position:-1,adds_context:0,supports_position:1};
 const normal=(v:string)=>v.trim().replace(/\s+/g,' ');
 
-function canonical(value:string|undefined){
+/** Shared article identity for observations and aggregation; tracking aliases are not new articles. */
+export function canonicalArticleUrl(value:string|undefined){
  try{
   const u=new URL(value??'');
-  if(!['https:','http:'].includes(u.protocol)||u.username||u.password)return null;
+  const hostname=u.hostname.toLowerCase();
+  if(!['https:','http:'].includes(u.protocol)||u.username||u.password||u.port||
+    !hostname.includes('.')||hostname.endsWith('.local')||hostname.endsWith('.localhost')||/^[\d.:[\]]+$/.test(hostname))return null;
   u.hash='';u.hostname=u.hostname.toLowerCase();
   for(const k of [...u.searchParams.keys()])if(/^(utm_|fbclid$|gclid$)/i.test(k))u.searchParams.delete(k);
   const host=u.hostname.replace(/^www\./,'');
@@ -83,7 +86,7 @@ function prepare(points:MapPoint[],options?:PositionOptions):Prepared{
  // key: position + canonical url -> classification; conflicting duplicates become undetermined.
  const seen=new Map<string,{article:Article;conflict:boolean}>();
  for(const p of used){
-  const c=canonical(p?.url);const position=normal(p?.position??'');
+  const c=canonicalArticleUrl(p?.url);const position=normal(p?.position??'');
   const code=p?CODE[p.stance]:undefined;
   if(!c||!position||code===undefined||!['supports','contradicts','mixed','unreviewed'].includes(p.evidence)){invalid++;continue;}
   const key=`${position}\u0000${c.url}`;const article:Article={url:c.url,host:c.host,position,code,evidence:p.evidence};
@@ -126,7 +129,7 @@ export function publisherPositions(points:MapPoint[],options?:PositionOptions):P
  */
 export function absolutePositionDifference(points:MapPoint[],selectedUrl?:string,options?:PositionOptions):PositionDifference{
  const empty=(reason:PositionDifference['reason'],extra:Partial<PositionDifference>={}):PositionDifference=>({baseline:MEDIA_POSITION_BASELINE,note:MEDIA_POSITION_NOTE,value:null,status:'insufficient',reason,position:null,selectedCode:null,referenceCentroid:null,publishersUsed:0,...extra});
- const sel=selectedUrl?canonical(selectedUrl):null;
+ const sel=selectedUrl?canonicalArticleUrl(selectedUrl):null;
  if(!sel)return empty('no_selection');
  const prep=prepare(points,options);
  const hits=[...prep.groups.entries()].map(([position,g])=>({position,g,article:g.articles.find(a=>a.url===sel.url)})).filter(h=>h.article);

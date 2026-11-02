@@ -110,7 +110,7 @@
 .forecast-workspace>div>.notice{width:min(100%,max(680px,calc((100svh - 190px) * 1.25)));margin:12px auto 0}
 
 /* Review dialogs (components/review-dialog.tsx) */
-.canva-dialog{width:min(940px,calc(100% - 32px));max-height:calc(100svh - 40px);padding:0;border:0;border-radius:14px;background:#f4fbff;color:var(--forecast-ink);box-shadow:0 24px 70px #0b2a3a59;overflow:hidden}
+.canva-dialog{width:min(940px,calc(100% - 32px));max-height:calc(100svh - 40px);padding:0;border:0;border-radius:14px;background:#f4fbff;color:var(--forecast-ink);box-shadow:0 24px 70px #0b2a3a59;overflow:clip}
 .canva-dialog[open]{display:flex;flex-direction:column}
 .canva-dialog::backdrop{background:#0b2a3a73;backdrop-filter:blur(2px)}
 .canva-dialog-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 22px;background:var(--forecast-blue);border-bottom:1px solid #8dcfe3;flex:none}

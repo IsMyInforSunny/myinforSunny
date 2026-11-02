@@ -1,6 +1,7 @@
 import { Reference } from '../contracts';
 import { RuntimeConfig } from './config';
 import {scrapeFirecrawl} from './firecrawl';
+import {ARTICLE_EXTRACTION_VERSION,decodeArticleDocument,extractArticleDocument} from './article-document';
 
 // The initial web adapter deliberately supports exact, operator-approved hosts only.
 // Arbitrary user URLs never become network destinations. Redirects are never followed.
@@ -20,8 +21,8 @@ export async function retrieve(url:string,id:string,config:RuntimeConfig,signal:
   const chunks:Uint8Array[]=[];let bytes=0;
   while(true){const {done,value}=await reader.read();if(done)break;bytes+=value.length;if(bytes>2*1024*1024){await reader.cancel();return null;}chunks.push(value);}
   const data=new Uint8Array(bytes);let offset=0;for(const c of chunks){data.set(c,offset);offset+=c.length;}
-  const html=new TextDecoder().decode(data);
-  const cleaned=type.startsWith('text/html')?html.replace(/<(script|style|noscript|nav|footer|header)\b[^>]*>[\s\S]*?<\/\1>/gi,' ').replace(/<[^>]*>/g,' ').replace(/&nbsp;/gi,' ').replace(/&amp;/gi,'&').replace(/&lt;/gi,'<').replace(/&gt;/gi,'>').replace(/\s+/g,' ').trim():html;
-  if(!cleaned.trim())return null;
-  return {id,provenance:'web_fetched',url:target.href,text:cleaned.slice(0,8000),fetchedAt:new Date().toISOString(),truncated:cleaned.length>8000};
+  const document=decodeArticleDocument(data,type);if(document===null)return null;
+  const extracted=extractArticleDocument(document,/^text\/html(?:;|$)/i.test(type));
+  if(!extracted.text)return null;
+  return {id,provenance:'web_fetched',url:target.href,text:extracted.text.slice(0,8000),title:extracted.title,publishedAt:extracted.publishedAt,fetchedAt:new Date().toISOString(),truncated:extracted.text.length>8000,fullTextLength:extracted.text.length,extractionVersion:ARTICLE_EXTRACTION_VERSION};
 }

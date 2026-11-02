@@ -4,11 +4,13 @@ import path from 'node:path';
 
 // Verification history contains command output, never environment variables or article input.
 const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-const directory = path.resolve('docs', 'test-runs', stamp);
+const websiteOnly = process.argv.includes('--website-only');
+const directory = path.resolve('docs', 'test-runs', stamp + (websiteOnly ? '-website' : ''));
 await mkdir(directory, {recursive: true});
 const commands = [
   ['typecheck', ['node_modules/typescript/bin/tsc', '--noEmit']],
-  ['test', ['node_modules/vitest/vitest.mjs', 'run']],
+  ['test', ['node_modules/vitest/vitest.mjs', 'run', ...(websiteOnly ?
+    ['--exclude', 'tests/codex-launcher.test.ts', '--exclude', 'tests/codex-routing.test.ts'] : [])]],
   ['build', ['scripts/run-framework.mjs', 'build']],
 ];
 const records = [];

@@ -2,7 +2,7 @@
 import {useId,useState} from 'react';
 import type {Analysis} from '@/lib/contracts';
 import type {ResearchVerification} from '@/lib/research-contract';
-import {articleMapPoints,type MapPoint} from '@/lib/reader-metrics';
+import {articleMapObservations,type MapPoint} from '@/lib/reader-metrics';
 import {publisherPositions,absolutePositionDifference,MAX_POSITION_POINTS} from '@/lib/media-position';
 
 const DEMO_POSITION='학교 도서관 운영 시간을 늘려야 한다.';
@@ -18,7 +18,7 @@ export default function MediaPositionMap({analysis,results}:{analysis:Analysis;r
  const [demo,setDemo]=useState(false),[selection,setSelection]=useState('');
  const [manual,setManual]=useState({context:'',code:''});
  // Preserve conflicting observations across runs so the statistics module can reject them.
- const points=demo?sample:results.flatMap(v=>articleMapPoints(analysis,[v]));
+ const points=demo?sample:articleMapObservations(analysis,results);
  const report=publisherPositions(points);
  const group=report.groups.find(g=>g.position===selection)??report.groups[0];
  const context=JSON.stringify([analysis.analysisId,demo,group?.position]);

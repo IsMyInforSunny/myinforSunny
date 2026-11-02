@@ -1,0 +1,69 @@
+﻿[
+    {
+        "started":  "2026-11-02T00:07:15.4942522Z",
+        "name":  "state",
+        "result":  {
+                       "scope":  "local browser, synthetic examples only",
+                       "passed":  [
+                                      "new article clears feedback and both export opt-ins",
+                                      "reset clears inputs and disables old report",
+                                      "custom reference comparison is explained and blocked while live is disabled",
+                                      "stale coordinate warning and 6-article demo baseline give expected 1.000 difference"
+                                  ]
+                   },
+        "durationMs":  4645
+    },
+    {
+        "started":  "2026-11-02T00:07:20.1483761Z",
+        "name":  "research",
+        "result":  {
+                       "scope":  "browser with intercepted local API responses; no external model/search calls",
+                       "planCount":  3,
+                       "compareCount":  1,
+                       "passed":  [
+                                      "closed input keeps visible progress and cancellation suppresses late analysis response",
+                                      "research cancel and prepare restart require fresh consent and do not retry",
+                                      "input change cancels active research and restoring the text makes no new call",
+                                      "explicit restart completes one mocked comparison and updates the same main gauge",
+                                      "quota exhaustion switches to a clearly marked demo and retains the limit notice"
+                                  ]
+                   },
+        "durationMs":  5099
+    },
+    {
+        "started":  "2026-11-02T00:07:25.2472280Z",
+        "name":  "coordinates",
+        "result":  {
+                       "scope":  "intercepted local API; six synthetic articles, not real acquisition or accuracy evaluation",
+                       "queries":  3,
+                       "articles":  6,
+                       "eligiblePublishers":  2,
+                       "factualCompletion":  2,
+                       "propositionExcludedFromFactualCount":  true,
+                       "baseline":  0,
+                       "inputStance":  1,
+                       "absoluteDifference":  1,
+                       "passed":  [
+                                      "user-selected proposition reaches every research operation",
+                                      "related articles, factual progress and publisher coordinates share current analysis",
+                                      "three unique articles per publisher and two publishers remain required",
+                                      "mobile coordinates have no horizontal overflow"
+                                  ]
+                   },
+        "durationMs":  11777
+    },
+    {
+        "started":  "2026-11-02T00:07:37.0242186Z",
+        "name":  "popup",
+        "result":  {
+                       "scope":  "actual local popup; synthetic examples only; no external API",
+                       "passed":  [
+                                      "actual popup opens /popup without opener or automatic source transfer; example updates its main gauge",
+                                      "popup review tabs support arrows, Home and End with synchronized selection",
+                                      "popup claim citation opens and highlights the same analyzed source",
+                                      "560px and 375px popup evidence views have one open dialog and no horizontal overflow"
+                                  ]
+                   },
+        "durationMs":  4632
+    }
+]

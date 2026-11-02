@@ -20,17 +20,18 @@ export function buildChecks(raw:ReturnType<typeof rawVerificationSchema.parse>,c
     if(!candidate){damaged=true;return {claimId:claim.id,outcome:'unchecked' as const,execution:'failed' as const,relations:[],explanation:'이 주장의 자료 대조 결과를 확인하지 못했습니다.',temporalFit:'unclear' as const,limitations:[]};}
     if(claim.kind!=='factual')return {claimId:claim.id,outcome:'not_applicable' as const,execution:'skipped' as const,relations:[],explanation:'의견 또는 미분류 문장을 사실의 참·거짓으로 평가하지 않습니다.',temporalFit:'unclear' as const,limitations:[]};
     if(!candidate.originMatches){damaged=true;return {claimId:claim.id,outcome:'unchecked' as const,execution:'skipped' as const,relations:[],explanation:'선택한 주장이 원문의 의미와 맞는지 확인하지 못했습니다.',temporalFit:'unclear' as const,limitations:[]};}
-    const relations:EvidenceRelation[]=candidate.relations.flatMap(r=>{const ref=references.find(s=>s.id===r.referenceId);const selected=positions?.get(r);const index=selected?.start??ref?.text.indexOf(r.quote)??-1;const end=selected?.end??index+r.quote.length;if(!ref||index<0||end<=index||ref.text.slice(index,end)!==r.quote){damaged=true;return [];}return [{...r,start:index,end}];});
+    const relations:EvidenceRelation[]=candidate.relations.flatMap(r=>{const ref=references.find(s=>s.id===r.referenceId);const selected=positions?.get(r);const index=selected?.start??ref?.text.indexOf(r.quote)??-1;const end=selected?.end??index+r.quote.length;if(!ref||!Number.isInteger(index)||!Number.isInteger(end)||index<0||end<=index||end>ref.text.length||!r.quote.trim()||ref.text.slice(index,end)!==r.quote){damaged=true;return [];}return [{...r,start:index,end}];});
     const hasSupport=relations.some(r=>r.relation==='supports'),hasContradiction=relations.some(r=>r.relation==='contradicts');let outcome=candidate.outcome;
     if(outcome==='supported'&&!hasSupport||outcome==='contradicted'&&!hasContradiction||outcome==='conflicting'&&(!hasSupport||!hasContradiction)){damaged=true;outcome='insufficient';}
     if(hasSupport&&hasContradiction)outcome='conflicting';
-    if(candidate.temporalFit==='mismatched'&&['supported','contradicted'].includes(outcome))outcome='insufficient';
+    if(candidate.temporalFit!=='matched'&&['supported','contradicted','conflicting'].includes(outcome))outcome='insufficient';
     if(['unchecked','inaccessible','not_applicable'].includes(outcome))outcome='insufficient';
     return {claimId:claim.id,outcome,execution:'completed' as const,relations,explanation:candidate.explanation,temporalFit:candidate.temporalFit,limitations:[...candidate.limitations,...(candidate.relations.length!==relations.length?['원문과 일치하지 않는 자료 인용을 제외했습니다.']:[])]};
   });return {checks,damaged};
 }
 // trustedReferences is server-internal. HTTP input cannot provide a provenance field.
 export async function verify(req:VerifyTextRequest,config:RuntimeConfig,requestId:string,signal:AbortSignal,trustedReferences:Reference[]=[],position?:string):Promise<ResearchVerification>{
+  if(!req.claims.length&&(!position||!trustedReferences.length))throw new AppError(422,'VALIDATION_ERROR','대조할 주장이나 취득 자료가 있는 비교 명제가 필요합니다.');
   validateVerifyInput(req);const references:Reference[]=[...trustedReferences];const attempts:Verification['attempts']=[];
   // Input text is labeled as unverified provenance even when a URL accompanies it.
   for(const ref of req.references){if(ref.text){references.push({id:ref.id,text:ref.text,url:ref.url,provenance:'provided_text',truncated:false});continue;}
@@ -42,13 +43,15 @@ export async function verify(req:VerifyTextRequest,config:RuntimeConfig,requestI
     const referenceSentences=references.flatMap(ref=>sentences(ref.text,ref.id).map(s=>({referenceId:ref.id,referenceSentenceId:s.id,text:ref.text.slice(s.start,s.end),start:s.start,end:s.end})));
     if(!referenceSentences.length)throw new AppError(422,'VALIDATION_ERROR','대조할 수 있는 참고자료 문장을 입력해 주세요.');
     const sentenceId=z.enum(referenceSentences.map(s=>s.referenceSentenceId) as [string,...string[]]);
-    const claimId=z.enum(req.claims.map(c=>c.id) as [string,...string[]]);
+    // A perspective-only research request requires checks: []; no synthetic
+    // factual claim or source span is created for the user's comparison dimension.
+    const claimId=z.enum((req.claims.length?req.claims.map(c=>c.id):['no_factual_claims']) as [string,...string[]]);
     const relation=z.object({referenceSentenceId:sentenceId,relation:z.enum(['supports','contradicts','context']),explanation:z.string().min(1).max(1000)}).strict();
     const schema=rawVerificationSchema.extend({checks:z.array(rawVerificationSchema.shape.checks.element.extend({claimId,relations:z.array(relation).max(10)})).length(req.claims.length)});
     const input={claims:req.claims,sources:req.sources.map(s=>({id:s.id,text:s.text})),references:references.map(ref=>({id:ref.id,title:ref.title??null,publishedAt:ref.publishedAt??null,truncated:ref.truncated,sentences:referenceSentences.filter(s=>s.referenceId===ref.id)}))};
     const perspectiveSchema=z.object({referenceSentenceId:sentenceId,stance:z.enum(['supports_position','opposes_position','adds_context','not_expressed','undetermined']),explanation:z.string().min(1).max(300)}).strict();
     const extended=schema.extend({perspectives:z.array(perspectiveSchema).max(2)});
-    const raw=position&&trustedReferences.length?await structured(config,extended,VERIFY_PROMPT+' position은 원문에서 추출한 제안·의견이다. 각 참고자료가 이 제안을 명시적으로 지지·반대하는지 perspectives로 구분한다. 사실 수치가 다르다는 이유만으로 의견 반대로 분류하지 않는다. 반대가 명시되지 않으면 adds_context, not_expressed 또는 undetermined다. referenceSentenceId는 해당 입장을 보여 주는 실제 자료 문장이어야 한다. 입장이나 출처를 만들어내지 않는다.',{...input,position},signal):await structured(config,schema,VERIFY_PROMPT,input,signal);
+    const raw=position&&trustedReferences.length?await structured(config,extended,VERIFY_PROMPT+' position은 사용자가 지정한 비교 명제 또는 원문에서 추출한 제안·의견이다. 이 명제 자체를 사실 판정하거나 원문 인용으로 만들지 않는다. claims가 비어 있으면 checks는 빈 배열이다. 각 참고자료가 이 명제를 명시적으로 지지·반대하는지 perspectives로 구분한다. 사실 수치가 다르다는 이유만으로 의견 반대로 분류하지 않는다. 반대가 명시되지 않으면 adds_context, not_expressed 또는 undetermined다. referenceSentenceId는 해당 입장을 보여 주는 실제 자료 문장이어야 한다. 입장이나 출처를 만들어내지 않는다.',{...input,position},signal):await structured(config,schema,VERIFY_PROMPT,input,signal);
     if('perspectives' in raw){
       const perspectives=z.array(perspectiveSchema).parse(raw.perspectives);
       const candidates=perspectives.map(p=>({...p,sentence:referenceSentences.find(s=>s.referenceSentenceId===p.referenceSentenceId)!}));
@@ -59,6 +62,6 @@ export async function verify(req:VerifyTextRequest,config:RuntimeConfig,requestI
     const result=buildChecks(expanded,req.claims,references,positions);checks=result.checks;damaged=result.damaged;
   }
   const fetched=references.some(r=>r.provenance==='web_fetched'),provided=references.some(r=>r.provenance==='provided_text');
-  return {schemaVersion:'2.1',requestId,parentAnalysisId:req.parentAnalysisId,mode:'live',status:damaged?'partial':'success',versions:{rubric:RUBRIC,prompt:position&&trustedReferences.length?'verification-research-1.0':'verification-4.2',model:modelName(config),retriever:fetched?'allowlisted-fetch-1.0':'provided-only-1.0'},scope:fetched?(provided?'mixed':'retrieved_documents'):'provided_text',references,checks,attempts,...(perspectiveChecks.length?{perspectiveChecks}:{}),warnings:[...(req.useWebSearch?[{code:'SEARCH_UNAVAILABLE',message:'자동 웹 검색은 아직 연결되지 않아 입력 자료와 허용된 URL만 대조했습니다.'}]:[]),...(damaged?[{code:'PARTIAL_EVIDENCE',message:'일부 대조 근거를 확인하지 못했습니다.'}]:[])],createdAt:new Date().toISOString()};
+  return {schemaVersion:'2.1',requestId,parentAnalysisId:req.parentAnalysisId,mode:'live',status:damaged?'partial':'success',versions:{rubric:RUBRIC,prompt:position&&trustedReferences.length?'verification-research-1.1':'verification-4.2',model:modelName(config),retriever:fetched?'allowlisted-fetch-1.0':'provided-only-1.0'},scope:fetched?(provided?'mixed':'retrieved_documents'):'provided_text',references,checks,attempts,...(perspectiveChecks.length?{perspectiveChecks}:{}),warnings:[...(req.useWebSearch?[{code:'SEARCH_UNAVAILABLE',message:'자동 웹 검색은 아직 연결되지 않아 입력 자료와 허용된 URL만 대조했습니다.'}]:[]),...(damaged?[{code:'PARTIAL_EVIDENCE',message:'일부 대조 근거를 확인하지 못했습니다.'}]:[])],createdAt:new Date().toISOString()};
 }
 

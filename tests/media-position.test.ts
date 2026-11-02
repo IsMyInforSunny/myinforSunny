@@ -5,7 +5,8 @@ import MediaPositionMap from '../components/media-position-map';
 import {demoAnalysis} from '../lib/fixtures';
 import type {ResearchVerification} from '../lib/research-contract';
 import type {MapPoint} from '../lib/reader-metrics';
-import {absolutePositionDifference,publisherPositions} from '../lib/media-position';
+import {articleMapObservations} from '../lib/reader-metrics';
+import {absolutePositionDifference,canonicalArticleUrl,publisherPositions} from '../lib/media-position';
 
 const P='정책 A를 도입해야 한다';
 const pt=(host:string,n:number,stance:MapPoint['stance'],o:Partial<MapPoint>={}):MapPoint=>({url:`https://${host}/a${n}`,title:'t',publisher:host,stance,evidence:'unreviewed',quote:'q',reason:'r',position:P,claimCount:0,...o});
@@ -36,6 +37,13 @@ describe('publisherPositions',()=>{
  it('counts invalid points and respects the sample limit',()=>{
   const r=publisherPositions([pt('a.com',1,'supports_position'),pt('a.com',2,'supports_position',{url:'javascript:x'}),pt('a.com',3,'supports_position')],{maxPoints:2});
   expect(r.truncated).toBe(1);expect(r.invalid).toBe(1);
+ });
+ it('uses the same safe article identity for observations, selection, and aggregation',()=>{
+  expect(canonicalArticleUrl('https://WWW.a.com/a1/?utm_source=x&z=2&a=1#top')).toEqual({url:'https://a.com/a1?a=1&z=2',host:'a.com'});
+  for(const url of ['https://a.com:8080/a1','http://127.0.0.1/a1','https://news.local/a1','https://user:password@a.com/a1']){
+   expect(canonicalArticleUrl(url)).toBeNull();
+   expect(publisherPositions([pt('a.com',1,'supports_position',{url})]).invalid).toBe(1);
+  }
  });
 });
 
@@ -160,5 +168,16 @@ describe('bounded media coordinate module markup',()=>{
   expect(html).toContain('고유 기사 2개 더 필요');
   expect(html).not.toContain('class="media-publisher-point"');
   expect(html).toContain('<dt>잠정 기준선</dt><dd>계산 대기</dd>');
+ });
+ it('withholds a publisher below three unique articles after a conflict inside one verification',()=>{
+  const a=analysis(),v=verification(a),opposite=verification(a,'b.example',3,'opposes_position');
+  v.references.push({...v.references[0],id:'duplicate',url:`${v.references[0].url}?utm_source=alias`});
+  v.perspectiveChecks!.push({...v.perspectiveChecks![0],referenceId:'duplicate',stance:'opposes_position'});
+  const report=publisherPositions(articleMapObservations(a,[v,opposite]));
+  const group=report.groups[0];
+  expect(group.undetermined).toBe(1);
+  expect(group.eligiblePublishers).toBe(1);
+  expect(group.publishers.find(p=>p.publisher==='a.example')).toMatchObject({sampleCount:2,eligible:false,centroidX:null});
+  expect(absolutePositionDifference(articleMapObservations(a,[v,opposite]),opposite.references[0].url)).toMatchObject({value:null,reason:'insufficient_publishers'});
  });
 });

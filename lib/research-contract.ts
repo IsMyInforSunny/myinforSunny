@@ -3,7 +3,7 @@ import {claimSchema,sourceSchema,searchQuerySchema} from './contracts';
 import type {Check,Reference,Verification} from './contracts';
 
 export type ResearchStage='not_started'|'planning'|'searching'|'fetching'|'waiting'|'comparing'|'completed'|'partial'|'unavailable'|'failed'|'cancelled';
-export const researchInputSchema=z.object({sources:z.array(sourceSchema).min(1).max(6),claims:z.array(claimSchema).max(5),position:claimSchema.optional(),transmissionConsent:z.literal(true),researchConsent:z.literal(true)}).strict().refine(v=>v.claims.length>0||v.position?.kind==='opinion','조사할 사실 주장이나 의견이 필요합니다.');
+export const researchInputSchema=z.object({sources:z.array(sourceSchema).min(1).max(6),claims:z.array(claimSchema).max(5),position:claimSchema.optional(),proposition:z.string().trim().min(1).max(160).optional(),transmissionConsent:z.literal(true),researchConsent:z.literal(true)}).strict().refine(v=>v.claims.length>0||v.position?.kind==='opinion'||!!v.proposition,'조사할 사실 주장·의견이나 비교 명제가 필요합니다.');
 export type ResearchInput=z.infer<typeof researchInputSchema>;
 export const researchQuerySchema=z.object({claimId:z.string().min(1).max(64),label:z.string().min(1).max(100),query:searchQuerySchema,purpose:z.enum(['fact_check','perspective'])}).strict();
 export type ResearchQuery=z.infer<typeof researchQuerySchema>;

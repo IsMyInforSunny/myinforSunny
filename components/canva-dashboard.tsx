@@ -87,7 +87,7 @@ export default function CanvaDashboard({analysis, checks, researchResults, resea
   const total = analysis?.claims.filter(claim => claim.kind === 'factual').length ?? 0;
   const count = completed.length;
   const expression = analysis ? expressionSummary(analysis) : null;
-  const cards = analysis?.mode === 'live' ? verifiedRecommendations(results) : [];
+  const cards = analysis?.mode === 'live' ? verifiedRecommendations(results, analysis) : [];
   const visibleCards = cards.slice(0, 3);
   const emptySlots = Math.max(0, 3 - visibleCards.length);
   const measured = Boolean(analysis && total);

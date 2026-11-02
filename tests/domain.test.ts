@@ -18,6 +18,23 @@ describe('성분 지표',()=>{
   it('검증되지 않은 표현은 정상 대신 유보한다',()=>{const result=assembleAnalysis({kind:'text',body:'근거를 살펴보자.',comments:[]},{topics:[],topicAssignments:[],stances:[],bodyAssigned:[],bodyOtherIds:[],bodyUndeterminedIds:[],expressions:[],claims:[],perspectiveQuestions:[],counterArguments:[],searchSuggestions:[],claimsMayBeOmitted:false},'test','test-model');expect(result.expressions[0].status).toBe('undetermined');expect(result.status).toBe('partial');});
 });
 describe('자료 대조',()=>{
+  it.each(['unclear','mismatched'] as const)('시점 %s인 자료는 양쪽 인용이 있어도 사실 상충으로 확정하지 않는다',temporalFit=>{
+    const a=demoAnalysis('conflict');
+    const references=[{id:'support',text:'운영 시간은 6시다.',provenance:'provided_text' as const,truncated:false},{id:'oppose',text:'운영 시간은 9시다.',provenance:'provided_text' as const,truncated:false}];
+    const relations=references.map((r,i)=>({referenceId:r.id,quote:r.text,relation:i===0?'supports' as const:'contradicts' as const,explanation:'가상 운영 시간 안내'}));
+    for(const outcome of ['supported','contradicted','conflicting'] as const){
+      const result=buildChecks({checks:[{claimId:a.claims[0].id,originMatches:true,outcome,relations,explanation:'시점 확인 필요',temporalFit,limitations:[]}]},a.claims,references);
+      expect(result.checks[0]).toMatchObject({outcome:'insufficient',execution:'completed',temporalFit});
+      expect(indicators(a,result.checks).evidenceSupport.numerator).toBe(0);
+    }
+    expect(buildChecks({checks:[{claimId:a.claims[0].id,originMatches:true,outcome:'conflicting',relations,explanation:'같은 시점의 자료',temporalFit:'matched',limitations:[]}]},a.claims,references).checks[0].outcome).toBe('conflicting');
+  });
+  it.each([{start:0,end:99},{start:0.5,end:5},{start:0,end:5.5}])('참고자료 범위가 잘못된 인용을 slice 보정으로 통과시키지 않는다: %j',offset=>{
+    const a=demoAnalysis('conflict'),reference={id:'r',text:'공개 자료',provenance:'provided_text' as const,truncated:false};
+    const relation={referenceId:'r',quote:reference.text,relation:'supports' as const,explanation:'가상 자료'};
+    const result=buildChecks({checks:[{claimId:a.claims[0].id,originMatches:true,outcome:'supported',relations:[relation],explanation:'자료 대조',temporalFit:'matched',limitations:[]}]},a.claims,[reference],new Map([[relation,offset]]));
+    expect(result.damaged).toBe(true);expect(result.checks[0]).toMatchObject({outcome:'insufficient',relations:[]});
+  });
   it('가짜 인용으로 뒷받침을 만들지 않는다',()=>{const a=demoAnalysis('conflict');const result=buildChecks({checks:[{claimId:'claim_0',originMatches:true,outcome:'supported',relations:[{referenceId:'r',quote:'없는 인용',relation:'supports',explanation:'예시'}],explanation:'대조',temporalFit:'matched',limitations:[]}]},a.claims,[{id:'r',provenance:'provided_text',text:'다른 문장',truncated:false}]);expect(result.checks[0].outcome).toBe('insufficient');expect(result.checks[0].relations).toHaveLength(0);expect(result.damaged).toBe(true);});
   it('원문 위치를 바꿔 보내면 거절한다',()=>{const a=demoAnalysis('conflict');const req={kind:'text' as const,sources:a.sources,claims:a.claims,references:[],useWebSearch:false as const};expect(()=>validateVerifyInput(req)).not.toThrow();req.sources[0].sentences[0].start=1;expect(()=>validateVerifyInput(req)).toThrow();});
   it('시점이 다른 자료로 뒷받침을 확정하지 않는다',()=>{const a=demoAnalysis('conflict');const result=buildChecks({checks:[{claimId:'claim_0',originMatches:true,outcome:'supported',relations:[{referenceId:'r',quote:'작년 공지',relation:'supports',explanation:'작년의 내용'}],explanation:'올해 자료 아님',temporalFit:'mismatched',limitations:[]}]},a.claims,[{id:'r',text:'작년 공지',provenance:'provided_text',truncated:false}]);expect(result.checks[0].outcome).toBe('insufficient');});

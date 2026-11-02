@@ -1,0 +1,39 @@
+[
+  {
+    "name": "typecheck",
+    "command": [
+      "node",
+      "node_modules/typescript/bin/tsc",
+      "--noEmit"
+    ],
+    "started": "2026-11-02T00:05:45.294Z",
+    "durationMs": 4246,
+    "exitCode": 0
+  },
+  {
+    "name": "test",
+    "command": [
+      "node",
+      "node_modules/vitest/vitest.mjs",
+      "run",
+      "--exclude",
+      "tests/codex-launcher.test.ts",
+      "--exclude",
+      "tests/codex-routing.test.ts"
+    ],
+    "started": "2026-11-02T00:05:49.542Z",
+    "durationMs": 5625,
+    "exitCode": 0
+  },
+  {
+    "name": "build",
+    "command": [
+      "node",
+      "scripts/run-framework.mjs",
+      "build"
+    ],
+    "started": "2026-11-02T00:05:55.170Z",
+    "durationMs": 10704,
+    "exitCode": 0
+  }
+]

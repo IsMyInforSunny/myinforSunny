@@ -13,4 +13,19 @@ describe('브라우저 자동 조사 실행 순서',()=>{
  });
  it('취득 본문이 없으면 모델을 호출하거나 대조 완료로 세지 않는다',async()=>{const operations:string[]=[],stages:string[]=[];await runResearch(input(),new AbortController().signal,{now:Date.now,wait:async()=>{throw Error('unexpected wait');},post:async<T,>(body:unknown)=>{const op=(body as {operation:string}).operation;operations.push(op);return (op==='plan'?{token:'p',queries:[{label:'자료'}],nextModelCallAt:new Date().toISOString()}:{token:'e',references:[]}) as T;}},p=>stages.push(p.stage),()=>{throw Error('unexpected result');});expect(operations).toEqual(['plan','discover']);expect(stages.at(-1)).toBe('partial');});
  it('취소하면 기다린 뒤 비교 호출을 시작하지 않는다',async()=>{const c=new AbortController(),operations:string[]=[];await expect(runResearch(input(),c.signal,{now:()=>0,wait:async()=>{c.abort();},post:async<T,>(body:unknown)=>{const op=(body as {operation:string}).operation;operations.push(op);return (op==='plan'?{token:'p',queries:[{label:'자료'}],nextModelCallAt:new Date(61000).toISOString()}:{token:'e',references:[{text:'자료'}]}) as T;}},()=>{},()=>{})).rejects.toMatchObject({name:'AbortError'});expect(operations).toEqual(['plan','discover']);});
+ it('이미 취소된 요청은 계획 API도 호출하지 않는다',async()=>{
+  const c=new AbortController();c.abort();const operations:string[]=[],stages:string[]=[];
+  await expect(runResearch(input(),c.signal,{now:()=>0,wait:async()=>{},post:async<T,>(body:unknown)=>{operations.push((body as {operation:string}).operation);return {} as T;}},p=>stages.push(p.stage),()=>{})).rejects.toMatchObject({name:'AbortError'});
+  expect(operations).toEqual([]);expect(stages).toEqual([]);
+ });
+ it.each(['plan','discover','compare'])('%s 응답 도중 취소되면 늦은 결과나 완료 상태를 반영하지 않는다',async cancelAt=>{
+  const c=new AbortController(),operations:string[]=[],stages:string[]=[],results:unknown[]=[];let time=0;
+  await expect(runResearch(input(),c.signal,{now:()=>time,wait:async ms=>{time+=ms;},post:async<T,>(body:unknown)=>{
+   const op=(body as {operation:string}).operation;operations.push(op);
+   if(op===cancelAt)c.abort();
+   return (op==='plan'?{token:'p',queries:[{label:'자료'}],nextModelCallAt:new Date(0).toISOString()}:op==='discover'?{token:'e',references:[{text:'자료'}]}:demoVerification('conflict')) as T;
+  }},p=>stages.push(p.stage),r=>results.push(r))).rejects.toMatchObject({name:'AbortError'});
+  expect(operations).toEqual(['plan','discover','compare'].slice(0,['plan','discover','compare'].indexOf(cancelAt)+1));
+  expect(results).toEqual([]);expect(stages).not.toContain('completed');expect(stages).not.toContain('partial');
+ });
 });

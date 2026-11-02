@@ -1,7 +1,8 @@
 import {describe,expect,it} from 'vitest';
 import {demoAnalysis} from '../lib/fixtures';
 import {makeSources,locate} from '../lib/domain';
-import {articleAnnotations,articleMapPoints,fomoSignals,reviewSegments} from '../lib/reader-metrics';
+import {articleAnnotations,articleMapObservations,articleMapPoints,fomoSignals,reviewSegments} from '../lib/reader-metrics';
+import {publisherPositions} from '../lib/media-position';
 import type {Analysis,Check,Span} from '../lib/contracts';
 import type {ResearchVerification} from '../lib/research-contract';
 
@@ -33,4 +34,37 @@ describe('기사별 관점·근거 좌표',()=>{
  it('상충 판정이 아닌 관계를 상충 좌표로 오독하지 않는다',()=>{const a=analysis();factual(a);const v=verification(a);v.checks[0].outcome='insufficient';expect(articleMapPoints(a,[v])[0].evidence).toBe('unreviewed');v.checks[0].outcome='supported';expect(articleMapPoints(a,[v])[0].evidence).toBe('unreviewed');});
  it('다른 명제나 존재하지 않는 인용을 사용한 좌표는 제외한다',()=>{const a=analysis();factual(a);const v=verification(a);v.perspectiveChecks![0].positionText='학교 휴대전화를 금지해야 한다.';expect(articleMapPoints(a,[v])).toEqual([]);v.perspectiveChecks![0].positionText=a.proposition!;v.perspectiveChecks![0].quote='출처에 없음';expect(articleMapPoints(a,[v])).toEqual([]);});
  it('반복 대조는 같은 기사 한 점으로 표시하며 다른 분석 결과를 섞지 않는다',()=>{const a=analysis();factual(a);const v=verification(a);expect(articleMapPoints(a,[v,v])).toHaveLength(1);v.parentAnalysisId='another';expect(articleMapPoints(a,[v])).toEqual([]);});
+ it('한 검토 안 동일 URL의 모순 입장은 순서와 무관하게 유보한다',()=>{
+  const a=analysis();factual(a);const v=verification(a),ref=v.references[0],opposes=v.perspectiveChecks![0];
+  v.references.push({...ref,id:'r2',url:`${ref.url}?utm_source=duplicate#top`});
+  v.perspectiveChecks!.push({...opposes,referenceId:'r2',stance:'supports_position',explanation:'반대되는 시험 분류'});
+  for(const references of [v.references,[...v.references].reverse()]){
+   const result={...v,references};
+   expect(articleMapPoints(a,[result])).toEqual([]);
+   const observations=articleMapObservations(a,[result]);
+   expect(observations).toHaveLength(2);
+   expect(publisherPositions(observations).groups[0]).toMatchObject({undetermined:1,publishers:[]});
+  }
+ });
+ it('같은 참조에 여러 유효한 입장 인용이 있으면 첫 분류로 확정하지 않는다',()=>{
+  const a=analysis();factual(a);const v=verification(a),opposes=v.perspectiveChecks![0];
+  v.perspectiveChecks!.push({...opposes,stance:'supports_position'});
+  expect(articleMapPoints(a,[v])).toEqual([]);
+  expect(articleMapObservations(a,[v]).map(p=>p.stance).sort()).toEqual(['opposes_position','supports_position']);
+  v.perspectiveChecks![1].quote='원문에 없는 인용';
+  expect(articleMapPoints(a,[v])).toHaveLength(1); // An unvalidated observation cannot veto a valid quote.
+ });
+ it('동일한 기사라도 명제가 다르면 각 명제의 입장을 별도로 보존한다',()=>{
+  const a=analysis();factual(a);const other='도서관 주말 운영을 시작해야 한다.';
+  a.claims.push({id:'opinion',kind:'opinion',text:other,origin:a.claims[0].origin});
+  const v=verification(a),opposes=v.perspectiveChecks![0];
+  v.perspectiveChecks!.push({...opposes,positionText:other,stance:'supports_position'});
+  expect(articleMapPoints(a,[v]).map(p=>[p.position,p.stance])).toEqual([[a.proposition,'opposes_position'],[other,'supports_position']]);
+ });
+ it('여러 검토의 A/B/A 분류도 최신 입장으로 되돌리지 않고 계속 유보한다',()=>{
+  const a=analysis();factual(a);const first=verification(a),second=structuredClone(first);
+  second.perspectiveChecks![0].stance='supports_position';
+  expect(articleMapPoints(a,[first,second,first])).toEqual([]);
+  expect(publisherPositions(articleMapObservations(a,[first,second,first])).groups[0].undetermined).toBe(1);
+ });
 });
