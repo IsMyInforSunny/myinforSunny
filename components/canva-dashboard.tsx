@@ -91,6 +91,7 @@ export default function CanvaDashboard({analysis, checks, researchResults, resea
   const visibleCards = cards.slice(0, 3);
   const emptySlots = Math.max(0, 3 - visibleCards.length);
   const measured = Boolean(analysis && total);
+  const partial = analysis?.status === 'partial';
   const angle = measured ? 180 + 180 * count / total : null;
   const prefix = `${stale ? '이전 입력 결과: ' : ''}${isDemo ? '가상 예시: ' : ''}`;
   const gaugeLabel = !analysis
@@ -120,6 +121,7 @@ export default function CanvaDashboard({analysis, checks, researchResults, resea
             : analysis
               ? stale ? '이전 입력의 분석 결과' : '현재 입력의 분석 결과'
               : '분석을 기다리고 있어요'}
+          {partial && ' · 일부만 분석됨'}
         </span>
         <span className="cv3-tagline">점수보다 중요한 건, 확인한 근거</span>
         {onInput && (
@@ -134,9 +136,10 @@ export default function CanvaDashboard({analysis, checks, researchResults, resea
           아래 지표·게이지·추천은 <strong>이전 입력</strong>으로 분석한 결과입니다. 기사 본문이 수정되어 지금 입력과 일치하지 않으니, 다시 분석한 뒤 확인해주세요.
         </p>
       )}
+      {partial && <p className="cv3-notice" role="note">일부 분석만 완료된 결과입니다. 빠진 내용과 분석 한계를 근거 화면에서 확인해주세요.</p>}
 
       <div className="cv3-frame">
-        <div className={`cv3-board${measured ? '' : ' is-waiting'}`}>
+        <div className={`cv3-board${measured ? '' : ' is-waiting'}${analysis && stale ? ' is-stale' : ''}`}>
           <div className="cv3-gauge">
             <svg className="cv3-gauge-svg" viewBox="0 0 500 252" role="img" aria-label={gaugeLabel}>
               <path d={sector(180, 360, RING_OUTER, RING_INNER)} className="cv3-ring" />
@@ -165,7 +168,7 @@ export default function CanvaDashboard({analysis, checks, researchResults, resea
               )}
             </svg>
 
-            <ul className="cv3-axes" aria-label="편향·자극·신뢰">
+            <ul className="cv3-axes" aria-label={analysis && stale ? '편향·자극·신뢰 (이전 입력의 결과)' : '편향·자극·신뢰'}>
               <li className="cv3-axis cv3-axis-bias">
                 <span className="cv3-axis-label">편향</span>
                 {onCoordinates ? (
@@ -206,7 +209,7 @@ export default function CanvaDashboard({analysis, checks, researchResults, resea
                     title={`${card.title}\n${card.reason}`}>
                     <span className="cv3-tile-kind">{recommendationLabels[card.kind]}</span>
                     <strong className="cv3-tile-title">{card.title}</strong>
-                    <small className="cv3-tile-publisher">{card.publisherDomain} <ArrowUpRight size={12} aria-hidden="true" /></small>
+                    <small className="cv3-tile-publisher"><span>{card.publisherDomain}</span> <ArrowUpRight size={12} aria-hidden="true" /><span className="sr-only"> (새 탭에서 열림)</span></small>
                   </a>
                 </li>
               ))}
@@ -220,17 +223,17 @@ export default function CanvaDashboard({analysis, checks, researchResults, resea
           </section>
 
           <div className="cv3-actions">
-            <button type="button" className="cv3-articles-button" disabled={!analysis} onClick={onArticles}>
+            {!analysis && <span id={`${id}-locked`} className="sr-only">기사를 분석한 뒤에 열 수 있어요.</span>}
+            <button type="button" className="cv3-articles-button" disabled={!analysis} aria-describedby={analysis ? undefined : `${id}-locked`} onClick={onArticles}>
               추천·조사 열기
             </button>
-            <button type="button" className="cv3-evidence-button" disabled={!analysis} onClick={onEvidence}>
+            <button type="button" className="cv3-evidence-button" disabled={!analysis} aria-describedby={analysis ? undefined : `${id}-locked`} onClick={onEvidence}>
               <FileSearch size={22} aria-hidden="true" /> 분석근거 표시
             </button>
           </div>
         </div>
       </div>
 
-      {analysis?.status === 'partial' && <p className="cv3-notice" role="note">일부 분석만 완료된 결과입니다. 빠진 내용과 분석 한계를 근거 화면에서 확인해주세요.</p>}
       {isDemo && <p className="cv3-notice" role="note">체험용 가상 데이터입니다. 위 건수는 예시이며 실제 기사나 외부 자료를 검증한 결과가 아닙니다.</p>}
 
       <details className="cv3-help">

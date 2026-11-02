@@ -1,0 +1,26 @@
+{
+  "recordedAt": "2026-11-02T08:24:46.174Z",
+  "dashboardStates": {
+    "scope": "intercepted local /api/analyze; synthetic public example; no external model or search",
+    "passed": [
+      "mocked live partial analysis shows the partial badge and the notice above the board",
+      "partial result opens evidence details and Esc returns focus",
+      "editing the input after a partial result keeps both notices and marks the board as stale",
+      "partial and stale notices fit 1280, 768, 375 and 320px without horizontal overflow"
+    ]
+  },
+  "longTitleAndDomain": {
+    "scope": "previously observed root Workbench with intercepted six-article mock",
+    "widths": [
+      320,
+      375,
+      768,
+      1280
+    ],
+    "publisherInside": true,
+    "minFontPixels": 10,
+    "keyboardFocusVisible": true,
+    "horizontalOverflow": false
+  },
+  "limitations": "Synthetic local responses; no real model or article search; no screen-reader listening test."
+}

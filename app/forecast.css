@@ -27,7 +27,7 @@
 .cv3-notice{width:min(100%,max(680px,calc((100svh - 190px) * 1.25)));margin:10px auto;padding:10px 12px;background:#e5f6ff;border-left:3px solid #5086ab;font-size:12px;line-height:1.8}
 .cv3-notice-stale{background:#fff4d6;border-left-color:#c98a12}
 
-.cv3-frame{container-type:inline-size;container-name:cv3;width:min(100%,max(680px,calc((100svh - 190px) * 1.25)));margin-inline:auto}
+.cv3-frame{container-type:inline-size;container-name:cv3;width:min(100%,max(680px,calc((100svh - 190px) * 1.25)));margin-inline:auto;padding-bottom:10px}
 .cv3-board{position:relative;aspect-ratio:25/20;width:100%;background:var(--forecast-blue)}
 .cv3-gauge{position:absolute;inset:0 0 auto 0}
 .cv3-gauge-svg{display:block;width:100%;height:auto;overflow:visible}
@@ -38,6 +38,13 @@
 .cv3-needle .cv3-needle-cap{fill:white;stroke:#111;stroke-width:5}
 .cv3-board.is-waiting .cv3-fan{opacity:.38}
 .cv3-board.is-waiting .cv3-ring-label{opacity:.55}
+/* 이전 입력 결과: 값은 남기되 현재 결과처럼 보이지 않게 게이지를 흐리고 값에 취소선을 긋는다. */
+.cv3-board.is-stale .cv3-gauge-svg{opacity:.6;filter:grayscale(.45)}
+.cv3-board.is-stale .cv3-axis-value{text-decoration:line-through 2px #c98a12a6}
+
+/* Keyboard focus: the global green ring (#92b9a4) is about 2:1 on sky blue and white, so every control in the app and its dialogs uses a dark ring. */
+:is(.forecast-app,.canva-workspace) :is(a,button,summary,select,[role=tab]):focus-visible{outline:3px solid #111;outline-offset:3px;box-shadow:0 0 0 6px #fff}
+.canva-workspace :is(input,textarea):focus-visible{outline:2px solid #173f53;outline-offset:1px}
 
 .cv3-axes{position:absolute;inset:0;margin:0;padding:0;list-style:none;pointer-events:none}
 .cv3-axis{position:absolute;top:6.2cqi;width:27cqi;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;text-align:center;pointer-events:auto}
@@ -51,19 +58,21 @@
 .cv3-axis-action:hover{background:white}
 .cv3-axis-caption{margin-top:.8cqi;padding:.25cqi 1cqi;border-radius:4px;background:#ffffffd6;color:#1f3b48;font-size:max(10px,1.45cqi);line-height:1.45;font-weight:650}
 
-.cv3-gauge-caption{position:absolute;top:48.6cqi;left:50%;transform:translateX(-50%);width:46cqi;text-align:center}
+.cv3-gauge-caption{position:absolute;top:50.2cqi;left:50%;transform:translateX(-50%);width:46cqi;text-align:center}
 .cv3-gauge-caption h2{font-size:6.4cqi;line-height:1.1;font-weight:900;letter-spacing:-.25cqi;color:#0d0d0d}
 .cv3-gauge-caption p{margin-top:.3cqi;font-size:max(11px,1.6cqi);line-height:1.4;color:#24485a;font-weight:650}
 
-.cv3-recs{position:absolute;left:3.5cqi;top:58.6cqi;width:47cqi}
+.cv3-recs{position:absolute;left:3.5cqi;top:59.8cqi;width:56cqi}
 .cv3-recs-heading h3{font-size:4.2cqi;line-height:1.1;font-weight:900;letter-spacing:-.15cqi;color:#0d0d0d}
-.cv3-recs-row{display:grid;grid-template-columns:repeat(3,12.4cqi);gap:1.2cqi;margin:1cqi 0 0 3cqi;padding:0;list-style:none}
+.cv3-recs-row{display:grid;grid-template-columns:repeat(3,12cqi);gap:1.2cqi;margin:1cqi 0 0 3cqi;padding:0;list-style:none}
 .cv3-recs-row>li{min-width:0}
-.cv3-tile{width:12.4cqi;height:12.4cqi;display:flex;flex-direction:column;gap:.4cqi;padding:.9cqi;background:white;border:1px solid #6fa9bf;border-radius:3px;overflow:hidden;color:#111}
+.cv3-tile{width:12cqi;height:12cqi;display:flex;flex-direction:column;gap:.4cqi;padding:.9cqi;background:white;border:1px solid #6fa9bf;border-radius:3px;overflow:hidden;color:#111}
 .cv3-tile:hover{border-color:#173f53;box-shadow:0 0 0 2px #173f5333}
-.cv3-tile-kind{align-self:flex-start;padding:.1cqi .7cqi;border-radius:3px;background:#173f53;color:white;font-size:max(9px,1.15cqi);font-weight:800}
-.cv3-tile-title{font-size:max(10px,1.35cqi);line-height:1.35;font-weight:800;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
-.cv3-tile-publisher{margin-top:auto;display:flex;align-items:center;gap:3px;font-size:max(9px,1.1cqi);color:#41616f;overflow-wrap:anywhere}
+.cv3-tile-kind{flex:none;align-self:flex-start;padding:.1cqi .7cqi;border-radius:3px;background:#173f53;color:white;font-size:max(10px,1.15cqi);font-weight:800}
+/* Long titles shrink and clamp so the publisher line always stays inside the square tile. */
+.cv3-tile-title{flex:0 1 auto;min-height:0;font-size:max(10px,1.35cqi);line-height:1.35;font-weight:800;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.cv3-tile-publisher{flex:none;margin-top:auto;display:flex;align-items:center;gap:3px;min-width:0;font-size:max(10px,1.1cqi);color:#41616f}
+.cv3-tile-publisher>:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cv3-tile-opposing_view .cv3-tile-kind{background:#b5441a}
 .cv3-tile-different_evidence .cv3-tile-kind{background:#3b48b8}
 .cv3-tile-empty{align-items:center;justify-content:center;background:#d6f3ff;border:2px dashed #83bad0;color:#7fb2c6}
@@ -101,6 +110,12 @@
   .cv3-actions{flex-direction:column-reverse;align-items:stretch;gap:8px}
   .cv3-evidence-button{justify-content:center;font-size:20px;padding:12px 16px;border-radius:8px}
   .cv3-articles-button{font-size:13px;padding:10px 14px}
+}
+@container cv3 (max-width:360px){
+  .cv3-axis-label{font-size:26px}
+  .cv3-axis-value{font-size:20px}
+  .cv3-axis-action{font-size:12px;padding:5px 8px;gap:3px;white-space:nowrap}
+  .cv3-axis-action svg{width:14px;height:14px}
 }
 
 /* Secondary entry points under the board. */
