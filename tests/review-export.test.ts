@@ -93,7 +93,7 @@ describe('review export', () => {
     expect(buildReviewExport({...input, analysis: live, researchResults: [provided]}).research.completedClaims).toBe(0);
     expect(buildReviewExport({...input, analysis: live, researchResults: [fetched]}).research.completedClaims).toBe(1);
   });
-  it('exports the same combined completed count as the main gauge after automatic review', () => {
+  it('keeps claim-review counts separate from the bias gauge', () => {
     const live = {...analysis, mode: 'live' as const};
     const fetched = {...result, mode: 'live' as const, references: result.references.map(r => ({...r,
       provenance: 'web_fetched' as const, url: 'https://news.example/synthetic-library'}))};
@@ -109,7 +109,8 @@ describe('review export', () => {
       expect(out.summary?.completedChecks).toBe(count);
       const html = renderToStaticMarkup(createElement(CanvaDashboard, {analysis: live,
         checks: [...checks], researchResults: [...researchResults], onEvidence: () => {}, onArticles: () => {}}));
-      expect(html).toContain(`사실 주장 1개 중 ${count}개 대조 완료`);
+      expect(html).toContain('편향 정도 계산 대기');
+      expect(html).not.toContain(`사실 주장 1개 중 ${count}개 대조 완료`);
       expect(JSON.stringify(out)).not.toContain(fetched.references[0].text);
     }
   });
