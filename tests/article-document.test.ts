@@ -49,11 +49,36 @@ describe('허용 출처의 문서 해독과 본문 추출 — 모의 응답만 �
  it('일반 텍스트는 HTML이나 문자 엔티티로 재해석하지 않는다',()=>{
   expect(extractArticleDocument('  공개 문구 <예시> &amp;\n둘째 줄  ',false)).toEqual({text:'공개 문구 <예시> &amp;\n둘째 줄',title:undefined,publishedAt:undefined});
  });
+ it('일반 텍스트의 meta 문구를 인코딩 선언으로 사용하지 않고 BOM·HTTP 선언만 따른다',()=>{
+  const literal='공개 문구 <meta charset="not-an-encoding">다.';
+  expect(decodeArticleDocument(utf8(literal),'text/plain')).toBe(literal);
+  expect(decodeArticleDocument(utf8('\ufeff'+literal),'text/plain; charset=euc-kr')).toBe(literal);
+  expect(decodeArticleDocument(Uint8Array.from([0xbe,0xc8,0xb3,0xe7]),'text/plain; charset=euc-kr')).toBe('안녕');
+ });
+ it('article·main 접두어를 쓰는 커스텀 태그를 본문 영역으로 오인하지 않는다',()=>{
+  expect(extractArticleDocument('<article-summary>다른 기사 카드.</article-summary><main>실제 기사 본문.</main>',true).text).toBe('실제 기사 본문.');
+  expect(extractArticleDocument('<main-menu>메뉴 카드.</main-menu><main class="body">실제 본문.</main>',true).text).toBe('실제 본문.');
+  expect(extractArticleDocument('<script-template>공개 템플릿.</script-template><article>실제 기사.</article>',true).text).toBe('실제 기사.');
+ });
+ it('중첩 광고·메뉴는 내부 닫기 태그 뒤까지 제거하고 본문을 보존한다',()=>{
+  const html='<nav>바깥 메뉴<nav>내부 메뉴</nav>남은 메뉴</nav><article>본문 시작.<aside><aside>내부 광고</aside>남은 광고<nav>추천 메뉴</nav></aside>본문 끝.</article>';
+  expect(extractArticleDocument(html,true).text).toBe('본문 시작. 본문 끝.');
+  expect(extractArticleDocument('<article>본문.<aside>닫히지 않은 광고',true).text).toBe('본문.');
+ });
  it('대소문자가 다른 HTML MIME도 본문으로 추출하고 길이·잘림을 정확히 기록한다',async()=>{
   const text='가상기사 본문 '.repeat(1200);const call=vi.fn().mockResolvedValue(new Response(`<article>${text}</article>`,{headers:{'content-type':'Text/HTML; Charset=UTF-8'}}));vi.stubGlobal('fetch',call);
   const ref=await retrieve('https://news.example/a','r1',{ALLOWED_RETRIEVAL_HOSTS:'news.example'},new AbortController().signal);
   expect(ref).toMatchObject({provenance:'web_fetched',truncated:true,fullTextLength:text.trim().length,extractionVersion:ARTICLE_EXTRACTION_VERSION});
   expect(ref!.text).toHaveLength(8000);expect(call).toHaveBeenCalledTimes(1);expect(call.mock.calls[0][1].redirect).toBe('manual');
+ });
+ it('취득 상한과 제목 상한의 이모지를 반으로 자르지 않고 원래 전체 길이를 기록한다',async()=>{
+  const body='가'.repeat(7999)+'😀끝',title='나'.repeat(249)+'😀제목';
+  const call=vi.fn().mockResolvedValue(new Response(`<head><title>${title}</title></head><article>${body}</article>`,{headers:{'content-type':'text/html; charset=utf-8'}}));vi.stubGlobal('fetch',call);
+  const ref=await retrieve('https://news.example/a','r1',{ALLOWED_RETRIEVAL_HOSTS:'news.example'},new AbortController().signal);
+  expect(ref).toMatchObject({text:'가'.repeat(7999),title:'나'.repeat(249),truncated:true,fullTextLength:body.length,extractionVersion:ARTICLE_EXTRACTION_VERSION});
+  // If the pair fits exactly, preserve it instead of stripping every boundary emoji.
+  call.mockResolvedValue(new Response('가'.repeat(7998)+'😀',{headers:{'content-type':'text/plain'}}));
+  expect(await retrieve('https://news.example/a','r2',{ALLOWED_RETRIEVAL_HOSTS:'news.example'},new AbortController().signal)).toMatchObject({text:'가'.repeat(7998)+'😀',truncated:false,fullTextLength:8000});
  });
  it('알 수 없는 인코딩·HTML이 아닌 응답·빈 본문은 취득 자료로 승격하지 않는다',async()=>{
   for(const response of [new Response(Uint8Array.from([0xbe,0xc8]),{headers:{'content-type':'text/html'}}),new Response('{}',{headers:{'content-type':'application/json'}}),new Response('<article><script>onlyScript()</script></article>',{headers:{'content-type':'text/html'}})]){

@@ -29,6 +29,7 @@ export default function MediaPositionMap({analysis,results}:{analysis:Analysis;r
  const articleDifference=demo?absolutePositionDifference(sample,sample[0].url):null;
  const max=Math.max(report.minArticlesPerPublisher,...(group?.publishers.map(p=>p.sampleCount)??[]));
  const conflicts=report.groups.reduce((n,g)=>n+g.undetermined,0);
+ const duplicates=report.groups.reduce((n,g)=>n+g.duplicateContent,0);
  const observed=points.slice(0,MAX_POSITION_POINTS).filter(p=>normal(p.position)===group?.position);
  const switchMode=(value:boolean)=>{setDemo(value);setSelection('');setManual({context:'',code:''});};
 
@@ -44,6 +45,7 @@ export default function MediaPositionMap({analysis,results}:{analysis:Analysis;r
   </div>
   {demo&&<p className="notice media-synthetic-notice" role="status">가상 교내신문 A·B의 기사 6개로 직접 구성한 학습용 예시입니다. 실제 언론사 분석·웹 검색·평가 결과가 아니며 현재 분석 자료와 섞이지 않습니다.</p>}
   {(report.invalid>0||report.truncated>0||conflicts>0)&&<p className="notice media-exclusions">좌표 집계 제외: 형식 미확인 {report.invalid}개 · 처리 한도 초과 {report.truncated}개 · 중복 분류 충돌 {conflicts}개. 제외된 자료는 기준선에 사용하지 않습니다.</p>}
+  {duplicates>0&&<p className="notice media-content-duplicates">동일 매체의 동일 본문 중복 주소 {duplicates}개를 고유 기사 수에 추가하지 않았습니다. 명제별로 집계하며, 취득 범위가 완전하고 본문이 같은 자료만 묶습니다.</p>}
   {report.groups.length>1&&<label className="media-select">비교 명제<select value={group?.position??''} onChange={e=>{setSelection(e.target.value);setManual({context:'',code:''});}}>{report.groups.map(g=><option key={g.position} value={g.position}>{g.position}</option>)}</select></label>}
   <p className="map-proposition media-proposition"><strong>비교 명제</strong> {group?.position??analysis.proposition??analysis.claims.find(c=>c.kind==='opinion')?.text??'명시적인 제안이 확인되면 비교합니다.'}</p>
 
@@ -99,7 +101,7 @@ export default function MediaPositionMap({analysis,results}:{analysis:Analysis;r
   </div>)}</div>:<p className="notice media-empty">현재는 좌표를 계산할 실제 외부 기사가 없습니다. 현재 분석에 연결되고 명제·원문 인용이 확인된 외부 자료만 사용합니다. 가상 좌표 체험에서 계산 방식을 살펴볼 수 있습니다.</p>}
 
   {observed.length>0&&<details className="media-observed-sources"><summary>{demo?'가상 예시의 구성':'관측 출처와 입장 분류 근거'} · {observed.length}건</summary>
-   <p className="topic-note">{demo?'아래 문장과 주소는 직접 구성한 가상 예시이며 실제 출처가 아닙니다.':'집계 전 관측 자료입니다. URL 중복은 한 번만 세고 분류가 충돌하는 URL은 집계에서 제외합니다. 출처의 입장과 사실 대조는 서로 다른 정보입니다.'} 최대 20건을 표시합니다.</p>
+   <p className="topic-note">{demo?'아래 문장과 주소는 직접 구성한 가상 예시이며 실제 출처가 아닙니다.':'집계 전 관측 자료입니다. URL 중복과 같은 매체의 동일 본문 중복은 한 번만 세고, 묶인 자료의 분류가 충돌하면 집계에서 제외합니다. 출처의 입장과 사실 대조는 서로 다른 정보입니다.'} 최대 20건을 표시합니다.</p>
    <ul className="media-source-list">{observed.slice(0,20).map((p,i)=><li className="media-source-item" key={`${p.url}-${i}`}>
     {demo?<strong>{p.title} · 가상 자료</strong>:<a href={p.url} target="_blank" rel="noopener noreferrer">{p.title} ↗</a>}
     <p>{p.publisher} · {stanceLabels[p.stance]} · {evidenceLabels[p.evidence]}</p>
@@ -108,6 +110,6 @@ export default function MediaPositionMap({analysis,results}:{analysis:Analysis;r
    {observed.length>20&&<p className="topic-note">나머지 {observed.length-20}건은 이 목록에서 생략했습니다. 목록 표시 한도는 좌표 집계 한도와 별개입니다.</p>}
   </details>}
   {demo&&articleDifference?.value!=null&&<p className="topic-note media-sample-difference">가상 첫 기사 (+1)와 기준선의 차이: {articleDifference.value.toFixed(3)} / 2 · 직접 작성한 계산 예시이며 위의 직접 지정 값과 별개입니다.</p>}
-  <details className="media-methodology"><summary>좌표의 기준과 제한</summary><p className="topic-note">매체별 고유 기사 {report.minArticlesPerPublisher}개와 적격 매체 {report.minEligiblePublishers}곳은 계산을 시작하는 최소 조건일 뿐 검증된 평가 기준이나 대표 표본을 보장하지 않습니다. 동일 명제만 비교하고 URL 중복·분류 충돌을 제외합니다. 최대 {MAX_POSITION_POINTS}개 관측 자료까지만 처리합니다. 수집 범위·기간·주제의 영향을 받으며, 자료가 많거나 기준선에 가깝다고 중립이나 진실이 되는 것은 아닙니다. 보정된 편향·신뢰도·정치 성향 점수가 아닙니다.</p></details>
+  <details className="media-methodology"><summary>좌표의 기준과 제한</summary><p className="topic-note">매체별 고유 기사 {report.minArticlesPerPublisher}개와 적격 매체 {report.minEligiblePublishers}곳은 계산을 시작하는 최소 조건일 뿐 검증된 평가 기준이나 대표 표본을 보장하지 않습니다. 동일 명제만 비교하고 URL 중복·분류 충돌을 제외합니다. 같은 매체에서 200자 이상인 취득 본문 전체가 동일하고 추출 방식·길이가 확인된 자료는 주소가 달라도 한 번만 셉니다. 짧은 인용·잘린 본문·취득 정보가 없는 이전 결과는 본문 동일 여부를 확정하지 않습니다. 매체가 다른 동일 본문은 각 매체의 관측으로 남으며 독립적인 근거를 뜻하지 않습니다. 최대 {MAX_POSITION_POINTS}개 관측 자료까지만 처리합니다. 수집 범위·기간·주제의 영향을 받으며, 자료가 많거나 기준선에 가깝다고 중립이나 진실이 되는 것은 아닙니다. 보정된 편향·신뢰도·정치 성향 점수가 아닙니다.</p></details>
  </section>;
 }

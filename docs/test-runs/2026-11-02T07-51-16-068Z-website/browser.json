@@ -1,0 +1,22 @@
+{
+  "recordType": "summary of observed local Playwright CLI results",
+  "date": "2026-11-02",
+  "origin": "http://127.0.0.1:5173",
+  "externalModelOrSearchCalls": false,
+  "results": [
+    {"script": "state.js", "status": "passed", "scope": "public synthetic examples", "checks": ["new article clears feedback and export opt-ins", "reset clears old report", "custom comparison is blocked without live capability", "stale coordinate warning and demo difference 1.000"]},
+    {"script": "example-navigation.js", "status": "passed", "scope": "synthetic examples and mocked capabilities", "checks": ["cancel and reset suppress late coordinate navigation", "successful example opens coordinates", "manual text is required even when automatic fetching is enabled"]},
+    {"script": "research.js", "status": "passed", "scope": "intercepted local API responses", "planCount": 3, "compareCount": 1, "checks": ["late analysis ignored after cancellation", "fresh consent for restart", "input change and restoration do not retry", "main gauge and default export completion agree", "quota fallback remains a marked demo"]},
+    {"script": "coordinates.js", "status": "passed", "scope": "six mocked public synthetic articles", "queries": 3, "articles": 6, "eligiblePublishers": 2, "factualCompletion": 2, "baseline": 0, "inputStance": 1, "absoluteDifference": 1, "checks": ["explicit proposition reaches every operation without becoming a factual claim", "same current results feed recommendation and coordinates", "three articles per publisher and two publishers required", "375px no horizontal overflow"]},
+    {"script": "popup.js", "status": "passed", "scope": "actual local popup with public synthetic examples", "checks": ["no opener and no automatic source transfer", "arrows Home End synchronize tabs", "claim quote highlights source", "560px and 375px title and close button remain visible without horizontal overflow"]},
+    {"script": "exports.js", "status": "passed", "scope": "actual local JSON downloads of public synthetic example", "checks": ["default and opted-in downloads succeed", "files equal previews", "default excludes raw input and reference details", "opted-in file contains current input and quoted relation"]},
+    {"script": "fomo-boundary.js", "status": "passed", "scope": "mocked public synthetic long sentence", "naturalSentences": 1, "processingUnits": 2, "flaggedSentences": 1, "markedParts": 2, "checks": ["count and marks agree across processing units", "both marks explain the whole phrase", "source text and natural denominator preserved", "375px no horizontal overflow"]},
+    {"script": "local one-off methodology inspection", "status": "passed", "scope": "actual local rendered page", "widths": [375, 768, 1280], "checks": ["current coordinate axes sample requirements and formula", "FOMO denominator distinction", "no horizontal overflow"]}
+  ],
+  "harnessFailuresResolvedBeforePass": [
+    "example navigation clicked before hydration: wait for mount capabilities response",
+    "state script global error locator matched two alerts: scope to open evidence dialog",
+    "failed state script left a mocked verify route: clear the test route and always unroute in finally"
+  ],
+  "limitations": "Not real article acquisition, real model accuracy, independent human evaluation or public deployment verification. Screenshots, downloads and browser session data are local ignored artifacts."
+}

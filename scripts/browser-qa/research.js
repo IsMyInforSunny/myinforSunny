@@ -70,6 +70,12 @@ async page => {
   await page.keyboard.press('Escape');
   check(await page.getByRole('img',{name:/사실 주장 1개 중 1개 대조 완료/}).isVisible(),'Completed research did not update main gauge');
   log.push('explicit restart completes one mocked comparison and updates the same main gauge');
+  await page.getByRole('button',{name:'분석근거 표시',exact:true}).click();
+  const exported=JSON.parse(await page.locator('.export-preview pre').textContent());
+  check(exported.summary.completedChecks===1&&exported.research.completedClaims===1,'Export completion differs from the main gauge');
+  check(!('analysis' in exported)&&!('results' in exported.research),'Default export includes raw input or source results');
+  await page.keyboard.press('Escape');
+  log.push('default export matches automatic completion on the main gauge without raw input or reference text');
   quota=true;
   await openInput();await body.fill(original+' 추가 가상 문장.');await page.getByRole('checkbox',{name:/가상 또는 사용 가능한 공개 자료/}).check();
   await page.getByRole('button',{name:'정보 성분표 만들기',exact:true}).click();

@@ -91,4 +91,18 @@ describe('자동 신뢰성 검토와 실제 기사 추천',()=>{
   latest.perspectiveChecks![0].end=source.text.length+1;
   expect(verifiedRecommendations([previous,latest])).toEqual([]);
  });
+ it('공백·추적 주소가 달라도 같은 명제와 기사의 최신 입장만 추천한다',()=>{
+  const previous=verification();previous.checks=[];
+  previous.references=[{...source,url:'https://www.news.example/a/?utm_source=old#quote'}];
+  previous.perspectiveChecks=[{referenceId:'r1',positionText:'운영 시간을 늘려야 한다.',stance:'opposes_position',quote:source.text,start:0,end:source.text.length,explanation:'이전 분류'}];
+  const latest=structuredClone(previous);
+  latest.references[0].url='https://news.example/a?utm_source=new';
+  Object.assign(latest.perspectiveChecks![0],{positionText:'  운영  시간을\n늘려야 한다. ',stance:'supports_position',explanation:'새 분류'});
+  const cards=verifiedRecommendations([previous,latest]);
+  expect(cards).toHaveLength(1);
+  expect(cards[0]).toMatchObject({kind:'supporting_view',reason:'새 분류',url:latest.references[0].url});
+  expect(reliabilityReview({claims:[claim]},[previous,latest],'completed')).toMatchObject({sourceCount:1,publisherDomainCount:1});
+  latest.perspectiveChecks![0].quote='원문에 없는 후속 인용';
+  expect(verifiedRecommendations([previous,latest])).toEqual([]);
+ });
 });

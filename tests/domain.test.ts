@@ -1,7 +1,7 @@
 import { describe,it,expect } from 'vitest';
 import { assertAnalysis, indicators, locate, makeSources, ratio, sentences, validSpan } from '../lib/domain';
 import { demoAnalysis, demoVerification, fixtures } from '../lib/fixtures';
-import { analyzeRequestSchema, verifyRequestSchema } from '../lib/contracts';
+import { analyzeRequestSchema, verifyRequestSchema, type RawAnalysis } from '../lib/contracts';
 import { buildChecks, validateVerifyInput } from '../lib/server/verify';
 import { allowedUrl } from '../lib/server/retrieval';
 import { assembleAnalysis } from '../lib/server/analyze';
@@ -17,6 +17,29 @@ describe('성분 지표',()=>{
   it('재대조를 중복 합산하지 않고 실패를 완료로 세지 않는다',()=>{const a=demoAnalysis('conflict');const completed=demoVerification('conflict').checks[0];expect(indicators(a,[completed,completed]).verificationProgress.numerator).toBe(1);expect(indicators(a,[completed,{...completed,execution:'failed',outcome:'inaccessible'}]).verificationProgress.numerator).toBe(0);});
   it('검증되지 않은 표현은 정상 대신 유보한다',()=>{const result=assembleAnalysis({kind:'text',body:'근거를 살펴보자.',comments:[]},{topics:[],topicAssignments:[],stances:[],bodyAssigned:[],bodyOtherIds:[],bodyUndeterminedIds:[],expressions:[],claims:[],perspectiveQuestions:[],counterArguments:[],searchSuggestions:[],claimsMayBeOmitted:false},'test','test-model');expect(result.expressions[0].status).toBe('undetermined');expect(result.status).toBe('partial');});
 });
+describe('모델 정규화에서 제외한 항목의 부분 결과 표시',()=>{
+  const req={kind:'text' as const,body:'공개 본문이다.',comments:[{id:'c',text:'공개 댓글이다.'}]};
+  function proposal():RawAnalysis{
+    return {topics:[{id:'public',label:'공개 논점',description:'공개 합성 논점',evidence:[{sentenceId:'body_s0',quote:req.body}]}],topicAssignments:[{sourceId:'comment_0',topicIds:['public'],status:'assigned',evidence:[{sentenceId:'comment_0_s0',quote:req.comments[0].text}],reason:'공개 댓글의 논점'}],stances:[],bodyAssigned:[{sentenceId:'body_s0',topicIds:['public']}],bodyOtherIds:[],bodyUndeterminedIds:[],expressions:['body_s0','comment_0_s0'].map(sentenceId=>({sentenceId,status:'clear',criteria:[],severity:'none',context:'direct',explanation:'',evidence:[]})),claims:[],perspectiveQuestions:[],counterArguments:[],searchSuggestions:[],claimsMayBeOmitted:false};
+  }
+  it('댓글의 알 수 없는 논점을 제외하되 정상 논점·댓글 분모를 보존하고 경고한다',()=>{
+    const raw=proposal();raw.topicAssignments[0].topicIds.push('unknown');
+    const result=assembleAnalysis(req,raw,'unknown-comment-topic','mock');
+    expect(result.status).toBe('partial');expect(result.warnings.map(w=>w.code)).toContain('PARTIAL_EVIDENCE');
+    expect(result.topicAssignments[0]).toMatchObject({status:'assigned',topicIds:['public']});
+    expect(result.indicators.topics[0].coverage).toEqual({numerator:1,denominator:1,percent:100});
+    expect(result.coverage).toMatchObject({totalSentences:2,naturalSentences:2,claimsMayBeOmitted:true});
+  });
+  it('존재하지 않는 문장의 상세 표현을 제외하고 정상 문장 수·정상 분류를 유지하며 경고한다',()=>{
+    const raw=proposal();raw.expressions.push({sentenceId:'phantom',status:'flagged',criteria:['mockery'],severity:'strong',context:'direct',explanation:'존재하지 않는 문장에 붙은 모델 분류',evidence:[{sentenceId:'body_s0',quote:req.body}]});
+    const result=assembleAnalysis(req,raw,'unknown-expression-unit','mock');
+    expect(result.status).toBe('partial');expect(result.warnings.map(w=>w.code)).toContain('PARTIAL_EVIDENCE');
+    expect(result.expressions.map(e=>[e.sentenceId,e.status])).toEqual([['body_s0','clear'],['comment_0_s0','clear']]);
+    expect(result.indicators.expression).toEqual({numerator:0,denominator:2,percent:0});
+    expect(result.coverage).toMatchObject({totalSentences:2,naturalSentences:2});
+  });
+});
+
 describe('자료 대조',()=>{
   it.each(['unclear','mismatched'] as const)('시점 %s인 자료는 양쪽 인용이 있어도 사실 상충으로 확정하지 않는다',temporalFit=>{
     const a=demoAnalysis('conflict');

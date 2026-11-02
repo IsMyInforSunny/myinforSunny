@@ -35,7 +35,7 @@ export function fomoSignals(analysis:Pick<Analysis,'sources'>){
  return {version:FOMO_RULE_VERSION,totalSentences:groups.length,flaggedSentences,signals};
 }
 function relationExists(ref:Reference|undefined,relation:{start:number;end:number;quote:string}){
- return !!ref&&Number.isInteger(relation.start)&&Number.isInteger(relation.end)&&relation.start>=0&&relation.end>relation.start&&relation.end<=ref.text.length&&ref.text.slice(relation.start,relation.end)===relation.quote;
+ return !!ref&&!!relation.quote.trim()&&Number.isInteger(relation.start)&&Number.isInteger(relation.end)&&relation.start>=0&&relation.end>relation.start&&relation.end<=ref.text.length&&ref.text.slice(relation.start,relation.end)===relation.quote;
 }
 const labels:Record<ReviewTone,string>={unverified:'추가 근거 확인',supported:'대조 자료에서 확인',contradicted:'대조 자료와 다름',conflicting:'자료 간 내용이 다름',expression:'자극 표현 검토',fomo:'FOMO 표현 후보'};
 
@@ -59,8 +59,14 @@ export function articleAnnotations(analysis:Analysis,checks:Check[]=[],verificat
  }
  for(const expression of analysis.expressions.filter(e=>e.status==='flagged'))for(const [i,span] of expression.evidence.entries())if(validSpan(analysis.sources,span))out.push({id:`expression-${expression.sentenceId}-${i}`,tone:'expression',label:labels.expression,reason:expression.explanation??'표현의 맥락을 직접 확인해 주세요.',span});
  for(const [i,signal] of fomoSignals(analysis).signals.entries()){
-  const source=analysis.sources.find(s=>s.id===signal.sourceId)!;const unit=source.sentences.find(s=>s.start<=signal.start&&s.end>=signal.end);
-  if(unit)out.push({id:`fomo-${i}`,tone:'fomo',label:labels.fomo,reason:'긴급성·희소성·동조 압력 표현을 찾는 규칙에 해당합니다. 문맥을 확인해 주세요.',span:{...signal,sentenceId:unit.id}});
+  const source=analysis.sources.find(s=>s.id===signal.sourceId)!;
+  // A lexical phrase can cross a long sentence's processing boundary. Keep
+  // one detected signal/count, but give each visible part a valid unit span.
+  for(const unit of source.sentences){
+   const start=Math.max(signal.start,unit.start),end=Math.min(signal.end,unit.end);
+   if(end<=start)continue;const quote=source.text.slice(start,end);if(!quote.trim())continue;
+   out.push({id:`fomo-${i}-${unit.id}`,tone:'fomo',label:labels.fomo,reason:`‘${signal.quote}’ 표현이 긴급성·희소성·동조 압력을 찾는 규칙에 해당합니다. 문맥을 확인해 주세요.`,span:{sourceId:signal.sourceId,sentenceId:unit.id,start,end,quote}});
+  }
  }
  return out;
 }
@@ -72,7 +78,7 @@ export function reviewSegments(text:string,annotations:ReviewAnnotation[]):Revie
  return boundaries.slice(0,-1).map((start,i)=>({start,end:boundaries[i+1],text:text.slice(start,boundaries[i+1]),annotations:safe.filter(a=>a.span.start<=start&&a.span.end>=boundaries[i+1])}));
 }
 
-export type MapPoint={url:string;title:string;publisher:string;stance:'opposes_position'|'adds_context'|'supports_position';evidence:'supports'|'contradicts'|'mixed'|'unreviewed';quote:string;reason:string;position:string;claimCount:number};
+export type MapPoint={url:string;title:string;publisher:string;stance:'opposes_position'|'adds_context'|'supports_position';evidence:'supports'|'contradicts'|'mixed'|'unreviewed';quote:string;reason:string;position:string;claimCount:number}&Pick<Reference,'contentDigest'|'retrievedTextLength'|'retrievedTruncated'|'fullTextLength'|'extractionVersion'>;
 const normal=(v:string)=>v.trim().replace(/\s+/g,' ');
 /** Valid quoted observations, including contradictory classifications for the same article.
  * Keep those contradictions available to the publisher module so it can count them as undetermined.
@@ -94,8 +100,8 @@ export function articleMapObservations(analysis:Analysis,results:ResearchVerific
    }
    const evidence:MapPoint['evidence']=supports&&contradicts?'mixed':supports?'supports':contradicts?'contradicts':'unreviewed';
    for(const p of perspectives){
-    const position=normal(p.positionText),key=JSON.stringify([article.url,position,p.stance,evidence]);
-    if(!articles.has(key))articles.set(key,{url:article.url,title:ref.title??article.host,publisher:article.host,stance:p.stance as MapPoint['stance'],evidence,quote:p.quote,reason:p.explanation,position,claimCount:claimIds.size});
+    const position=normal(p.positionText),key=JSON.stringify([article.url,position,p.stance,evidence,ref.contentDigest??null,ref.retrievedTextLength??null,ref.retrievedTruncated??null,ref.fullTextLength??null,ref.extractionVersion??null]);
+    if(!articles.has(key))articles.set(key,{url:article.url,title:ref.title??article.host,publisher:article.host,stance:p.stance as MapPoint['stance'],evidence,quote:p.quote,reason:p.explanation,position,claimCount:claimIds.size,contentDigest:ref.contentDigest,retrievedTextLength:ref.retrievedTextLength,retrievedTruncated:ref.retrievedTruncated,fullTextLength:ref.fullTextLength,extractionVersion:ref.extractionVersion});
    }
   }
  }

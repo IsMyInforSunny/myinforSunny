@@ -4,6 +4,9 @@ import {buildReviewExport} from '../lib/review-export';
 import {makeSources} from '../lib/domain';
 import type {Check} from '../lib/contracts';
 import {reliabilityReview} from '../lib/reliability';
+import {createElement} from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+import CanvaDashboard from '../components/canva-dashboard';
 
 const analysis = demoAnalysis('supported');
 const result = {...demoVerification('supported'), parentAnalysisId: analysis.analysisId};
@@ -89,5 +92,25 @@ describe('review export', () => {
     }
     expect(buildReviewExport({...input, analysis: live, researchResults: [provided]}).research.completedClaims).toBe(0);
     expect(buildReviewExport({...input, analysis: live, researchResults: [fetched]}).research.completedClaims).toBe(1);
+  });
+  it('exports the same combined completed count as the main gauge after automatic review', () => {
+    const live = {...analysis, mode: 'live' as const};
+    const fetched = {...result, mode: 'live' as const, references: result.references.map(r => ({...r,
+      provenance: 'web_fetched' as const, url: 'https://news.example/synthetic-library'}))};
+    const failed = {...fetched, references: [], checks: fetched.checks.map(c => ({...c,
+      execution: 'failed' as const, relations: []}))};
+    for (const [checks, researchResults, count] of [
+      [[], [fetched], 1],
+      [result.checks, [fetched], 1],
+      [result.checks, [fetched, failed], 0],
+      [[], [{...fetched, parentAnalysisId: 'old'}], 0],
+    ] as const) {
+      const out = buildReviewExport({...input, analysis: live, checks: [...checks], researchResults: [...researchResults]});
+      expect(out.summary?.completedChecks).toBe(count);
+      const html = renderToStaticMarkup(createElement(CanvaDashboard, {analysis: live,
+        checks: [...checks], researchResults: [...researchResults], onEvidence: () => {}, onArticles: () => {}}));
+      expect(html).toContain(`사실 주장 1개 중 ${count}개 대조 완료`);
+      expect(JSON.stringify(out)).not.toContain(fetched.references[0].text);
+    }
   });
 });

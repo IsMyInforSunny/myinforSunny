@@ -43,7 +43,9 @@ export const verifyRequestSchema = z.discriminatedUnion('kind',[
   z.object({kind:z.literal('text'),parentAnalysisId:id.optional(),sources:z.array(sourceSchema).min(1).max(6),claims:z.array(claimSchema).min(1).max(1),references:z.array(referenceInputSchema).max(2),useWebSearch:z.literal(false),transmissionConsent:z.literal(true)}).strict(),
 ]);
 export type VerifyTextRequest = Omit<Extract<z.infer<typeof verifyRequestSchema>,{kind:'text'}>,'transmissionConsent'>;
-export type Reference = { id:string;provenance:'provided_text'|'web_fetched';text:string;url?:string;title?:string;publishedAt?:string;fetchedAt?:string;truncated:boolean;publisherGroup?:string;fullTextLength?:number;extractionVersion?:string };
+export type Reference = { id:string;provenance:'provided_text'|'web_fetched';text:string;url?:string;title?:string;publishedAt?:string;fetchedAt?:string;truncated:boolean;publisherGroup?:string;fullTextLength?:number;extractionVersion?:string;
+ /** Server-owned digest of retrieved text before excerpting (not a digest of the displayed quote). */
+ contentDigest?:string;retrievedTextLength?:number;retrievedTruncated?:boolean };
 export const outcomeSchema = z.enum(['supported','contradicted','conflicting','insufficient','unchecked','inaccessible','not_applicable']);
 export type Outcome = z.infer<typeof outcomeSchema>;
 export type EvidenceRelation = { referenceId:string;quote:string;start:number;end:number;relation:'supports'|'contradicts'|'context';explanation:string };

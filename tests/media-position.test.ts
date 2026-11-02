@@ -85,6 +85,50 @@ describe('absolutePositionDifference',()=>{
  });
 });
 
+describe('same-publisher complete-content duplicates across research runs',()=>{
+ const identity={contentDigest:'A'.repeat(43),retrievedTextLength:500,retrievedTruncated:false,fullTextLength:500,extractionVersion:'semantic-text-1.0'};
+ const duplicate=(n:number,o:Partial<MapPoint>={})=>pt('a.example',n,'supports_position',{...identity,...o});
+ it('three different addresses with the same complete retrieved body remain one article',()=>{
+  const points=[duplicate(1),duplicate(2),duplicate(3),...many('b.example',Array(3).fill('opposes_position'))];
+  for(const ordered of [points,[...points].reverse()]){
+   const group=publisherPositions(ordered).groups[0];
+   expect(group).toMatchObject({eligiblePublishers:1,duplicateContent:2});
+   expect(group.publishers.find(p=>p.publisher==='a.example')).toMatchObject({sampleCount:1,eligible:false,centroidX:null});
+   expect(absolutePositionDifference(ordered,duplicate(2).url)).toMatchObject({value:null,reason:'insufficient_publishers'});
+  }
+ });
+ it('preserves every alias for selection and gives each eligible publisher equal weight',()=>{
+  const points=[duplicate(1),duplicate(2),pt('a.example',3,'supports_position'),pt('a.example',4,'supports_position'),...many('b.example',Array(3).fill('opposes_position'))];
+  expect(publisherPositions(points).groups[0].publishers[0].sampleCount).toBe(3);
+  expect(absolutePositionDifference(points,duplicate(2).url)).toMatchObject({status:'ok',value:1,referenceCentroid:0,publishersUsed:2});
+ });
+ it('withholds the entire duplicate-content group when quoted classifications conflict',()=>{
+  const points=[duplicate(1),duplicate(2,{stance:'opposes_position'}),duplicate(3)];
+  for(const ordered of [points,[...points].reverse()]){
+   expect(publisherPositions(ordered).groups[0]).toMatchObject({duplicateContent:2,undetermined:1,publishers:[]});
+   for(const p of points)expect(absolutePositionDifference(ordered,p.url).reason).toBe('selected_undetermined');
+  }
+ });
+ it('does not infer identity from matching quotes, incomplete bodies or malformed metadata',()=>{
+  const incomplete:Partial<MapPoint>[]=[{contentDigest:undefined},{contentDigest:'not-a-digest'},{retrievedTextLength:150,fullTextLength:150},{retrievedTextLength:500.5},{retrievedTruncated:true},{retrievedTruncated:undefined},{fullTextLength:9000},{extractionVersion:''}];
+  for(const metadata of incomplete){
+   const group=publisherPositions([duplicate(1,metadata),duplicate(2,metadata),duplicate(3,metadata)]).groups[0];
+   expect(group.duplicateContent).toBe(0);expect(group.publishers[0]).toMatchObject({sampleCount:3,eligible:true});
+  }
+ });
+ it('keeps different extraction versions, bodies, propositions and publishers separate',()=>{
+  expect(publisherPositions([duplicate(1),duplicate(2,{extractionVersion:'another-version'}),duplicate(3,{contentDigest:'B'.repeat(43)})]).groups[0]).toMatchObject({duplicateContent:0});
+  const points=[duplicate(1),duplicate(2,{position:'다른 명제'}),pt('b.example',1,'opposes_position',identity)];
+  const groups=publisherPositions(points).groups;
+  expect(groups).toHaveLength(2);expect(groups.every(g=>g.duplicateContent===0)).toBe(true);
+  expect(groups.find(g=>g.position===P)!.publishers).toHaveLength(2);
+ });
+ it('joins a URL observation lacking metadata to its signed-content alias without order dependence',()=>{
+  const points=[duplicate(1),duplicate(2),pt('a.example',2,'opposes_position')];
+  for(const ordered of [points,[points[2],points[0],points[1]]])expect(publisherPositions(ordered).groups[0]).toMatchObject({duplicateContent:1,undetermined:1,publishers:[]});
+ });
+});
+
 describe('bounded media coordinate module markup',()=>{
  const analysis=()=>({...demoAnalysis('mixed'),mode:'live' as const,proposition:'학교 도서관 운영 시간을 늘려야 한다.'});
  function verification(a:ReturnType<typeof analysis>,host='a.example',count=3,stance:MapPoint['stance']='supports_position'):ResearchVerification{

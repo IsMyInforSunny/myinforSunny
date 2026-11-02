@@ -2,6 +2,7 @@ import type {Reference} from '../contracts';
 import type {NewsResult,RelatedArticle} from '../news-contract';
 import type {RuntimeConfig} from './config';
 import {AppError} from './errors';
+import {articleTextPrefix} from './article-document';
 
 const API='https://api.firecrawl.dev/v2/';
 const positive=(s:string|undefined)=>!!s&&/^\d+$/.test(s)&&Number.isSafeInteger(Number(s))&&Number(s)>0?Number(s):0;
@@ -61,7 +62,7 @@ export async function searchFirecrawl(query:string,c:RuntimeConfig,signal:AbortS
   for(const key of [...u.searchParams.keys()])if(/^utm_|^(fbclid|gclid)$/i.test(key))u.searchParams.delete(key);
   const domain=u.hostname.replace(/^www\./,'');if(seen.has(u.href)||(domains.get(domain)??0)>=2)continue;
   seen.add(u.href);domains.set(domain,(domains.get(domain)??0)+1);
-  articles.push({id:`news_${articles.length}`,title:row.title.trim().slice(0,250),url:u.href,publisherDomain:domain,language:'not_verified',provenance:'search_result',stance:'not_checked'});
+  articles.push({id:`news_${articles.length}`,title:articleTextPrefix(row.title.trim(),250),url:u.href,publisherDomain:domain,language:'not_verified',provenance:'search_result',stance:'not_checked'});
   if(articles.length===5)break;
  }
  return {provider:'firecrawl',query,status:articles.length?'success':'empty',articles,searchedAt:new Date().toISOString(),scopeNote:'검색 결과 중 운영자가 이용 조건을 확인한 출처 후보만 표시합니다. 검색 결과는 본문 확인이나 신뢰성 검증 결과가 아닙니다.'};
@@ -76,7 +77,8 @@ export async function scrapeFirecrawl(url:string,id:string,c:RuntimeConfig,signa
  if(m.statusCode!==undefined&&m.statusCode!==200||m.error)return null;
  const markdown=typeof data.markdown==='string'?data.markdown.trim():'';
  if(markdown.length<80||markdown.length>200000||/(paywall|robots.?txt|access denied|sign in to continue|구독 후|유료 회원|AI\s*학습\s*(?:및|과)?\s*활용\s*금지)/i.test(`${String(data.warning??'')} ${markdown}`))return null;
- const title=typeof m.title==='string'?m.title.slice(0,250):undefined;
+ const title=typeof m.title==='string'?articleTextPrefix(m.title,250):undefined;
  const rawDate=m.publishedTime??m.publishedAt??m['article:published_time'];const publishedAt=typeof rawDate==='string'&&Number.isFinite(Date.parse(rawDate))?new Date(rawDate).toISOString():undefined;
- return {id,provenance:'web_fetched',url:target.href,text:markdown.slice(0,8000),title,publishedAt,fetchedAt:new Date().toISOString(),truncated:markdown.length>8000};
+ const text=articleTextPrefix(markdown,8000);
+ return {id,provenance:'web_fetched',url:target.href,text,title,publishedAt,fetchedAt:new Date().toISOString(),truncated:text.length<markdown.length,fullTextLength:markdown.length,extractionVersion:'firecrawl-markdown-1.1'};
 }

@@ -81,7 +81,7 @@ export async function discoverEvidence(request:Request,input:ResearchInput,planT
   try{
    const fetched=await retrieve(article.url,`web_${queryIndex}_${fetches++}`,config,signal);
    if(!fetched){attempts.push({stage:'fetch',url:article.url,status:'inaccessible',reason:'공개 본문을 취득하지 못했습니다.'});continue;}
-   fullSources.push({...fetched,provenance:'web_fetched',url:article.url,title:fetched.title||article.title,fetchedAt:fetched.fetchedAt!,publisherDomain:article.publisherDomain,contentDigest:await digest(fetched.text),excerptStart:0,excerptEnd:fetched.text.length,fullTextLength:fetched.fullTextLength??fetched.text.length,extractionVersion:fetched.extractionVersion??(result.provider==='firecrawl'?'firecrawl-markdown-1.0':'allowlisted-text-1.0')});
+   fullSources.push({...fetched,provenance:'web_fetched',url:article.url,title:fetched.title||article.title,fetchedAt:fetched.fetchedAt!,publisherDomain:article.publisherDomain,contentDigest:await digest(fetched.text),retrievedTextLength:fetched.text.length,retrievedTruncated:fetched.truncated,excerptStart:0,excerptEnd:fetched.text.length,fullTextLength:fetched.fullTextLength??fetched.text.length,extractionVersion:fetched.extractionVersion??(result.provider==='firecrawl'?'firecrawl-markdown-1.0':'allowlisted-text-1.0')});
    attempts.push({stage:'fetch',url:article.url,status:'completed'});
   }catch{if(signal.aborted)throw new AppError(408,'REQUEST_ABORTED','조사를 취소했거나 제한 시간이 지났습니다.');attempts.push({stage:'fetch',url:article.url,status:'failed',reason:'자료 본문에 연결하지 못했습니다.'});}
  }

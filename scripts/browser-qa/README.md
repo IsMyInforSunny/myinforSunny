@@ -6,9 +6,12 @@
 npx --yes --package @playwright/cli playwright-cli -s=site-qa open http://127.0.0.1:5173 --browser=chrome
 npx --yes --package @playwright/cli playwright-cli -s=site-qa snapshot
 npx --yes --package @playwright/cli playwright-cli -s=site-qa run-code --filename scripts/browser-qa/state.js
+npx --yes --package @playwright/cli playwright-cli -s=site-qa run-code --filename scripts/browser-qa/example-navigation.js
 npx --yes --package @playwright/cli playwright-cli -s=site-qa run-code --filename scripts/browser-qa/research.js
 npx --yes --package @playwright/cli playwright-cli -s=site-qa run-code --filename scripts/browser-qa/coordinates.js
 npx --yes --package @playwright/cli playwright-cli -s=site-qa run-code --filename scripts/browser-qa/popup.js
+npx --yes --package @playwright/cli playwright-cli -s=site-qa run-code --filename scripts/browser-qa/exports.js
+npx --yes --package @playwright/cli playwright-cli -s=site-qa run-code --filename scripts/browser-qa/fomo-boundary.js
 npx --yes --package @playwright/cli playwright-cli -s=site-qa close
 ```
 
@@ -17,9 +20,12 @@ npx --yes --package @playwright/cli playwright-cli -s=site-qa close
 | 파일 | 확인 범위 |
 | --- | --- |
 | `state.js` | 새 분석·초기화 시 내보내기 선택 해제, 비활성 대조 차단, 수정된 입력의 좌표 경고 |
-| `research.js` | 분석·조사 취소, 늦은 응답 무시, 재시작 동의, 입력 변경·복원, 한도 소진 안내 |
+| `example-navigation.js` | 예시 요청 취소·초기화 후 좌표창 재개방 방지, 정상 완료 시 이동, 수동 대조 본문 안내 |
+| `research.js` | 분석·조사 취소, 늦은 응답 무시, 재시작 동의, 입력 변경·복원, 메인·내보내기 집계 일치, 한도 소진 안내 |
 | `coordinates.js` | 직접 지정한 명제, 사실 건수와 의견 구분, 현재 조사에서 추천·매체 좌표 연결, 매체별 3개·2곳 기준, 모바일 |
 | `popup.js` | 실제 팝업, 원문 강조, 방향키·Home·End 탭 조작, 모바일 제목·닫기 버튼과 가로 넘침 |
+| `exports.js` | 실제 기본·상세 JSON 다운로드 성공, 미리보기와 파일 일치, 원문·자료 포함 선택 구분 |
+| `fomo-boundary.js` | 긴 문장의 처리 경계에 걸친 FOMO 표현 집계·원문 밑줄·설명 일치, 본문과 자연 문장 분모 보존 |
 
 타입·웹사이트 단위 테스트·빌드를 웹사이트 전용 기록으로 남기려면 다음 명령을 실행한다. 실행기·코딩 제공자 설정의 개인 테스트를 제외한다. 실제 API opt-in 시험은 기본적으로 건너뛴다.
 

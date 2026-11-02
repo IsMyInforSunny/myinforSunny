@@ -1,8 +1,12 @@
 import type {Analysis,Check,Reference} from './contracts';
 import type {Recommendation,ResearchStage,ResearchVerification,ReliabilityReview} from './research-contract';
+import {canonicalArticleUrl} from './media-position';
 
 function validRelation(ref:Reference|undefined,r:{quote:string;start:number;end:number}){return !!ref&&ref.provenance==='web_fetched'&&Number.isInteger(r.start)&&Number.isInteger(r.end)&&r.start>=0&&r.end>r.start&&r.end<=ref.text.length&&!!r.quote.trim()&&ref.text.slice(r.start,r.end)===r.quote;}
 function safeLink(value:string|undefined){try{const u=new URL(value??'');return ['http:','https:'].includes(u.protocol)&&!u.username&&!u.password?u:null;}catch{return null;}}
+// Match the coordinate module's article identity without rewriting the link
+// shown to the reader. Tracking aliases are observations of the same article.
+const articleIdentity=(url:URL)=>canonicalArticleUrl(url.href)?.url??url.href;
 type ReviewIdentity=Partial<Pick<Analysis,'analysisId'|'mode'>>;
 function inScope(verifications:ResearchVerification[],analysis?:ReviewIdentity){
  if(!analysis?.analysisId&&!analysis?.mode)return verifications;
@@ -29,7 +33,7 @@ export function reliabilityReview(analysis:Pick<Analysis,'claims'>&ReviewIdentit
    const execution=!fetched.length&&c.execution==='completed'?'skipped':c.execution;
    latest.set(c.claimId,{...c,outcome,execution,relations});
   }
-  for(const r of fetched){const u=safeLink(r.url)!;u.hash='';sources.add(u.href);domains.add(u.hostname.replace(/^www\./,''));}
+  for(const r of fetched){const u=safeLink(r.url)!;u.hash='';sources.add(articleIdentity(u));domains.add(u.hostname.replace(/^www\./,''));}
  }
  const checks=[...latest.values()];const complete=checks.filter(c=>c.execution==='completed');
  const count=(outcome:Check['outcome'])=>complete.filter(c=>c.outcome===outcome).length;
@@ -55,27 +59,27 @@ export function verifiedRecommendations(verifications:ResearchVerification[],ana
  const positions=analysis?new Set([analysis.proposition,...(analysis.claims??[]).filter(c=>c.kind==='opinion').map(c=>c.text)].filter((p):p is string=>!!p).map(normal)):null;
  const latest=new Map<string,{index:number;check:Check}>();
  scoped.forEach((v,index)=>{for(const check of v.checks)latest.set(claimKey(v,check.claimId),{index,check});});
- const perspectiveKey=(v:ResearchVerification,url:string,position:string)=>JSON.stringify([v.mode,v.parentAnalysisId??null,url,position]);
+ const perspectiveKey=(v:ResearchVerification,url:URL,position:string)=>JSON.stringify([v.mode,v.parentAnalysisId??null,articleIdentity(url),normal(position)]);
  const latestPerspective=new Map<string,NonNullable<ResearchVerification['perspectiveChecks']>[number]>();
  for(const v of scoped)for(const p of v.perspectiveChecks??[]){
   const ref=v.references.find(r=>r.id===p.referenceId),url=safeLink(ref?.url);
-  if(!url)continue;url.hash='';latestPerspective.set(perspectiveKey(v,url.href,p.positionText),p);
+  if(!url)continue;url.hash='';latestPerspective.set(perspectiveKey(v,url,p.positionText),p);
  }
  const cards=new Map<string,Recommendation>();
  for(const [index,v] of scoped.entries()){for(const r of v.references){
   const u=safeLink(r.url);if(r.provenance!=='web_fetched'||!u)continue;
   u.hash='';
   const relations=v.checks.flatMap(c=>{const last=latest.get(claimKey(v,c.claimId));return last?.index===index&&last.check===c&&(!known||known.has(c.claimId))&&c.execution==='completed'&&c.temporalFit==='matched'?c.relations:[];}).filter(q=>q.referenceId===r.id&&validRelation(r,q));
-  const perspective=v.perspectiveChecks?.find(p=>p.referenceId===r.id&&(!positions||positions.has(normal(p.positionText)))&&latestPerspective.get(perspectiveKey(v,u.href,p.positionText))===p&&validRelation(r,p));
+  const perspective=v.perspectiveChecks?.find(p=>p.referenceId===r.id&&(!positions||positions.has(normal(p.positionText)))&&latestPerspective.get(perspectiveKey(v,u,p.positionText))===p&&validRelation(r,p));
   const related=relations.find(q=>q.relation==='contradicts')??relations[0];
   let kind:Recommendation['kind'],reason:string,quote:string,start:number,end:number;
   if(perspective&&['opposes_position','supports_position'].includes(perspective.stance)){
    kind=perspective.stance==='opposes_position'?'opposing_view':'supporting_view';reason=perspective.explanation;({quote,start,end}=perspective);
   }else if(related){kind=related.relation==='contradicts'?'different_evidence':'context';reason=related.explanation;({quote,start,end}=related);}
   else continue;
-  const key=u.href;const old=cards.get(key);
+  const key=articleIdentity(u);const old=cards.get(key);
   if(old&&old.kind==='opposing_view')continue;
-  cards.set(key,{referenceId:r.id,title:r.title??u.hostname,url:key,publisherDomain:u.hostname.replace(/^www\./,''),kind,reason,quote,start,end,provenance:'web_fetched'});
+  cards.set(key,{referenceId:r.id,title:r.title??u.hostname,url:u.href,publisherDomain:u.hostname.replace(/^www\./,''),kind,reason,quote,start,end,provenance:'web_fetched'});
  }}
  return [...cards.values()].sort((a,b)=>Number(b.kind==='opposing_view')-Number(a.kind==='opposing_view')).slice(0,6);
 }

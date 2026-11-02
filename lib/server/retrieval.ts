@@ -1,7 +1,7 @@
 import { Reference } from '../contracts';
 import { RuntimeConfig } from './config';
 import {scrapeFirecrawl} from './firecrawl';
-import {ARTICLE_EXTRACTION_VERSION,decodeArticleDocument,extractArticleDocument} from './article-document';
+import {ARTICLE_EXTRACTION_VERSION,articleTextPrefix,decodeArticleDocument,extractArticleDocument} from './article-document';
 
 // The initial web adapter deliberately supports exact, operator-approved hosts only.
 // Arbitrary user URLs never become network destinations. Redirects are never followed.
@@ -24,5 +24,6 @@ export async function retrieve(url:string,id:string,config:RuntimeConfig,signal:
   const document=decodeArticleDocument(data,type);if(document===null)return null;
   const extracted=extractArticleDocument(document,/^text\/html(?:;|$)/i.test(type));
   if(!extracted.text)return null;
-  return {id,provenance:'web_fetched',url:target.href,text:extracted.text.slice(0,8000),title:extracted.title,publishedAt:extracted.publishedAt,fetchedAt:new Date().toISOString(),truncated:extracted.text.length>8000,fullTextLength:extracted.text.length,extractionVersion:ARTICLE_EXTRACTION_VERSION};
+  const text=articleTextPrefix(extracted.text,8000);
+  return {id,provenance:'web_fetched',url:target.href,text,title:extracted.title,publishedAt:extracted.publishedAt,fetchedAt:new Date().toISOString(),truncated:text.length<extracted.text.length,fullTextLength:extracted.text.length,extractionVersion:ARTICLE_EXTRACTION_VERSION};
 }

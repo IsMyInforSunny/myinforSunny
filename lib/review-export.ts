@@ -24,17 +24,21 @@ export function buildReviewExport({analysis, checks, feedback, includeRaw, inclu
   const research = analysis ? currentResearch(analysis, researchResults) : [];
   const manual = analysis ? currentResearch(analysis, verifications) : [];
   const expression = analysis ? expressionSummary(analysis) : null;
+  const external = analysis ? reliabilityReview(analysis, research, researchStage) : null;
   // Match the on-screen summaries: count natural sentences once and let the
   // latest attempt supersede an older completed check for the same claim.
   const completedResearch = analysis?.mode === 'live'
-    ? reliabilityReview(analysis, research, researchStage).completedClaims
+    ? external!.completedClaims
     : analysis ? completedFactualChecks(analysis.claims, research.flatMap(v => v.checks)).length : 0;
   return {
     schemaVersion: '2.2', rubric: analysis?.versions.rubric, mode: analysis?.mode, feedback,
     summary: analysis ? {
       topics: analysis.topics.length, sentences: expression!.total,
       flagged: expression!.flagged,
-      claims: analysis.claims.length, completedChecks: completedFactualChecks(analysis.claims, checks).length,
+      claims: analysis.claims.length,
+      // The main gauge combines manual checks with the current external review.
+      // Preserve that same order, including later external failures/skips.
+      completedChecks: completedFactualChecks(analysis.claims, [...checks, ...external!.checks]).length,
     } : null,
     research: {
       stage: analysis ? researchStage : 'not_started', resultCount: research.length,

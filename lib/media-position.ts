@@ -24,8 +24,10 @@ export type PositionGroup={
  position:string;
  publishers:PublisherPosition[];
  eligiblePublishers:number;
- /** Unique URLs whose conflicting duplicate classifications were rejected for this position. */
+ /** Article groups whose conflicting duplicate classifications were rejected for this position. */
  undetermined:number;
+ /** Additional URLs with identical complete retrieved text within the same publisher. */
+ duplicateContent:number;
 };
 export type PublisherPositionReport={
  baseline:typeof MEDIA_POSITION_BASELINE;
@@ -74,8 +76,17 @@ export function canonicalArticleUrl(value:string|undefined){
 }
 const evidenceKind=(e:MapPoint['evidence'])=>e==='supports'?'factSupport':e==='unreviewed'?'unreviewed':'factConflict';
 
-type Article={url:string;host:string;position:string;code:number;evidence:MapPoint['evidence']};
-type Prepared={groups:Map<string,{articles:Article[];undetermined:number;bad:Set<string>}>;invalid:number;truncated:number;inputCount:number};
+type Article={urls:string[];host:string;position:string;code:number;evidence:MapPoint['evidence']};
+type Prepared={groups:Map<string,{articles:Article[];undetermined:number;duplicateContent:number;bad:Set<string>}>;invalid:number;truncated:number;inputCount:number};
+
+/** A quote/excerpt or a shared 8,000-character prefix is not a complete content identity.
+ * Missing metadata in older results deliberately falls back to URL-only counting.
+ */
+function completeContentKey(p:MapPoint){
+ const length=p.retrievedTextLength;
+ if(!/^[A-Za-z0-9_-]{43}$/.test(p.contentDigest??'')||typeof length!=='number'||!Number.isInteger(length)||length<200||length>8000||p.retrievedTruncated!==false||p.fullTextLength!==length||!p.extractionVersion?.trim())return null;
+ return JSON.stringify([p.extractionVersion,length,p.contentDigest]);
+}
 
 function prepare(points:MapPoint[],options?:PositionOptions):Prepared{
  const list=Array.isArray(points)?points:[];
@@ -83,21 +94,32 @@ function prepare(points:MapPoint[],options?:PositionOptions):Prepared{
  const max=typeof requested==='number'&&Number.isFinite(requested)?Math.min(MAX_POSITION_POINTS,Math.max(0,Math.floor(requested))):MAX_POSITION_POINTS;
  const used=list.slice(0,max);
  let invalid=0;
- // key: position + canonical url -> classification; conflicting duplicates become undetermined.
- const seen=new Map<string,{article:Article;conflict:boolean}>();
+ // Union canonical URL aliases and complete-content duplicates for the same host/proposition.
+ // All classifications survive until after grouping: array order must not choose a stance.
+ const rows:{url:string;host:string;position:string;code:number;evidence:MapPoint['evidence']}[]=[];
+ const parent:number[]=[];const identities=new Map<string,number>();
+ const find=(n:number):number=>parent[n]===n?n:(parent[n]=find(parent[n]));
  for(const p of used){
   const c=canonicalArticleUrl(p?.url);const position=normal(p?.position??'');
   const code=p?CODE[p.stance]:undefined;
   if(!c||!position||code===undefined||!['supports','contradicts','mixed','unreviewed'].includes(p.evidence)){invalid++;continue;}
-  const key=`${position}\u0000${c.url}`;const article:Article={url:c.url,host:c.host,position,code,evidence:p.evidence};
-  const prev=seen.get(key);
-  if(!prev)seen.set(key,{article,conflict:false});
-  else if(prev.article.code!==code||prev.article.evidence!==p.evidence||prev.article.host!==c.host)prev.conflict=true;
+  const index=rows.length;rows.push({url:c.url,host:c.host,position,code,evidence:p.evidence});parent.push(index);
+  const content=completeContentKey(p);
+  for(const key of [JSON.stringify(['url',position,c.url]),...(content?[JSON.stringify(['content',position,c.host,content])]:[])]){
+   const previous=identities.get(key);
+   if(previous===undefined)identities.set(key,index);else parent[find(index)]=find(previous);
+  }
  }
+ const clusters=new Map<number,typeof rows>();
+ rows.forEach((row,index)=>{const key=find(index);clusters.set(key,[...(clusters.get(key)??[]),row]);});
  const groups:Prepared['groups']=new Map();
- for(const {article,conflict} of seen.values()){
-  const g=groups.get(article.position)??{articles:[],undetermined:0,bad:new Set<string>()};groups.set(article.position,g);
-  if(conflict){g.undetermined++;g.bad.add(article.url);}else g.articles.push(article);
+ for(const cluster of clusters.values()){
+  const first=cluster[0],urls=[...new Set(cluster.map(row=>row.url))].sort();
+  const g=groups.get(first.position)??{articles:[],undetermined:0,duplicateContent:0,bad:new Set<string>()};groups.set(first.position,g);
+  g.duplicateContent+=urls.length-1;
+  if(cluster.some(row=>row.code!==first.code||row.evidence!==first.evidence)){
+   g.undetermined++;for(const url of urls)g.bad.add(url);
+  }else g.articles.push({urls,host:first.host,position:first.position,code:first.code,evidence:first.evidence});
  }
  return {groups,invalid,truncated:list.length-used.length,inputCount:list.length};
 }
@@ -118,7 +140,7 @@ export function publisherPositions(points:MapPoint[],options?:PositionOptions):P
  const prep=prepare(points,options);
  const groups:PositionGroup[]=[...prep.groups.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([position,g])=>{
   const publishers=summarize(g.articles);
-  return {position,publishers,eligiblePublishers:publishers.filter(p=>p.eligible).length,undetermined:g.undetermined};
+  return {position,publishers,eligiblePublishers:publishers.filter(p=>p.eligible).length,undetermined:g.undetermined,duplicateContent:g.duplicateContent};
  });
  return {baseline:MEDIA_POSITION_BASELINE,note:MEDIA_POSITION_NOTE,minArticlesPerPublisher:MIN_ARTICLES_PER_PUBLISHER,minEligiblePublishers:MIN_ELIGIBLE_PUBLISHERS,inputCount:prep.inputCount,truncated:prep.truncated,invalid:prep.invalid,groups};
 }
@@ -132,7 +154,7 @@ export function absolutePositionDifference(points:MapPoint[],selectedUrl?:string
  const sel=selectedUrl?canonicalArticleUrl(selectedUrl):null;
  if(!sel)return empty('no_selection');
  const prep=prepare(points,options);
- const hits=[...prep.groups.entries()].map(([position,g])=>({position,g,article:g.articles.find(a=>a.url===sel.url)})).filter(h=>h.article);
+ const hits=[...prep.groups.entries()].map(([position,g])=>({position,g,article:g.articles.find(a=>a.urls.includes(sel.url))})).filter(h=>h.article);
  // A selected URL rejected as undetermined must not silently fall through to "not found".
  const undetermined=hits.length===0&&[...prep.groups.values()].some(g=>g.bad.has(sel.url));
  if(hits.length===0)return empty(undetermined?'selected_undetermined':'selected_not_found');

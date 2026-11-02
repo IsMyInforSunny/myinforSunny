@@ -13,6 +13,7 @@ export function assembleAnalysis(req:TextRequest,raw:RawAnalysis,requestId:strin
   const topicAssignments=sources.filter(s=>s.kind==='comment').map(s=>{const candidates=raw.topicAssignments.filter(t=>t.sourceId===s.id);const candidate=candidates.length===1?candidates[0]:undefined;
     if(!candidate){damaged=true;return {sourceId:s.id,topicIds:[],status:'undetermined' as const,evidence:[],reason:'논점 분류가 누락되거나 중복되었습니다.'};}
     const evidence=spans(candidate.evidence).filter(e=>e.sourceId===s.id);const topicIds=[...new Set(candidate.topicIds)].filter(id=>topics.some(t=>t.id===id));
+    if(candidate.topicIds.some(id=>!topics.some(t=>t.id===id)))damaged=true;
     if(candidate.status==='assigned'&&(!evidence.length||!topicIds.length)){damaged=true;return {sourceId:s.id,topicIds:[],status:'undetermined' as const,evidence:[],reason:'논점의 원문 근거를 확인하지 못했습니다.'};}
     return {...candidate,topicIds:candidate.status==='assigned'?topicIds:[],evidence};
   });
@@ -38,6 +39,8 @@ export function assembleAnalysis(req:TextRequest,raw:RawAnalysis,requestId:strin
     return entry.status==='undetermined'?{sentenceId:t.id,topicIds:[],status:'undetermined' as const,reason:'AI가 이 문장의 논점 판단을 유보했습니다.'}:{sentenceId:t.id,topicIds:[],status:'other' as const};
   });
   const stances=req.proposition?sources.filter(s=>s.kind==='comment').map(s=>{const candidates=raw.stances.filter(t=>t.sourceId===s.id);const c=candidates.length===1?candidates[0]:undefined;const evidence=c?spans(c.evidence).filter(e=>e.sourceId===s.id):[];if(!c||(['support','oppose','mixed'].includes(c.label)&&!evidence.length)){damaged=true;return {sourceId:s.id,label:'undetermined' as const,evidence:[],reason:'입장의 원문 근거를 확인하지 못했습니다.'};}return {...c,evidence};}):undefined;
+  const sentenceIds=new Set(sources.flatMap(s=>s.sentences.map(t=>t.id)));
+  if(raw.expressions.some(e=>!sentenceIds.has(e.sentenceId)))damaged=true;
   const expressions:Expression[]=sources.flatMap(s=>s.sentences.map(t=>{const candidates=raw.expressions.filter(e=>e.sentenceId===t.id);const c=candidates.length===1?candidates[0]:undefined;
     if(!c){damaged=true;return {sourceId:s.id,sentenceId:t.id,status:'undetermined' as const,criteria:[],context:'unclear' as const,evidence:[],explanation:'이 문장의 분석 결과를 확인하지 못했습니다.'};}
     const evidence=spans(c.evidence).filter(e=>e.sentenceId===t.id);

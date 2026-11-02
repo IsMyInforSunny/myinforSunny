@@ -31,11 +31,13 @@ async page => {
   const reference = page.getByRole('textbox', {name: '참고자료 1 본문'});
   await reference.fill('공개 가상 참고자료를 수정했습니다.');
   let verifyRequests = 0;
-  await page.route('**/api/verify', route => {verifyRequests++;return route.abort();});
-  await page.getByRole('button', {name: '선택한 주장 대조하기', exact: true}).click();
-  await page.getByRole('alert').filter({hasText: '실시간'}).waitFor();
-  check(verifyRequests === 0, 'Disabled custom comparison made a request');
-  await page.unroute('**/api/verify');
+  const blockVerify=route=>{verifyRequests++;return route.abort();};
+  await page.route('**/api/verify',blockVerify);
+  try{
+    await page.getByRole('button', {name: '선택한 주장 대조하기', exact: true}).click();
+    await page.locator('dialog[open]').filter({has:page.getByRole('heading',{name:'분석근거',exact:true})}).getByRole('alert').filter({hasText: '실시간'}).waitFor();
+    check(verifyRequests === 0, 'Disabled custom comparison made a request');
+  }finally{await page.unroute('**/api/verify',blockVerify);}
   log.push('custom reference comparison is explained and blocked while live is disabled');
   await page.keyboard.press('Escape');
   await page.getByRole('button', {name: '기사 다시 입력', exact: true}).click();
