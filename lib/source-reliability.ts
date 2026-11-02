@@ -70,9 +70,9 @@ const publisherKey = (value: string) => value.trim().toLowerCase().replace(/^www
 
 /**
  * Applies caller-supplied, documented source weights to claim-level evidence.
- * Same-origin observations are collapsed across publishers and receive the mean
- * of the participating publisher weights, preventing a syndicated story from
- * multiplying its influence. Without originId, article identity is publisher-local.
+ * Each publisher's weight is divided across its unique origin groups. Shared
+ * origins across publishers are one group using the mean participant allocation,
+ * so article volume or syndication cannot multiply influence.
  * Shares describe the weighted mix of reviewed evidence, never publisher reliability
  * or the probability that a claim is true.
  */
@@ -130,6 +130,12 @@ export function assessWeightedClaimEvidence(
     let eligibleEvidenceGroupCount = 0;
     const eligiblePublishers = new Set<string>();
     let insufficientEvidenceCount = 0;
+    const originCountByPublisher = new Map<string, number>();
+    for (const group of originGroups.values()) {
+      for (const publisher of new Set(group.map(o => publisherKey(o.publisher)))) {
+        originCountByPublisher.set(publisher, (originCountByPublisher.get(publisher) ?? 0) + 1);
+      }
+    }
     const usableOrigins = new Map<string, {outcome: 'supports' | 'contradicts' | 'conflicting'; publishers: Set<string>}>();
     for (const [originKey, group] of originGroups) {
       const publisherKeys = [...new Set(group.map(o => publisherKey(o.publisher)))];
@@ -140,37 +146,23 @@ export function assessWeightedClaimEvidence(
       if (publisherKeys.some(k => !byPublisher.has(k))) continue;
       usableOrigins.set(originKey, {outcome, publishers: new Set(publisherKeys)});
     }
-    // Shared syndicated content is one evidence group, with the mean participant
-    // weight. It is removed from the independent per-publisher article averages.
-    const independentMix = new Map<string, {counts: {supports: number; contradicts: number; conflicting: number}; articles: number}>();
+    // Allocate each publisher's weight over every origin it observed, including
+    // insufficient groups. A shared origin is counted once with the mean of the
+    // participants' allocated portions, capping each publisher's total contribution.
     for (const origin of usableOrigins.values()) {
-      if (origin.publishers.size > 1) {
-        const participantWeights = [...origin.publishers].map(k => byPublisher.get(k)!.value);
-        const groupWeight = participantWeights.reduce((sum, value) => sum + value, 0) / participantWeights.length;
-        weighted[origin.outcome] += groupWeight;
-        weightSum += groupWeight;
-        eligibleEvidenceGroupCount++;
-        eligibleArticleCount++;
-        for (const key of origin.publishers) eligiblePublishers.add(key);
-        continue;
-      }
-      const publisher = [...origin.publishers][0];
-      const mix = independentMix.get(publisher) ?? {counts: {supports: 0, contradicts: 0, conflicting: 0}, articles: 0};
-      mix.counts[origin.outcome]++;
-      mix.articles++;
-      independentMix.set(publisher, mix);
-    }
-    // Each publisher contributes its configured weight once, after averaging its
-    // independent articles, so article volume cannot increase that publisher's share.
-    for (const [publisher, mix] of independentMix) {
-      const weight = byPublisher.get(publisher)!.value;
-      weighted.supports += weight * mix.counts.supports / mix.articles;
-      weighted.contradicts += weight * mix.counts.contradicts / mix.articles;
-      weighted.conflicting += weight * mix.counts.conflicting / mix.articles;
-      weightSum += weight;
+      const allocations = [...origin.publishers].map(publisher => {
+        const weight = byPublisher.get(publisher)?.value;
+        const originCount = originCountByPublisher.get(publisher) ?? 0;
+        return weight !== undefined && originCount > 0 ? weight / originCount : null;
+      });
+      if (allocations.some(value => value === null)) continue;
+      const groupWeight = allocations.reduce<number>((sum, value) => sum + (value ?? 0), 0) / allocations.length;
+      if (!(groupWeight > 0)) continue;
+      weighted[origin.outcome] += groupWeight;
+      weightSum += groupWeight;
       eligibleEvidenceGroupCount++;
-      eligibleArticleCount += mix.articles;
-      eligiblePublishers.add(publisher);
+      eligibleArticleCount++;
+      for (const publisher of origin.publishers) eligiblePublishers.add(publisher);
     }
     const enoughPublishers = eligiblePublishers.size >= 2;
     const enoughEvidenceGroups = eligibleEvidenceGroupCount >= 2;
@@ -182,7 +174,7 @@ export function assessWeightedClaimEvidence(
         : eligibleArticleCount && !enoughPublishers ? 'insufficient_publishers'
           : eligibleArticleCount ? 'insufficient_evidence_groups' : 'no_eligible_evidence',
       // Never expose a partial share if a publisher weight is absent or fewer than two
-      // positive-weight publishers contribute usable evidence.
+      // positive-weight publishers and two independent origins contribute evidence.
       shares: complete ? {
         supports: weighted.supports / weightSum,
         contradicts: weighted.contradicts / weightSum,

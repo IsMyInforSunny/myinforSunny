@@ -20,7 +20,7 @@ describe('assessWeightedClaimEvidence', () => {
     ], weights);
     expect(result.status).toBe('ready');
     expect(result.methodologyVersion).toBe('reviewed-2026-01');
-    expect(result.claims[0]).toMatchObject({status: 'weighted_evidence_available', eligiblePublisherCount: 2, eligibleArticleCount: 3, eligibleEvidenceGroupCount: 2});
+    expect(result.claims[0]).toMatchObject({status: 'weighted_evidence_available', eligiblePublisherCount: 2, eligibleArticleCount: 3, eligibleEvidenceGroupCount: 3});
     expect(result.claims[0].shares).toEqual({supports: 0.75, contradicts: 0.25, conflicting: 0});
     expect(result.claims[0].weightSum).toBe(1);
     expect(result.claims[0].publisherCounts).toEqual([
@@ -93,7 +93,7 @@ describe('assessWeightedClaimEvidence', () => {
     ], weights);
     expect(result.status).toBe('pending_evidence');
     expect(result.claims[0]).toMatchObject({
-      status: 'insufficient_evidence_groups', weightSum: 0.5, eligiblePublisherCount: 2,
+      status: 'insufficient_evidence_groups', weightSum: 0.3125, eligiblePublisherCount: 2,
       eligibleEvidenceGroupCount: 1,
       eligibleArticleCount: 1, insufficientEvidenceCount: 1,
       shares: null,
@@ -102,5 +102,26 @@ describe('assessWeightedClaimEvidence', () => {
       {publisher: 'alpha.example', observedArticleCount: 2, usableArticleCount: 1, insufficientArticleCount: 1},
       {publisher: 'beta.example', observedArticleCount: 1, usableArticleCount: 1, insufficientArticleCount: 0},
     ]);
+  });
+
+  it('caps each publisher at its configured weight across shared and independent origins', () => {
+    const result = assessWeightedClaimEvidence([
+      {claimId: 'c1', articleId: 'a-shared', originId: 'wire-1', publisher: 'alpha.example', outcome: 'supports'},
+      {claimId: 'c1', articleId: 'b-shared', originId: 'wire-1', publisher: 'beta.example', outcome: 'supports'},
+      {claimId: 'c1', articleId: 'a-own', originId: 'alpha-own', publisher: 'alpha.example', outcome: 'contradicts'},
+    ], weights);
+    const claim = result.claims[0];
+    expect(result.status).toBe('ready');
+    expect(claim).toMatchObject({
+      status: 'weighted_evidence_available', eligiblePublisherCount: 2,
+      eligibleEvidenceGroupCount: 2, eligibleArticleCount: 2,
+    });
+    // Alpha allocates .75 / 2 across its two origins; beta allocates .25 / 1.
+    // The shared origin is averaged once: (.375 + .25) / 2 = .3125.
+    // Alpha's independent origin contributes .375. Total stays below .75 + .25.
+    expect(claim.weightSum).toBeCloseTo(0.6875);
+    expect(claim.weightSum).toBeLessThanOrEqual(weights.weights.reduce((sum, w) => sum + w.value, 0));
+    expect(claim.shares?.supports).toBeCloseTo(5 / 11);
+    expect(claim.shares?.contradicts).toBeCloseTo(6 / 11);
   });
 });
