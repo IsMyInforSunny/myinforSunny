@@ -21,7 +21,7 @@ function reference(overrides: Partial<Reference> = {}): Reference {
 function verification(options: {
   parentAnalysisId?: string; mode?: 'live' | 'demo'; refs?: Reference[];
   execution?: 'completed' | 'failed' | 'skipped'; temporalFit?: 'matched' | 'mismatched' | 'unclear';
-  relations?: ResearchVerification['checks'][number]['relations']; claimId?: string;
+  relations?: ResearchVerification['checks'][number]['relations']; claimId?: string; createdAt?: string;
 } = {}): ResearchVerification {
   return {
     schemaVersion: '2.1', requestId: 'request-1', parentAnalysisId: options.parentAnalysisId ?? 'analysis-current',
@@ -31,7 +31,7 @@ function verification(options: {
       execution: options.execution ?? 'completed', temporalFit: options.temporalFit ?? 'matched',
       relations: options.relations ?? [{referenceId: 'ref-1', quote: 'Evidence quote.', start: 0, end: 15, relation: 'supports', explanation: 'quoted'}],
       explanation: 'reviewed', limitations: []}],
-    attempts: [], warnings: [], createdAt: '2026-01-01T00:00:00.000Z',
+    attempts: [], warnings: [], createdAt: options.createdAt ?? '2026-01-01T00:00:00.000Z',
   };
 }
 
@@ -60,16 +60,33 @@ describe('observationsFromResearch', () => {
     expect(result).toEqual([]);
   });
 
-  it('marks disagreement between valid relations as conflicting and ignores context-only quotes', () => {
+  it('uses only the latest check for a claim, so an older completed check cannot survive a newer failed or stale check', () => {
+    const oldCompleted = verification({createdAt: '2026-01-01T00:00:00.000Z'});
+    const newerFailed = verification({execution: 'failed', createdAt: '2026-01-02T00:00:00.000Z'});
+    const newerMismatched = verification({temporalFit: 'mismatched', createdAt: '2026-01-02T00:00:00.000Z'});
+    expect(observationsFromResearch(analysis(), [oldCompleted, newerFailed])).toEqual([]);
+    expect(observationsFromResearch(analysis(), [oldCompleted, newerMismatched])).toEqual([]);
+    expect(observationsFromResearch(analysis(), [newerFailed, oldCompleted])).toEqual([]);
+  });
+
+  it('keeps a later completed matched check after an older failed check', () => {
     const result = observationsFromResearch(analysis(), [
-      verification({relations: [
+      verification({execution: 'failed', createdAt: '2026-01-01T00:00:00.000Z'}),
+      verification({createdAt: '2026-01-02T00:00:00.000Z'}),
+    ]);
+    expect(result).toHaveLength(1);
+    expect(result[0].outcome).toBe('supports');
+  });
+
+  it('marks disagreement between valid relations as conflicting and ignores context-only quotes', () => {
+    const result = observationsFromResearch(analysis(), [verification({
+      refs: [reference(), reference({id: 'ref-2', url: 'https://beta.example/story'})],
+      relations: [
         {referenceId: 'ref-1', quote: 'Evidence quote.', start: 0, end: 15, relation: 'supports', explanation: 's'},
         {referenceId: 'ref-1', quote: 'Evidence quote.', start: 0, end: 15, relation: 'contradicts', explanation: 'c'},
-      ]}),
-      verification({refs: [reference({id: 'ref-2', url: 'https://beta.example/story'})], relations: [
         {referenceId: 'ref-2', quote: 'Evidence quote.', start: 0, end: 15, relation: 'context', explanation: 'context'},
-      ]}),
-    ]);
+      ],
+    })]);
     expect(result.map(o => o.outcome).sort()).toEqual(['conflicting', 'insufficient']);
   });
 
@@ -86,6 +103,15 @@ describe('observationsFromResearch', () => {
     const ref = reference({contentDigest: undefined, retrievedTruncated: true});
     const result = observationsFromResearch(analysis(), [verification({refs: [ref]})]);
     expect(result[0]).toMatchObject({articleId: 'https://alpha.example/story', originId: 'url:https://alpha.example/story'});
+  });
+
+  it('maps only verified same-brand redirect hosts and keeps other brands distinct', () => {
+    const khan = observationsFromResearch(analysis(), [verification({refs: [reference({url: 'https://m.khan.co.kr/news/1'})]})]);
+    const donga = observationsFromResearch(analysis(), [verification({refs: [reference({url: 'https://news.donga.com/news/1'})]})]);
+    const joseonBiz = observationsFromResearch(analysis(), [verification({refs: [reference({url: 'https://biz.chosun.com/news/1'})]})]);
+    expect(khan[0].publisher).toBe('khan.co.kr');
+    expect(donga[0].publisher).toBe('donga.com');
+    expect(joseonBiz[0].publisher).toBe('biz.chosun.com');
   });
 
   it('rejects non-public, provided-text, and demo-only references', () => {

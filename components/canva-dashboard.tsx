@@ -8,7 +8,10 @@ import {expressionSummary} from '@/lib/domain';
 import {verifiedRecommendations} from '@/lib/reliability';
 import {currentResearch} from '@/lib/current-research';
 import {analyzeBiasCoordinate, type BiasArticleCoordinate, type BiasOrientationSet} from '@/lib/bias-analysis';
-import {assessWeightedClaimEvidence, type EvidenceObservation, type PublisherWeightSet} from '@/lib/source-reliability';
+import {assessWeightedClaimEvidence, type EvidenceObservation, type PublisherWeightSet, type WeightedClaimEvidence} from '@/lib/source-reliability';
+import {MIN_N_FOR_PERCENT} from '@/lib/display';
+import {reviewCitedSources, type ClaimSourcingStatus, type CitedSourceType} from '@/lib/cited-sources';
+import {buildAnalysisScores} from '@/lib/analysis-scores';
 
 type Props = {
   analysis: Analysis | null;
@@ -43,13 +46,38 @@ const NEEDLE = 178;
 
 const bands = ['#087b42', '#40b74a', '#e6e619', '#ffb53c', '#f35a22'];
 /* 바깥 띠는 검증된 편향 강도 구간이다. */
-const ringLabels = ['0–20%', '20–40%', '40–60%', '60–80%', '80–100%'];
+const ringLabels = ['0–20점', '20–40점', '40–60점', '60–80점', '80–100점'];
 
 const axisHelp = {
   bias: '같은 비교 주제의 매체 기사를 검증된 모델의 상대 좌표에 놓고, 매체별 기사 중심의 동일가중 중간지점과 입력 기사를 비교합니다. Claude의 매체 구분은 좌익·우익 축 방향을 정하고 검증하는 데만 사용합니다. 매체별 고유 기사 3개와 적격 매체 2곳 이상, 모델 평가가 필요합니다. 자료가 없으면 계산을 기다립니다.',
-  expression: '인신공격·조롱·공포 유도 등의 표현이 발견된 문장 수입니다. 인용과 문맥을 함께 확인해야 하며, 독자의 감정이나 심리 상태를 측정하지 않습니다.',
-  trust: 'Reuters Institute 2025 한국 매체별 이용자 신뢰 응답을 확인된 14개 매체의 출처 가중치로 사용합니다. 실제 기사에서는 인용 위치·발행 시점·원문 출처를 확인하고, 서로 독립된 자료의 뒷받침·상충·충돌 결과를 함께 집계합니다. 이용자 신뢰는 정확도와 같지 않습니다. 가중치가 없는 출처가 섞이면 계산을 보류합니다.',
+  expression: '자극 점수는 인신공격·조롱·공포 유도 등의 표현이 발견된 자연 문장 수를 본문·댓글의 전체 자연 문장 수로 나누고 100을 곱합니다. 미판정 문장은 가능한 점수 범위로 표시합니다. 인용과 문맥을 함께 확인해야 하며, 독자의 감정이나 심리 상태를 측정하지 않습니다.',
+  trust: '먼저 기사가 사실 주장의 근거로 든 출처를 봅니다. 공식 통계·공공기관·연구처럼 자료 이름이나 시점까지 적힌 1차 자료인지, 이름 있는 당사자·단체인지, 관계자·전언처럼 확인할 수 없는 출처인지, 출처 표시가 없는지를 문장에서 찾아 분류합니다. 출처가 실제로 그렇게 말했는지와 주장의 참·거짓은 이 분류만으로 알 수 없습니다. 외부 자료를 조사한 경우에는 Reuters Institute 2025 한국 매체별 이용자 신뢰 응답을 확인된 14개 매체의 출처 가중치로 사용합니다. 실제 기사에서는 인용 위치·발행 시점·원문 출처를 확인하고, 서로 독립된 자료의 뒷받침·상충·충돌 결과를 함께 집계합니다. 이용자 신뢰는 정확도와 같지 않습니다. 가중치가 없는 출처가 섞이면 계산을 보류합니다.',
 } as const;
+
+/* 기사가 사실 주장의 근거로 든 출처가 어디까지 추적 가능한지. 점수가 아니라 분류다. */
+const sourcingLabels: Record<ClaimSourcingStatus, string> = {
+  traceable_primary: '1차 자료 출처',
+  traceable_secondary: '이름 있는 출처',
+  weak: '익명·전언 출처',
+  unattributed: '출처 표시 없음',
+};
+const citedTypeLabels: Record<CitedSourceType, string> = {
+  official_statistics: '공식 통계',
+  public_agency: '공공기관·공식 기록',
+  research: '연구·학술',
+  named_person: '실명 당사자',
+  organization: '기업·단체',
+  media_report: '다른 언론 재인용',
+  anonymous: '익명·불특정',
+};
+
+/* 주장별 가중 구성이 아직 계산되지 않은 이유. 값이 없다는 것을 기사 판단으로 읽지 않게 사유를 그대로 보인다. */
+const weightedPendingLabels: Record<Exclude<WeightedClaimEvidence['status'], 'weighted_evidence_available'>, string> = {
+  weight_missing: '가중치가 없는 출처가 있어 계산 보류',
+  insufficient_publishers: '가중치가 있는 출처가 2곳 미만',
+  insufficient_evidence_groups: '독립 근거 집단이 2개 미만',
+  no_eligible_evidence: '인용·시점이 확인된 근거 없음',
+};
 
 const recommendationLabels = {
   opposing_view: '다른 입장',
@@ -90,8 +118,15 @@ export default function CanvaDashboard({analysis, researchResults, biasArticleCo
   const results = analysis ? currentResearch(analysis, researchResults) : [];
   const total = analysis?.claims.filter(claim => claim.kind === 'factual').length ?? 0;
   const bias = analyzeBiasCoordinate(biasArticleCoordinates, biasOrientationSet, selectedBiasArticleId);
+  const scores = buildAnalysisScores(analysis,bias);
+  const scoreLabel = (score:typeof scores.bias) => score.value === null ? score.status === 'not_applicable' ? '해당 없음' : '산출 대기'
+    : score.status === 'partial' && score.upperBound !== undefined && score.upperBound !== score.value ? `${score.value}–${score.upperBound}점` : `${score.value}점`;
   const weightedReliability = assessWeightedClaimEvidence(reliabilityObservations, sourceWeightSet,
     analysis?.claims.filter(claim => claim.kind === 'factual').map(claim => claim.id) ?? []);
+  const cited = analysis ? reviewCitedSources(analysis) : null;
+  const tracedClaims = scores.reliability.numerator ?? 0;
+  const weightedReady = weightedReliability.claims.filter(claim => claim.status === 'weighted_evidence_available').length;
+  const weightedObserved = weightedReliability.claims.filter(claim => claim.publisherCounts.length > 0);
   const expression = analysis ? expressionSummary(analysis) : null;
   const cards = analysis?.mode === 'live' ? verifiedRecommendations(results, analysis) : [];
   const visibleCards = cards.slice(0, 3);
@@ -101,10 +136,10 @@ export default function CanvaDashboard({analysis, researchResults, biasArticleCo
   const angle = measured ? 180 + 180 * bias.gaugePercent! / 100 : null;
   const prefix = `${stale ? '이전 입력 결과: ' : ''}${isDemo ? '가상 예시: ' : ''}`;
   const gaugeLabel = measured
-    ? `${prefix}편향 정도 ${bias.gaugePercent!.toFixed(0)}%, 방향 ${bias.directionLabel ?? '불확실 구간'}. 참·거짓 확률이 아닙니다.`
+    ? `${prefix}편향 정도 ${scores.bias.value}점, 100점 만점, 방향 ${bias.directionLabel ?? '불확실 구간'}. 참·거짓 확률이 아닙니다.`
     : `${prefix}편향 정도 계산 대기. 검증된 매체 기사 좌표와 비교 표본이 아직 없습니다.`;
   const gaugeNote = measured
-    ? `${prefix}편향 강도 ${bias.gaugePercent!.toFixed(0)}% · ${bias.directionLabel ?? '방향 유보'} · 좌표 차이 ${bias.magnitude!.toFixed(2)}/2 (평가 오차 ±${bias.coordinateUncertainty!.toFixed(2)})`
+    ? `${prefix}편향 강도 ${scores.bias.value}점 / 100 · ${bias.directionLabel ?? '방향 유보'} · 좌표 차이 ${bias.magnitude!.toFixed(2)}/2 (평가 오차 ±${bias.coordinateUncertainty!.toFixed(2)})`
     : `${prefix}편향 분석 대기 · 검증된 기사 모델·매체별 평가·비교 표본 필요`;
   const recommendationGuide = cards.length
     ? `확인된 ${cards.length}개 중 ${visibleCards.length}개 · 본문 인용 확인 · 기사 전체의 정확성 보증 아님`
@@ -173,24 +208,24 @@ export default function CanvaDashboard({analysis, researchResults, biasArticleCo
             <ul className="cv3-axes" aria-label={analysis && stale ? '편향·자극·신뢰 (이전 입력의 결과)' : '편향·자극·신뢰'}>
               <li className="cv3-axis cv3-axis-bias">
                 <span className="cv3-axis-label">편향</span>
+                <strong className={`cv3-axis-value${scores.bias.value === null ? ' cv3-axis-value-text' : ''}`}>{scoreLabel(scores.bias)}</strong>
                 {onCoordinates ? (
-                  <button type="button" className="cv3-axis-action" onClick={onCoordinates}>
+                  <button type="button" className="cv3-axis-action cv3-score-coordinate" onClick={onCoordinates}>
                     <MapPinned size={18} aria-hidden="true" /> 좌표 보기
                   </button>
-                ) : (
-                <strong className="cv3-axis-value cv3-axis-value-text">{measured ? `${bias.gaugePercent!.toFixed(0)}%` : '계산 대기'}</strong>
-                )}
+                ) : null}
                 <small className="cv3-axis-caption">{measured ? `${bias.directionLabel ?? '방향 유보'} · ${bias.eligiblePublisherCount}개 매체 기준` : `상대 매체 좌표 · 기사 모델 대기`}</small>
               </li>
               <li className="cv3-axis cv3-axis-expression">
                 <span className="cv3-axis-label">자극</span>
-                <strong className="cv3-axis-value">{expression ? `${expression.flagged}문장` : '—'}</strong>
-                <small className="cv3-axis-caption">{expression ? `전체 ${expression.total}문장 중 표현 표시` : '표현 분석 대기'}</small>
+                <strong className={`cv3-axis-value${scores.stimulation.value === null ? ' cv3-axis-value-text' : ''}`}>{scoreLabel(scores.stimulation)}{scores.stimulation.denominator !== null && <span className="cv3-score-sample">n={scores.stimulation.denominator}</span>}</strong>
+                <small className="cv3-axis-caption">{expression ? `검출 ${expression.flagged}/${expression.total}문장 · 100점 만점${expression.undetermined ? ` · 미판정 ${expression.undetermined}` : ''}` : '표현 분석 대기'}</small>
               </li>
               <li className="cv3-axis cv3-axis-trust">
                 <span className="cv3-axis-label">신뢰</span>
-                <strong className="cv3-axis-value">{!analysis ? '—' : !total ? '해당 없음' : weightedReliability.status === 'ready' ? `가중 근거 ${weightedReliability.claims.length}건` : weightedReliability.status === 'pending_weights' ? '출처 가중치 대기' : '근거 표본 대기'}</strong>
-                <small className="cv3-axis-caption">{!analysis ? '출처 가중 분석 대기' : !total ? '대조할 사실 주장 없음' : '이용자 신뢰 가중 · 인용·시점·독립 근거 대조'}</small>
+                <strong className={`cv3-axis-value${scores.reliability.value === null ? ' cv3-axis-value-text' : ''}`}>{scoreLabel(scores.reliability)}{scores.reliability.denominator !== null && scores.reliability.denominator > 0 && <span className="cv3-score-sample">n={scores.reliability.denominator}</span>}</strong>
+                <small className="cv3-axis-measure">출처 명시 점수</small>
+                <small className="cv3-axis-caption">{!analysis ? '근거 출처 분석 대기' : !total ? '대조할 사실 주장 없음' : `출처 명시 ${tracedClaims}/${total} · 1차 자료 ${cited!.summary.traceable_primary}${cited!.summary.weak ? ` · 익명·전언 ${cited!.summary.weak}` : ''}`}</small>
               </li>
             </ul>
           </div>
@@ -242,22 +277,42 @@ export default function CanvaDashboard({analysis, researchResults, biasArticleCo
         <summary>편향·자극·신뢰와 게이지는 이렇게 읽어요</summary>
         <dl>
           <dt>편향</dt><dd>{axisHelp.bias}</dd>
+          <dt>점수 기준</dt><dd>모든 점수는 0–100점입니다. 편향·자극은 높을수록 해당 특성이 많이 관찰됐고, 신뢰는 높을수록 사실 주장의 근거 출처가 명시됐다는 뜻입니다. 신뢰 점수는 출처 명시 점수이며 사실 정확도나 진실 확률로 해석하지 않습니다. 표본 건수와 외부 자료 대조 결과를 함께 확인해 주세요.</dd>
           <dt>자극</dt>
           <dd>
             {axisHelp.expression}
             {expression && expression.undetermined > 0 && ` 아직 판단하지 못한 문장 ${expression.undetermined}개가 있어요. 표시가 없다고 모두 자극적인 표현이 없는 것은 아닙니다.`}
           </dd>
           <dt>신뢰</dt><dd>{axisHelp.trust}</dd>
-          <dt>반원 게이지</dt><dd>바늘은 적격 매체별 기사 중심의 상대 중간지점에서 입력 기사 좌표가 벗어난 강도(0–2)를 0–100%로 환산해 표시합니다. 좌익·우익 방향은 별도로 표시합니다. 사실 대조 진행률이나 진실 확률이 아닙니다. 데이터와 검증 결과가 없으면 계산 대기입니다.</dd>
+          <dt>반원 게이지</dt><dd>바늘은 적격 매체별 기사 중심의 상대 중간지점에서 입력 기사 좌표가 벗어난 강도(0–2)를 0–100점으로 환산해 표시합니다. 좌익·우익 방향은 별도로 표시합니다. 사실 대조 진행률이나 진실 확률이 아닙니다. 데이터와 검증 결과가 없으면 계산 대기입니다.</dd>
         </dl>
-        {weightedReliability.claims.some(claim => claim.shares) && <section aria-label="주장별 출처 가중 근거 구성">
-          <h3>주장별 출처 가중 근거 구성</h3>
-          {weightedReliability.claims.filter(claim => claim.shares).map(claim => <article key={claim.claimId}>
-            <p>{analysis?.claims.find(item => item.id === claim.claimId)?.text ?? '사실 주장'} · 뒷받침 {(claim.shares!.supports * 100).toFixed(0)}% · 상충 {(claim.shares!.contradicts * 100).toFixed(0)}% · 충돌 {(claim.shares!.conflicting * 100).toFixed(0)}%</p>
-            <small>가중치 합 {claim.weightSum.toFixed(2)} · 출처 {claim.eligiblePublisherCount}곳 · 기사 {claim.eligibleArticleCount}건 · 독립 근거 집단 {claim.eligibleEvidenceGroupCount}개</small>
-            <details><summary>적용한 출처 가중치 근거와 버전</summary>
-              <ul>{claim.weightsUsed.map(weight => <li key={weight.publisher}>{weight.publisher}: {weight.value.toFixed(2)} · {weight.version} · {weight.evidence}</li>)}</ul>
-            </details>
+        {analysis && cited && total > 0 && <section aria-label="사실 주장의 근거 출처">
+          <h3>사실 주장의 근거 출처 · 출처 특정 {tracedClaims}/{total}</h3>
+          <p>1차 자료 {cited.summary.traceable_primary} · 2차·일반 명칭 출처 {cited.summary.traceable_secondary} · 익명·전언 {cited.summary.weak} · 출처 표시 없음 {cited.summary.unattributed}{!!cited.summary.unresolvedAttributionClaims && ` (화자 미확인 ${cited.summary.unresolvedAttributionClaims})`}</p>
+          <p>{cited.note}</p>
+          {cited.claims.map(item => {
+            const linked = cited.sources.filter(source => item.sourceIds.includes(source.id));
+            return <article key={item.claimId}>
+              <p>{analysis.claims.find(claim => claim.id === item.claimId)?.text ?? '사실 주장'}</p>
+              <small>{item.unresolvedAttribution ? '화자 미확인 · 앞 문장의 출처를 추측하지 않았습니다' : sourcingLabels[item.status]}{linked.map(source => ` · ${citedTypeLabels[source.type]}${source.name ? `: ${source.name}` : ''} (${source.reasons.join(', ')})`).join('')}</small>
+            </article>;
+          })}
+        </section>}
+        {analysis && total > 0 && weightedObserved.length > 0 && <section aria-label="주장별 출처 가중 근거 구성">
+          <h3>주장별 출처 가중 근거 구성 · {weightedReady}/{total} 주장 계산 가능</h3>
+          <p>{weightedReliability.note}</p>
+          {weightedReliability.methodology && <details><summary>가중치표 방법과 버전 ({weightedReliability.methodologyVersion})</summary>
+            <p>{weightedReliability.methodology}</p>
+          </details>}
+          {weightedObserved.map(claim => <article key={claim.claimId}>
+            <p>{analysis.claims.find(item => item.id === claim.claimId)?.text ?? '사실 주장'}</p>
+            {claim.status !== 'weighted_evidence_available'
+              ? <p>계산 대기 · {weightedPendingLabels[claim.status]}{claim.missingWeightPublishers.length > 0 && ` · 가중치 없는 출처: ${claim.missingWeightPublishers.join(', ')}`}</p>
+              : claim.eligibleEvidenceGroupCount < MIN_N_FOR_PERCENT
+                ? <p>표본 부족 · 독립 근거 집단 {claim.eligibleEvidenceGroupCount}개 · 분모(독립 근거 집단)가 {MIN_N_FOR_PERCENT}개 미만이라 비율을 표시하지 않습니다.</p>
+                : <p>분모: 독립 근거 집단 {claim.eligibleEvidenceGroupCount}개 · 가중 근거 중 뒷받침 {(claim.shares!.supports * 100).toFixed(0)}% · 상충 {(claim.shares!.contradicts * 100).toFixed(0)}% · 충돌 {(claim.shares!.conflicting * 100).toFixed(0)}%</p>}
+            <small>가중치 합 {claim.weightSum.toFixed(2)} · 가중치 있는 출처 {claim.eligiblePublisherCount}곳 · 독립 근거 집단 {claim.eligibleEvidenceGroupCount}개 · 맥락만 있는 근거 {claim.insufficientEvidenceCount}개</small>
+            {claim.weightsUsed.length > 0 && <small> · 적용 가중치: {claim.weightsUsed.map(weight => `${weight.publisher} ${weight.value.toFixed(2)}`).join(', ')} ({claim.weightsUsed[0]!.version})</small>}
           </article>)}
         </section>}
       </details>

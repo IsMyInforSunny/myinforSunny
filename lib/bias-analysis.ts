@@ -36,7 +36,7 @@ export type BiasClassifierEvidence = {
     metrics: { publisherId: string; sampleCount: number; coordinateMae: number; publisherAccuracy: number }[];
   };
 };
-export type BiasArticleCoordinate = { articleId: string; publisherId: string; comparisonGroup: string; classifier: BiasClassifierEvidence | null };
+export type BiasArticleCoordinate = { articleId: string; publisherId: string; comparisonGroup: string; sourceGroupId?: string; classifier: BiasClassifierEvidence | null };
 export type BiasAnalysisResult = {
   method: typeof BIAS_METHOD_VERSION;
   status: 'ready' | 'pending';
@@ -131,7 +131,10 @@ export function analyzeBiasCoordinate(articles: BiasArticleCoordinate[], orienta
   const orientations = new Map(orientationSetInput.profiles.map(p => [norm(p.publisherId), p.orientation]));
   const inScope = rows.filter(x => norm(x?.comparisonGroup ?? '') === group);
   const outOfScopeCount = rows.length - inScope.length;
-  const compatibleRows = inScope.filter(x => x?.classifier && validEvidence(x.classifier, orientationSetInput.axisId) && orientations.has(norm(x.publisherId)) && orientations.get(norm(x.publisherId)) !== 'excluded');
+  // A pasted target need not belong to a known publisher. Only reference outlets
+  // establish the baseline; the target is always excluded from those samples.
+  const compatibleRows = inScope.filter(x => x?.classifier && validEvidence(x.classifier, orientationSetInput.axisId) &&
+    (norm(x.articleId) === selectedId || (orientations.has(norm(x.publisherId)) && orientations.get(norm(x.publisherId)) !== 'excluded')));
   const incompatible = inScope.some(x => x?.classifier && orientations.has(norm(x.publisherId)) && orientations.get(norm(x.publisherId)) !== 'excluded' && !validEvidence(x.classifier, orientationSetInput.axisId));
   const systems = new Set(compatibleRows.map(x => JSON.stringify([x.classifier!.modelId, x.classifier!.modelVersion, x.classifier!.task, x.classifier!.axisId, x.classifier!.coordinateSpace, x.classifier!.trainingDataId, x.classifier!.evaluationDataId, x.classifier!.evaluation.groupSplitId, x.classifier!.evaluation.metrics])));
   if (incompatible || systems.size > 1) return pending('model_coordinate_mismatch', selectedId, group, orientationSetInput, { articleCount: inScope.length, outOfScope: outOfScopeCount, unique: compatibleRows.length, excluded: inScope.length - compatibleRows.length });
@@ -141,7 +144,7 @@ export function analyzeBiasCoordinate(articles: BiasArticleCoordinate[], orienta
   const selectedArticle = selected[0];
   const referenceSamples = compatibleRows.filter(x => x !== selectedArticle && norm(x.articleId) !== selectedId);
   const seen = new Set<string>();
-  const distinct = referenceSamples.filter(x => { const key = `${norm(x.publisherId)}\u0000${norm(x.articleId)}`; if (seen.has(key)) return false; seen.add(key); return true; });
+  const distinct = referenceSamples.filter(x => { const key = x.sourceGroupId ? `origin:${norm(x.sourceGroupId)}` : `${norm(x.publisherId)}\u0000${norm(x.articleId)}`; if (seen.has(key)) return false; seen.add(key); return true; });
   const byPublisher = new Map<string, BiasArticleCoordinate[]>();
   for (const x of distinct) byPublisher.set(norm(x.publisherId), [...(byPublisher.get(norm(x.publisherId)) ?? []), x]);
   const eligibleIds = [...byPublisher.entries()].filter(([id, xs]) => xs.length >= MIN_BIAS_ARTICLES_PER_PUBLISHER && orientations.has(id) && orientations.get(id) !== 'excluded').map(([id]) => id).sort();

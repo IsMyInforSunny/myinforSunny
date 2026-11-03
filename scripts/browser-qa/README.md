@@ -13,6 +13,7 @@ npx --yes --package @playwright/cli playwright-cli -s=site-qa run-code --filenam
 npx --yes --package @playwright/cli playwright-cli -s=site-qa run-code --filename scripts/browser-qa/exports.js
 npx --yes --package @playwright/cli playwright-cli -s=site-qa run-code --filename scripts/browser-qa/fomo-boundary.js
 npx --yes --package @playwright/cli playwright-cli -s=site-qa run-code --filename scripts/browser-qa/dashboard-states.js
+npx --yes --package @playwright/cli playwright-cli -s=site-qa run-code --filename scripts/browser-qa/scores.js
 npx --yes --package @playwright/cli playwright-cli -s=site-qa close
 ```
 
@@ -28,6 +29,7 @@ npx --yes --package @playwright/cli playwright-cli -s=site-qa close
 | `exports.js` | 실제 기본·상세 JSON 다운로드 성공, 미리보기와 파일 일치, 원문·자료 포함 선택 구분 |
 | `fomo-boundary.js` | 긴 문장의 처리 경계에 걸친 FOMO 표현 집계·원문 밑줄·설명 일치, 본문과 자연 문장 분모 보존 |
 | `dashboard-states.js` | 모의 부분 분석·이전 입력 배지와 보드 위 안내, 근거 접근·Esc 포커스 복원, 320/375/768/1280px |
+| `scores.js` | 세 축의 점수·분모와 JSON 일치, 가상 자료의 편향 보류, 원문 opt-in, 이전 입력 내보내기 표시, 모바일 |
 
 타입·웹사이트 단위 테스트·빌드를 웹사이트 전용 기록으로 남기려면 다음 명령을 실행한다. 실행기·코딩 제공자 설정의 개인 테스트를 제외한다. 실제 API opt-in 시험은 기본적으로 건너뛴다.
 

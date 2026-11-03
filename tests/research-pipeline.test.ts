@@ -8,12 +8,31 @@ import * as searchBudget from '../lib/server/search-budget';
 import {planResearch,discoverEvidence,compareEvidence,researchExcerpt} from '../lib/server/research';
 import type {RuntimeConfig} from '../lib/server/config';
 import {verifiedRecommendations,reliabilityReview} from '../lib/reliability';
+import {makeSources} from '../lib/domain';
 const request=()=>new Request('https://site.test/api/research',{headers:{'cf-connecting-ip':'192.0.2.1'}});
 const config:RuntimeConfig={AI_PROVIDER:'groq',ENABLE_LIVE_ANALYSIS:'true',GROQ_API_KEY:'synthetic-only-not-real',GROQ_MODEL:'openai/gpt-oss-120b',GROQ_ELIGIBILITY_CONFIRMED:'true',GROQ_FREE_PLAN_CONFIRMED:'true',GROQ_CONSOLE_LIMITS_CONFIRMED:'true',GROQ_CONSOLE_RPD:'1000',GROQ_CONSOLE_TPD:'200000',ENABLE_NEWS_SEARCH:'true',NEWS_TERMS_APPROVED:'true',ALLOWED_RETRIEVAL_HOSTS:'news.example',DB:{} as D1Database};
 const input=():ResearchInput=>{const a=demoAnalysis('conflict');return {sources:a.sources,claims:a.claims.filter(c=>c.kind==='factual').slice(0,1),transmissionConsent:true,researchConsent:true};};
 afterEach(()=>vi.restoreAllMocks());
 function planner(i:ResearchInput){return vi.spyOn(language,'structured').mockResolvedValue({queries:[{claimId:i.claims[0].id,label:'운영 시간',query:'school library closing time',purpose:'fact_check'}]});}
 describe('자동 조사 단계 연결 (모의 검색·모의 LLM, 실서비스 검증 아님)',()=>{
+ it('기사에 명시된 1차 출처를 같은 계획 호출의 미검증 힌트로 연결한다',async()=>{
+  const body='통계청에 따르면 2025년 조사에서 인구가 10% 증가했다.';
+  const sources=makeSources({kind:'text',body,comments:[]});const sentence=sources[0].sentences[0];
+  const i:ResearchInput={sources,claims:[{id:'c1',text:'인구가 10% 증가했다.',kind:'factual',origin:[{sourceId:sources[0].id,sentenceId:sentence.id,start:0,end:body.length,quote:body}]}],transmissionConsent:true,researchConsent:true};
+  const llm=planner(i);const plan=await planResearch(request(),i,config,AbortSignal.timeout(1000));
+  expect(llm).toHaveBeenCalledTimes(1);expect(plan.queries).toHaveLength(1);
+  const payload=llm.mock.calls[0][3] as {claims:{citedSources:unknown[]}[]};
+  expect(payload.claims[0].citedSources).toEqual([{name:'통계청',type:'official_statistics',primary:true,documentNamed:true,dated:true}]);
+  expect(llm.mock.calls[0][2]).toContain('실제 존재나 사실성을 보장하지 않는다');
+ });
+ it('익명·출처 없는 전언은 검색 기관으로 꾸미지 않는다',async()=>{
+  const body='관계자에 따르면 인구가 10% 증가했다.';
+  const sources=makeSources({kind:'text',body,comments:[]});const sentence=sources[0].sentences[0];
+  const i:ResearchInput={sources,claims:[{id:'c1',text:'인구가 10% 증가했다.',kind:'factual',origin:[{sourceId:sources[0].id,sentenceId:sentence.id,start:0,end:body.length,quote:body}]}],transmissionConsent:true,researchConsent:true};
+  const llm=planner(i);await planResearch(request(),i,config,AbortSignal.timeout(1000));
+  const payload=llm.mock.calls[0][3] as {claims:{citedSources:unknown[]}[]};
+  expect(payload.claims[0].citedSources).toEqual([]);
+ });
  it('서로 다른 매체를 우선하고 같은 본문 전재 후보를 독립 근거로 늘리지 않는다',async()=>{
   const i=input();planner(i);const c={...config,ALLOWED_RETRIEVAL_HOSTS:'news.example,second.example'};const plan=await planResearch(request(),i,c,AbortSignal.timeout(1000));
   vi.spyOn(searchBudget,'reserveSearch').mockResolvedValue(undefined);

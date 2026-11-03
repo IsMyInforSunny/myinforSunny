@@ -14,6 +14,22 @@ const input = {analysis, checks: [], feedback: '', includeRaw: false, includeRef
   verifications: [result], researchResults: [result], researchStage: 'cancelled' as const};
 
 describe('review export', () => {
+  it('exports sourcing counts by default and attribution quotes only with raw-input opt-in', () => {
+    const body='통계청에 따르면 2025년 조사에서 인구가 10% 증가했다.';
+    const sourced=structuredClone(analysis);
+    sourced.sources=makeSources({kind:'text',body,comments:[]});
+    const sentence=sourced.sources[0].sentences[0];
+    sourced.claims=[{id:'c1',text:'인구가 10% 증가했다.',kind:'factual',origin:[{sourceId:sourced.sources[0].id,sentenceId:sentence.id,start:0,end:body.length,quote:body}]}];
+    const normal=buildReviewExport({...input,analysis:sourced});
+    expect(normal.sourcing?.summary).toMatchObject({factualClaims:1,traceable_primary:1});
+    expect(normal).not.toHaveProperty('citedSources');
+    expect(JSON.stringify(normal)).not.toContain('통계청');
+    const referencesOnly=buildReviewExport({...input,analysis:sourced,includeRefs:true});
+    expect(referencesOnly).not.toHaveProperty('citedSources');
+    const raw=buildReviewExport({...input,analysis:sourced,includeRaw:true});
+    expect(raw.citedSources?.sources[0]).toMatchObject({name:'통계청',quote:'통계청에 따르면'});
+    expect(buildReviewExport({...input,analysis:null,includeRaw:true})).toMatchObject({sourcing:null,citedSources:null});
+  });
   it('includes partial research counts but no source text by default', () => {
     const out = buildReviewExport(input);
     expect(out.research.stage).toBe('cancelled');

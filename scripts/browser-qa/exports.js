@@ -2,7 +2,8 @@ async page => {
   const check=(ok,message)=>{if(!ok)throw Error(message);};
   const loaded=page.waitForResponse(r=>r.url().endsWith('/api/capabilities'));
   await page.goto('http://127.0.0.1:5173/?example=supported');await loaded;
-  await page.getByRole('img',{name:/사실 주장 1개 중 1개 대조 완료/}).waitFor();
+  await page.getByRole('status').filter({hasText:'가상 예시'}).waitFor();
+  await page.getByRole('img',{name:/편향 정도 계산 대기/}).waitFor();
   await page.getByRole('button',{name:'분석근거 표시',exact:true}).click();
   await page.getByText('잘못된 부분이 있나요? 검토 기록 내보내기',{exact:true}).click();
   const download=async name=>{

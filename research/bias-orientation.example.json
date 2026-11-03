@@ -1,0 +1,23 @@
+{
+  "axisId": "korean-news-relative-orientation-v1",
+  "version": "media-orientation-claude-v0.1",
+  "source": "Claude가 정리한 국내 언론의 통념적 구분; 특정 논문의 수치가 아님",
+  "note": "좌익 기준 매체 centroid는 우익 기준 매체보다 음(-)쪽이어야 합니다. 정치 성향 구분이 논란이 있거나 주제 적합성이 낮은 매체는 방향을 고정하지 않으며, 기술·산업 전문지는 기본 비교에서 제외합니다.",
+  "profiles": [
+    {"publisherId": "hani.co.kr", "orientation": "left"},
+    {"publisherId": "khan.co.kr", "orientation": "left"},
+    {"publisherId": "ohmynews.com", "orientation": "left"},
+    {"publisherId": "pressian.com", "orientation": "left"},
+    {"publisherId": "chosun.com", "orientation": "right"},
+    {"publisherId": "joongang.co.kr", "orientation": "right"},
+    {"publisherId": "donga.com", "orientation": "right"},
+    {"publisherId": "kbs.co.kr", "orientation": "unspecified"},
+    {"publisherId": "imbc.com", "orientation": "unspecified"},
+    {"publisherId": "sbs.co.kr", "orientation": "unspecified"},
+    {"publisherId": "ebs.co.kr", "orientation": "unspecified"},
+    {"publisherId": "yna.co.kr", "orientation": "unspecified"},
+    {"publisherId": "hankookilbo.com", "orientation": "unspecified"},
+    {"publisherId": "zdnet.co.kr", "orientation": "excluded"},
+    {"publisherId": "etnews.com", "orientation": "excluded"}
+  ]
+}

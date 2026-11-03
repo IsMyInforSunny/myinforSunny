@@ -5,11 +5,17 @@ import type {EvidenceObservation} from './source-reliability';
 
 type CurrentAnalysis = Pick<Analysis, 'analysisId' | 'mode' | 'claims'>;
 
+/** Exact same-brand hosts verified to redirect to the weighted publisher host. */
+const VERIFIED_PUBLISHER_HOST_ALIASES: Readonly<Record<string, string>> = {
+  'm.khan.co.kr': 'khan.co.kr',
+  'news.donga.com': 'donga.com',
+};
+
 function validPublicReference(ref: Reference): {host: string; canonicalUrl: string} | null {
   if (ref.provenance !== 'web_fetched') return null;
   const normalized = normalizeSourceUrl(ref.url);
   if (normalized.status !== 'ok' || !normalized.host || !normalized.url) return null;
-  return {host: normalized.host, canonicalUrl: normalized.url};
+  return {host: VERIFIED_PUBLISHER_HOST_ALIASES[normalized.host] ?? normalized.host, canonicalUrl: normalized.url};
 }
 
 function validRelation(ref: Reference, relation: ResearchVerification['checks'][number]['relations'][number]): boolean {
@@ -40,41 +46,53 @@ export function observationsFromResearch(
   if (analysis.mode !== 'live' || !analysis.analysisId) return [];
   const factualClaimIds = new Set(analysis.claims.filter(c => c.kind === 'factual').map(c => c.id));
   const output = new Map<string, EvidenceObservation>();
+  const latestCheckByClaim = new Map<string, {verification: ResearchVerification; check: ResearchVerification['checks'][number]; time: number; verificationIndex: number; checkIndex: number}>();
 
-  for (const verification of verifications) {
+  for (const [verificationIndex, verification] of verifications.entries()) {
     if (verification.mode !== 'live' || verification.parentAnalysisId !== analysis.analysisId) continue;
-    for (const check of verification.checks) {
-      if (!factualClaimIds.has(check.claimId) || check.execution !== 'completed' || check.temporalFit !== 'matched') continue;
-      // A bundle may carry references retrieved for other claims. Attribute only
-      // sources the current check explicitly cited.
-      const citedReferenceIds = new Set(check.relations.map(relation => relation.referenceId));
-      for (const ref of verification.references) {
-        if (!citedReferenceIds.has(ref.id)) continue;
-        const publicRef = validPublicReference(ref);
-        if (!publicRef) continue;
-        const referencedRelations = check.relations.filter(r => r.referenceId === ref.id);
-        const relations = referencedRelations.filter(r => validRelation(ref, r));
-        // Malformed quotes are not evidence observations. Insufficient is reserved
-        // for a valid context-only citation.
-        if (!relations.length) continue;
-        const evidenceRelations = new Set(relations.map(r => r.relation).filter(r => r === 'supports' || r === 'contradicts'));
-        const outcome: EvidenceObservation['outcome'] = evidenceRelations.size > 1 ? 'conflicting'
-          : evidenceRelations.has('supports') ? 'supports'
-            : evidenceRelations.has('contradicts') ? 'contradicts' : 'insufficient';
-        const originId = trustedOriginId(ref, publicRef.canonicalUrl);
-        const articleId = publicRef.canonicalUrl;
-        const key = JSON.stringify([check.claimId, articleId]);
-        const next: EvidenceObservation = {claimId: check.claimId, articleId, originId, publisher: publicRef.host, outcome};
-        const previous = output.get(key);
-        if (!previous) output.set(key, next);
-        else {
-          const sameOutcome = previous.outcome === outcome;
-          const mergedOutcome: EvidenceObservation['outcome'] = sameOutcome ? outcome
-            : previous.outcome === 'insufficient' ? outcome
-              : outcome === 'insufficient' ? previous.outcome : 'conflicting';
-          output.set(key, {...previous, outcome: mergedOutcome,
-            originId: previous.originId === originId ? originId : `url:${articleId}`});
-        }
+    const parsedTime = Date.parse(verification.createdAt);
+    const time = Number.isFinite(parsedTime) ? parsedTime : Number.NEGATIVE_INFINITY;
+    for (const [checkIndex, check] of verification.checks.entries()) {
+      if (!factualClaimIds.has(check.claimId)) continue;
+      const previous = latestCheckByClaim.get(check.claimId);
+      if (previous && (time < previous.time || (time === previous.time
+        && (verificationIndex < previous.verificationIndex
+          || (verificationIndex === previous.verificationIndex && checkIndex < previous.checkIndex))))) continue;
+      latestCheckByClaim.set(check.claimId, {verification, check, time, verificationIndex, checkIndex});
+    }
+  }
+
+  for (const {verification, check} of latestCheckByClaim.values()) {
+    if (check.execution !== 'completed' || check.temporalFit !== 'matched') continue;
+    // A bundle may carry references retrieved for other claims. Attribute only
+    // sources the current check explicitly cited.
+    const citedReferenceIds = new Set(check.relations.map(relation => relation.referenceId));
+    for (const ref of verification.references) {
+      if (!citedReferenceIds.has(ref.id)) continue;
+      const publicRef = validPublicReference(ref);
+      if (!publicRef) continue;
+      const referencedRelations = check.relations.filter(r => r.referenceId === ref.id);
+      const relations = referencedRelations.filter(r => validRelation(ref, r));
+      // Malformed quotes are not evidence observations. Insufficient is reserved
+      // for a valid context-only citation.
+      if (!relations.length) continue;
+      const evidenceRelations = new Set(relations.map(r => r.relation).filter(r => r === 'supports' || r === 'contradicts'));
+      const outcome: EvidenceObservation['outcome'] = evidenceRelations.size > 1 ? 'conflicting'
+        : evidenceRelations.has('supports') ? 'supports'
+          : evidenceRelations.has('contradicts') ? 'contradicts' : 'insufficient';
+      const originId = trustedOriginId(ref, publicRef.canonicalUrl);
+      const articleId = publicRef.canonicalUrl;
+      const key = JSON.stringify([check.claimId, articleId]);
+      const next: EvidenceObservation = {claimId: check.claimId, articleId, originId, publisher: publicRef.host, outcome};
+      const previous = output.get(key);
+      if (!previous) output.set(key, next);
+      else {
+        const sameOutcome = previous.outcome === outcome;
+        const mergedOutcome: EvidenceObservation['outcome'] = sameOutcome ? outcome
+          : previous.outcome === 'insufficient' ? outcome
+            : outcome === 'insufficient' ? previous.outcome : 'conflicting';
+        output.set(key, {...previous, outcome: mergedOutcome,
+          originId: previous.originId === originId ? originId : `url:${articleId}`});
       }
     }
   }

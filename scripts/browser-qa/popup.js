@@ -16,8 +16,9 @@ async page => {
   await popup.setViewportSize({width:560,height:820});
   await popup.getByRole('button',{name:'기사 입력하기',exact:true}).click();
   await popup.getByRole('button',{name:'출처에서 확인된 주장',exact:true}).click();
-  await popup.getByRole('img',{name:/사실 주장 1개 중 1개 대조 완료/}).waitFor();
-  log.push('actual popup opens /popup without opener or automatic source transfer; example updates its main gauge');
+  await popup.getByRole('status').filter({hasText:'가상 예시'}).waitFor();
+  await popup.getByRole('img',{name:/편향 정도 계산 대기/}).waitFor();
+  log.push('actual popup opens /popup without opener or automatic source transfer; demo leaves the untrained bias gauge pending');
   await popup.getByRole('button',{name:'분석근거 표시',exact:true}).click();
   const claims=popup.getByRole('tab',{name:'주장 · 자료 대조 1',exact:true});
   await claims.click();await claims.press('ArrowLeft');

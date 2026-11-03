@@ -199,6 +199,6 @@ export function assessWeightedClaimEvidence(
     methodologyVersion: validSet ? weightSet!.version.trim() : null,
     methodology: validSet ? weightSet!.methodology.trim() : null,
     claims,
-    note: '출처별 가중치는 제공된 근거·방법 버전으로만 적용합니다. 비율은 검토된 근거의 가중 구성이지 언론사 등급, 사실의 참일 확률 또는 기사 전체의 신뢰 점수가 아닙니다. 모든 관측 출처의 가중치, 적격 출처 2곳 이상, 독립 증거 집단 2개 이상일 때만 비율을 표시합니다.',
+    note: '출처 가중치는 Reuters 이용자 신뢰 응답과 기사별 근거 대조를 결합합니다. Reuters Trust는 매체를 들어 본 응답자 중 0–10점에서 6–10점을 준 비율이며(5 중립, 0–4 불신), 매체별 분모가 다릅니다. 이는 이용자 인식이지 기사 정확도나 언론사 등급이 아닙니다. 가중 구성 비율은 근거 표본의 가중 분포이지 사실의 참일 확률이 아닙니다. 모든 출처의 가중치와 적격 조건을 충족해도, 현재 자동 조사는 주장당 최대 2개 자료를 취득하고 화면은 독립 근거 집단 10개 미만의 비율을 숨기므로 실제 조사에서는 건수만 표시됩니다.',
   };
 }

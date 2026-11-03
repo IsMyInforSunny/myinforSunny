@@ -75,6 +75,14 @@ describe('허용 출처의 문서 해독과 본문 추출 — 모의 응답만 �
   expect(extractArticleDocument(html,true).text).toBe('공개 기사.');
   expect(extractArticleDocument('<article>본문.<aside>광고<body>광고 계속<main>추천 기사</main>',true).text).toBe('본문.');
  });
+ it('따옴표 속 꺾쇠괄호를 실제 태그 경계로 오인하지 않는다',()=>{
+  const fakeArticle='<main><div data-tpl="<article>가짜</article>">카드</div>도서관은 운영 시간을 안내한다.</main>';
+  expect(extractArticleDocument(fakeArticle,true).text).toBe('카드 도서관은 운영 시간을 안내한다.');
+  expect(extractArticleDocument('<article data-x="a>b">도서관은 연다.</article>',true).text).toBe('도서관은 연다.');
+  expect(extractArticleDocument('<meta property="og:title" content="속보 > 정치 > 도서관 연장"><main><img alt="그래프 a>b" src="x.png">끝 문장.</main>',true)).toMatchObject({title:'속보 > 정치 > 도서관 연장',text:'끝 문장.'});
+  const bytes=utf8('<meta charset="utf-8" content="분류 > 기사">');
+  expect(decodeArticleDocument(bytes,'text/html') ).toBe('<meta charset="utf-8" content="분류 > 기사">');
+ });
  it('대소문자가 다른 HTML MIME도 본문으로 추출하고 길이·잘림을 정확히 기록한다',async()=>{
   const text='가상기사 본문 '.repeat(1200);const call=vi.fn().mockResolvedValue(new Response(`<article>${text}</article>`,{headers:{'content-type':'Text/HTML; Charset=UTF-8'}}));vi.stubGlobal('fetch',call);
   const ref=await retrieve('https://news.example/a','r1',{ALLOWED_RETRIEVAL_HOSTS:'news.example'},new AbortController().signal);

@@ -1,7 +1,7 @@
 /** Bounded, offline document decoding/extraction for explicitly allowlisted publishers.
  * This does not establish that a page is an article or that its contents are accurate.
  */
-export const ARTICLE_EXTRACTION_VERSION = 'semantic-text-1.1';
+export const ARTICLE_EXTRACTION_VERSION = 'semantic-text-1.2';
 
 /** Keep the UTF-16 size ceiling without returning half of an astral character. */
 export function articleTextPrefix(text:string,limit:number){
@@ -10,6 +10,9 @@ export function articleTextPrefix(text:string,limit:number){
  return text.slice(0,end);
 }
 const entities:Record<string,string>={nbsp:' ',amp:'&',lt:'<',gt:'>',quot:'"',apos:"'",ndash:'–',mdash:'—',hellip:'…',lsquo:'‘',rsquo:'’',ldquo:'“',rdquo:'”',middot:'·',copy:'©'};
+// Match full tags without treating '<' or '>' inside quoted attributes as boundaries.
+const TAG_PATTERN=/<(\/?)([A-Za-z][A-Za-z0-9:-]*)(?=[\s/>])(?:[^"'<>]|"[^"]*"|'[^']*')*>/g;
+const htmlTags=(html:string)=>html.matchAll(TAG_PATTERN);
 
 function unescapeHtml(value:string){
  return value.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi,(original,key:string)=>{
@@ -18,7 +21,7 @@ function unescapeHtml(value:string){
   return code>0&&code<=0x10ffff&&!(code>=0xd800&&code<=0xdfff)?String.fromCodePoint(code):'�';
  });
 }
-function plainText(html:string){return unescapeHtml(html.replace(/<[^>]*>/g,' ')).replace(/\s+/g,' ').trim();}
+function plainText(html:string){return unescapeHtml(html.replace(TAG_PATTERN,' ')).replace(/\s+/g,' ').trim();}
 function attributes(tag:string){
  const out=new Map<string,string>();
  for(const match of tag.matchAll(/([^\s=/>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g))out.set(match[1].toLowerCase(),unescapeHtml(match[2]??match[3]??match[4]??''));
@@ -36,10 +39,9 @@ function removeInertMarkup(html:string){
 function removeExcludedRegions(html:string){
  // Consume every complete tag, including quoted attributes, so a literal
  // "<body>" inside metadata cannot implicitly close the real head.
- const pattern=/<(\/?)([A-Za-z][A-Za-z0-9:-]*)(?=[\s/>])(?:[^"'<>]|"[^"]*"|'[^']*')*>/g;
  const excluded=new Set(['head','nav','footer','header','aside','form','button']);
  const stack:string[]=[],parts:string[]=[];let cursor=0;
- for(const match of html.matchAll(pattern)){
+ for(const match of htmlTags(html)){
   const tag=match[2].toLowerCase(),closing=!!match[1],start=match.index!;
   // HTML permits omitting </head> before the body. Do not apply this to
   // unclosed advertising/menu regions, whose contents remain withheld.
@@ -67,17 +69,19 @@ export function decodeArticleDocument(bytes:Uint8Array,contentType:string):strin
  // ASCII scanning is only for the charset declaration, not the final document.
  const prefix=/^text\/html(?:;|$)/i.test(contentType)?removeInertMarkup(Array.from(bytes.subarray(0,2048),b=>b<128?String.fromCharCode(b):' ').join('')):'';
  let meta:string|undefined;
- for(const tag of prefix.match(/<meta(?=[\s/>])[^>]*>/gi)??[]){
-  const a=attributes(tag);meta=a.get('charset')??(a.get('http-equiv')?.toLowerCase()==='content-type'?/charset\s*=\s*([^\s;]+)/i.exec(a.get('content')??'')?.[1]:undefined);
+ for(const match of htmlTags(prefix)){
+  if(match[2].toLowerCase()!=='meta')continue;
+  const a=attributes(match[0]);meta=a.get('charset')??(a.get('http-equiv')?.toLowerCase()==='content-type'?/charset\s*=\s*([^\s;]+)/i.exec(a.get('content')??'')?.[1]:undefined);
   if(meta)break;
  }
  const bom=bytes[0]===0xef&&bytes[1]===0xbb&&bytes[2]===0xbf?'utf-8':bytes[0]===0xff&&bytes[1]===0xfe?'utf-16le':bytes[0]===0xfe&&bytes[1]===0xff?'utf-16be':undefined;
  try{return new TextDecoder(bom??header??meta??'utf-8',{fatal:true}).decode(bytes);}catch{return null;}
 }
 
-function semanticBodies(html:string,tag:'article'|'main'){
- const bodies:string[]=[];const pattern=new RegExp(`<(/?)${tag}(?=[\\s/>])[^>]*>`,'gi');let depth=0,start=0;
- for(const match of html.matchAll(pattern)){
+function semanticBodies(html:string,tag:'article'|'main'|'title'){
+ const bodies:string[]=[];let depth=0,start=0;
+ for(const match of htmlTags(html)){
+  if(match[2].toLowerCase()!==tag)continue;
   if(!match[1]){if(depth++===0)start=match.index!+match[0].length;}
   else if(depth>0&&--depth===0)bodies.push(html.slice(start,match.index));
  }
@@ -97,8 +101,8 @@ export function extractArticleDocument(document:string,isHtml:boolean){
  if(!isHtml)return {text:document.trim(),title:undefined,publishedAt:undefined};
  const visible=removeInertMarkup(document);
  const metadata=new Map<string,string>();
- for(const tag of visible.match(/<meta(?=[\s/>])[^>]*>/gi)??[]){const a=attributes(tag),name=a.get('property')??a.get('name');if(name&&a.get('content')&&!metadata.has(name.toLowerCase()))metadata.set(name.toLowerCase(),a.get('content')!);}
- const title=metadata.get('og:title')??plainText(/<title(?=[\s/>])[^>]*>([\s\S]*?)<\/title\s*>/i.exec(visible)?.[1]??'');
+ for(const match of htmlTags(visible)){if(match[2].toLowerCase()!=='meta')continue;const a=attributes(match[0]),name=a.get('property')??a.get('name');if(name&&a.get('content')&&!metadata.has(name.toLowerCase()))metadata.set(name.toLowerCase(),a.get('content')!);}
+ const title=metadata.get('og:title')??plainText(semanticBodies(visible,'title')[0]??'');
  const publishedAt=publicationDate(metadata.get('article:published_time')??metadata.get('datepublished')??metadata.get('date'));
  const cleaned=removeExcludedRegions(visible);
  const candidates=semanticBodies(cleaned,'article');

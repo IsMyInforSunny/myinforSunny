@@ -11,7 +11,7 @@ export type ObservedSources={
 /** Observations need an explicit analysis binding. Callers may scope their own current child results before passing them. */
 export function collectObservedSources(analysis:Analysis,results:readonly ResearchVerification[]):ObservedSources{
  const collected:ObservedSources={fetched:[],provided:[],demo:[],excluded:{stale:0,unbound:0,modeMismatch:0},temporalWarnings:[]};
- const seen=new Set<string>();let next=0;
+ const seen=new Map<string,Reference>();const warned=new Set<string>();let next=0;
  for(const result of results){
   if(!result.parentAnalysisId){collected.excluded.unbound++;continue;}
   if(result.parentAnalysisId!==analysis.analysisId){collected.excluded.stale++;continue;}
@@ -22,15 +22,17 @@ export function collectObservedSources(analysis:Analysis,results:readonly Resear
    // The same reference can occur in several checks. Exact repeated observations count once;
    // different text/metadata at the same URL remains visible to the duplicate detector.
    const key=JSON.stringify([category,canonical.url??ref.url??ref.id,ref.text,ref.publishedAt??null,ref.fetchedAt??null,ref.truncated,ref.fullTextLength??null]);
-   if(seen.has(key))continue;seen.add(key);
-   const copy={...ref,id:`observed_${next++}`};collected[category].push(copy);
+   // Deduplicate the source, not its claim-specific temporal observations.
+   let copy=seen.get(key);
+   if(!copy){copy={...ref,id:`observed_${next++}`};seen.set(key,copy);collected[category].push(copy);}
    if(category!=='fetched')continue;
    const times=[...new Set(result.checks.filter(c=>c.relations.some(r=>r.referenceId===ref.id)).flatMap(c=>{
     const claim=analysis.claims.find(a=>a.id===c.claimId);return claim?.targetTime?[claim.targetTime]:[];
    }))];
    for(const targetTime of times){
     const observation=assessSources([copy],{targetTime}).items[0];
-    if(observation.temporal.status==='mismatch_candidate')collected.temporalWarnings.push({referenceId:copy.id,targetTime});
+    const warningKey=JSON.stringify([copy.id,targetTime]);
+    if(observation.temporal.status==='mismatch_candidate'&&!warned.has(warningKey)){warned.add(warningKey);collected.temporalWarnings.push({referenceId:copy.id,targetTime});}
    }
   }
  }

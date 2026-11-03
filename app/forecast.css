@@ -56,6 +56,9 @@
 .cv3-axis-value-text{font-size:4.2cqi}
 .cv3-axis-action{margin-top:6.4cqi;display:inline-flex;align-items:center;gap:.8cqi;padding:.9cqi 1.8cqi;border-radius:99px;background:#ffffffeb;border:2px solid #111;color:#111;font-size:max(12px,2.5cqi);font-weight:850;line-height:1.2}
 .cv3-axis-action:hover{background:white}
+.cv3-axis-action.cv3-score-coordinate{margin-top:.8cqi}
+.cv3-score-sample{display:block;margin-top:3px;font-size:max(10px,1.5cqi);font-weight:650;letter-spacing:0}
+.cv3-axis-measure{margin-top:3px;font-size:max(10px,1.6cqi);font-weight:750;line-height:1.2;background:#ffffffd6;border-radius:4px;padding:2px 4px}
 .cv3-axis-caption{margin-top:.8cqi;padding:.25cqi 1cqi;border-radius:4px;background:#ffffffd6;color:#1f3b48;font-size:max(10px,1.45cqi);line-height:1.45;font-weight:650}
 
 .cv3-gauge-caption{position:absolute;top:50.2cqi;left:50%;transform:translateX(-50%);width:46cqi;text-align:center}

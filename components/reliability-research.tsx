@@ -8,6 +8,9 @@ import {researchWait,runResearch} from '@/lib/research-runner';
 export default function ReliabilityResearch({analysis,cap,onChange}:{analysis:Analysis;cap:Capabilities|null;onChange:(results:ResearchVerification[],stage:ResearchStage)=>void}){
  const [consent,setConsent]=useState(false),[started,setStarted]=useState(false),[stage,setStage]=useState<ResearchStage>('not_started'),[message,setMessage]=useState(''),[results,setResults]=useState<ResearchVerification[]>([]);
  const callback=useRef(onChange);callback.current=onChange;const control=useRef<AbortController|null>(null);
+ const consentRef=useRef<HTMLInputElement>(null),cancelRef=useRef<HTMLButtonElement>(null),restartRef=useRef<HTMLButtonElement>(null);
+ const focusAfterTransition=useRef<'cancel'|'restart'|'consent'|null>(null);
+ const researchFocusChain=useRef(false);
  const ready=!!cap?.live&&cap.webSearch&&cap.webFetch&&analysis.mode==='live';
  const factual=analysis.claims.filter(c=>c.kind==='factual');const proposition=analysis.proposition?.trim()||undefined;const position=proposition?undefined:analysis.claims.find(c=>c.kind==='opinion');const hasTargets=!!factual.length||!!position||!!proposition;
  useEffect(()=>{
@@ -26,8 +29,23 @@ export default function ReliabilityResearch({analysis,cap,onChange}:{analysis:An
  },[started,consent,ready]);
  const review=reliabilityReview(analysis,results,stage),cards=verifiedRecommendations(results,analysis);
  const busy=['planning','searching','fetching','waiting','comparing'].includes(stage);
- function cancel(){control.current?.abort();setStage('cancelled');setMessage('조사를 취소했어요. 이미 확인한 자료만 표시합니다.');callback.current(results,'cancelled');}
- function prepareRestart(){control.current?.abort();setStarted(false);setConsent(false);setStage('not_started');setMessage('');setResults([]);callback.current([],'not_started');}
+ useEffect(()=>{
+  const terminal=started&&!busy&&['completed','partial','failed','cancelled'].includes(stage);
+  if(!focusAfterTransition.current&&researchFocusChain.current&&terminal)focusAfterTransition.current='restart';
+  const target=focusAfterTransition.current;
+  const element=target==='cancel'?cancelRef.current:target==='restart'?restartRef.current:target==='consent'?consentRef.current:null;
+  if(!element){if(terminal)researchFocusChain.current=false;return;}
+  const frame=requestAnimationFrame(()=>{
+   // Restore focus only after the active control disappears; never pull it
+   // back from a user who has deliberately moved somewhere else.
+   if(document.activeElement===document.body){element.focus();if(document.activeElement===element){researchFocusChain.current=target==='cancel';focusAfterTransition.current=null;}}
+   else if(target!=='cancel'||terminal){researchFocusChain.current=false;focusAfterTransition.current=null;}
+  });
+  return ()=>cancelAnimationFrame(frame);
+ },[started,stage]);
+ function start(){researchFocusChain.current=false;focusAfterTransition.current='cancel';setStarted(true);}
+ function cancel(){researchFocusChain.current=false;focusAfterTransition.current='restart';control.current?.abort();setStage('cancelled');setMessage('조사를 취소했어요. 이미 확인한 자료만 표시합니다.');callback.current(results,'cancelled');}
+ function prepareRestart(){researchFocusChain.current=false;focusAfterTransition.current='consent';control.current?.abort();setStarted(false);setConsent(false);setStage('not_started');setMessage('');setResults([]);callback.current([],'not_started');}
  const kindLabel={opposing_view:'다른 입장',supporting_view:'같은 입장',different_evidence:'다른 수치·사실을 담은 자료',context:'관련 맥락'};
  return <section className="report-section" aria-label="자동 신뢰성 조사">
   <div className="report-section-title"><h3><Search size={16}/> 03. 신뢰성</h3><span className="badge badge-purple">외부 자료 조사</span></div>
@@ -36,10 +54,10 @@ export default function ReliabilityResearch({analysis,cap,onChange}:{analysis:An
   {!factual.length&&<p className="topic-note">대조할 사실 주장이 없어요. 의견·비교 명제를 참·거짓으로 판정하지 않고 다른 관점의 자료를 찾습니다.</p>}
   {proposition&&<p className="topic-note">직접 지정한 비교 명제: {proposition} · 이 명제에 대한 기사 입장을 별도로 살펴봅니다.</p>}
   {!hasTargets?<p className="topic-note">조사할 주장이나 의견을 추출하지 못했어요.</p>:analysis.mode==='demo'?<p className="topic-note">이 예시는 가상 자료입니다. 외부 검색이나 실제 조사 결과가 아닙니다.</p>:!ready?<div className="notice">자동 신뢰성 조사·관련 기사 검색은 아직 연결 준비 중입니다. 현재 입력한 기사만으로 외부 신뢰성 검토가 완료되지는 않습니다.</div>:<>
-   {!started&&<><label className="transmission-consent"><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/><span>공개 자료에서 추출한 검색어가 {(cap?.searchProvider==='firecrawl'?'Firecrawl':'GDELT')}로 전송되고, 취득한 기사 발췌와 주장이 Groq로 전송되는 자동 조사에 동의합니다. 검색어는 검색 제공자 정책에 따라 보관·서비스 개선에 사용될 수 있습니다.</span></label><button className="button secondary" disabled={!consent} onClick={()=>setStarted(true)}>{factual.length?'공개 자료로 자동 조사하기':'다른 관점의 기사 찾기'}</button><p className="topic-note">무료 한도를 지키며 주장별로 조사하므로 수 분 걸릴 수 있어요. 창을 열어 두세요.</p></>}
+   {!started&&<><label className="transmission-consent"><input ref={consentRef} type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/><span>공개 자료에서 추출한 검색어가 {(cap?.searchProvider==='firecrawl'?'Firecrawl':'GDELT')}로 전송되고, 취득한 기사 발췌와 주장이 Groq로 전송되는 자동 조사에 동의합니다. 검색어는 검색 제공자 정책에 따라 보관·서비스 개선에 사용될 수 있습니다.</span></label><button className="button secondary" disabled={!consent} onClick={start}>{factual.length?'공개 자료로 자동 조사하기':'다른 관점의 기사 찾기'}</button><p className="topic-note">무료 한도를 지키며 주장별로 조사하므로 수 분 걸릴 수 있어요. 창을 열어 두세요.</p></>}
    {message&&<p className="topic-note" role="status">{busy&&<LoaderCircle size={14} className="spin"/>} {message}</p>}
-   {busy&&<button className="small-button" onClick={cancel}>조사 취소</button>}
-   {started&&!busy&&['completed','partial','failed','cancelled'].includes(stage)&&<button className="small-button" onClick={prepareRestart}>새 조사 준비하기</button>}
+   {busy&&<button ref={cancelRef} className="small-button" onClick={cancel}>조사 취소</button>}
+   {started&&!busy&&['completed','partial','failed','cancelled'].includes(stage)&&<button ref={restartRef} className="small-button" onClick={prepareRestart}>새 조사 준비하기</button>}
   </>}
   {!!review.completedClaims&&<div className="stance-list"><span>뒷받침 {review.supported}</span><span>상충 {review.contradicted+review.conflicting}</span><span>불충분 {review.insufficient}</span></div>}
   {cards.length>0&&<><h4>참고할 관련 기사</h4>{cards.map(card=><article className="claim-relations" key={card.url}><span className="badge">{kindLabel[card.kind]}</span><h4><a href={card.url} target="_blank" rel="noopener noreferrer">{card.title} <ArrowUpRight size={12}/></a></h4><p className="topic-note">{card.publisherDomain} · 본문 취득 · 인용 일치 확인</p><blockquote>“{card.quote.slice(0,280)}{card.quote.length>280?'…':''}”</blockquote><p>{card.reason}</p></article>)}</>}

@@ -1,7 +1,7 @@
 import type {PublisherWeightSet} from './source-reliability';
 
 const CSV = 'https://datawrapper.dwcdn.net/3sOWE/2/data.csv';
-const CAVEAT = '이 수치는 이용자 신뢰 인식 응답이며 기사 정확도나 사실 신뢰도가 아니다. 두 매체 간 2%p 이하 차이는 조사 오차·표본의 한계를 고려해 유의한 순위 차이로 단정하지 않는다. Reuters Institute Digital News Report 2025 한국 브랜드 신뢰 표, 2025-06-17.';
+const CAVEAT = '이 수치는 매체를 들어 본 응답자 중 0–10점에서 6–10점을 준 비율(5점은 중립, 0–4점은 불신)이며 이용자 신뢰 인식을 나타낸다. 기사 정확도나 사실 신뢰도가 아니다. 매체별 인지자만 분모에 들어가므로 분모가 서로 다르다. 두 매체 간 2%p 이하 차이는 유의한 순위 차이로 단정하지 않는다. Reuters Institute Digital News Report 2025 한국 브랜드 신뢰 표, 2025-06-17.';
 const evidence = (brand: string, percent: number) =>
   `${brand} 이용자 신뢰 응답 ${percent}%. CSV 원자료: ${CSV}. ${CAVEAT} Yonhap News TV 응답은 yna.co.kr의 연합뉴스와 다른 방송 매체(yonhapnewstv.co.kr) 항목이다.`;
 
@@ -12,7 +12,7 @@ const evidence = (brand: string, percent: number) =>
  */
 export const SOUTH_KOREA_PUBLIC_TRUST_PRIOR_2025: PublisherWeightSet = {
   version: 'reuters-dnr-2025-kr-brand-trust-v2',
-  methodology: `Reuters Institute Digital News Report 2025 South Korea brand trust responses. Each weight is raw Trust% / 100 from the publisher's comparable named brand in the source CSV (${CSV}). Online YouGov South Korea sample (n=2,038), quota-based and census/industry weighted, non-probability sample. This measures reported audience trust, not factual accuracy. Differences of 2 percentage points or less must not be treated as a meaningful rank difference without uncertainty analysis. Partial host coverage: publishers without a clear comparable host are omitted, and a claim result remains pending if any observed publisher lacks a weight.`,
+  methodology: `Reuters Institute Digital News Report 2025 South Korea brand trust responses. Each weight is raw Trust% / 100 from the publisher's comparable named brand in the source CSV (${CSV}). Trust is the share rating 6–10 on a 0–10 scale; 5 is neither and 0–4 is don't trust. Respondents who had not heard of a brand are excluded, so each brand has a different awareness-conditioned denominator. The weighted share is reported audience perception, not factual accuracy. Differences of 2 percentage points or less are very unlikely to be statistically significant and should be interpreted with high caution. Partial host coverage: publishers without a clear comparable host are omitted, and a claim result remains pending if any observed publisher lacks a weight.`,
   weights: [
     {publisher: 'ichannela.com', value: 0.43, evidence: evidence('Channel A', 43)},
     {publisher: 'chosun.com', value: 0.40, evidence: evidence('Chosun', 40)},
