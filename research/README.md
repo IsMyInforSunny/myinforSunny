@@ -23,3 +23,5 @@ python -m pytest research/test_engine.py -q
 합성 시험은 명시적 `--synthetic`으로만 수행하고 provenance=synthetic인 행만 허용합니다. artifact는 synthetic-test-only로 표시됩니다. 사람이 검토한 실험 자료도 experimental-not-approved로 내보내며 테스트 개수만으로 승인 모델이 되지 않습니다. 별도 운영 승격은 아직 구현하지 않았습니다.
 
 현재 독립 한국어 학습·시험·운영 모델이 없으므로 공개 사이트는 예시 상태를 유지합니다. API 키를 만들거나 Cloudflare에 가입할 필요가 없습니다.
+
+편향 분석용 매체별 기사 SVM은 별도 준비 과제입니다. 2026-11-03 조사에서 KoPolitic과 Implicit Media Bias 공개 후보의 매체 이름 또는 기사 이용 라이선스가 불충분해 학습 대상으로 채택하지 않았습니다. 조건과 통과 기준은 [편향 데이터 준비 상태](bias-data-readiness.md)에 기록했습니다.

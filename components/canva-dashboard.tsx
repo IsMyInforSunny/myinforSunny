@@ -12,6 +12,7 @@ import {assessWeightedClaimEvidence, type EvidenceObservation, type PublisherWei
 import {MIN_N_FOR_PERCENT} from '@/lib/display';
 import {reviewCitedSources, type ClaimSourcingStatus, type CitedSourceType} from '@/lib/cited-sources';
 import {buildAnalysisScores} from '@/lib/analysis-scores';
+import {reviewedCitedSources} from '@/lib/cited-source-confirmations';
 
 type Props = {
   analysis: Analysis | null;
@@ -118,14 +119,16 @@ export default function CanvaDashboard({analysis, researchResults, biasArticleCo
   const results = analysis ? currentResearch(analysis, researchResults) : [];
   const total = analysis?.claims.filter(claim => claim.kind === 'factual').length ?? 0;
   const bias = analyzeBiasCoordinate(biasArticleCoordinates, biasOrientationSet, selectedBiasArticleId);
-  const scores = buildAnalysisScores(analysis,bias);
+  const scores = buildAnalysisScores(analysis,bias,{observations:reliabilityObservations,weightSet:sourceWeightSet});
   const scoreLabel = (score:typeof scores.bias) => score.value === null ? score.status === 'not_applicable' ? '해당 없음' : '산출 대기'
     : score.status === 'partial' && score.upperBound !== undefined && score.upperBound !== score.value ? `${score.value}–${score.upperBound}점` : `${score.value}점`;
   const weightedReliability = assessWeightedClaimEvidence(reliabilityObservations, sourceWeightSet,
     analysis?.claims.filter(claim => claim.kind === 'factual').map(claim => claim.id) ?? []);
   const cited = analysis ? reviewCitedSources(analysis) : null;
-  const tracedClaims = scores.reliability.numerator ?? 0;
+  const sourceAssessment = analysis ? reviewedCitedSources(analysis,results,sourceWeightSet) : null;
+  const tracedClaims = scores.attribution.numerator ?? 0;
   const weightedReady = weightedReliability.claims.filter(claim => claim.status === 'weighted_evidence_available').length;
+  const evidenceGroups = new Set(reliabilityObservations.map(item=>item.originId??item.articleId)).size;
   const weightedObserved = weightedReliability.claims.filter(claim => claim.publisherCounts.length > 0);
   const expression = analysis ? expressionSummary(analysis) : null;
   const cards = analysis?.mode === 'live' ? verifiedRecommendations(results, analysis) : [];
@@ -224,8 +227,9 @@ export default function CanvaDashboard({analysis, researchResults, biasArticleCo
               <li className="cv3-axis cv3-axis-trust">
                 <span className="cv3-axis-label">신뢰</span>
                 <strong className={`cv3-axis-value${scores.reliability.value === null ? ' cv3-axis-value-text' : ''}`}>{scoreLabel(scores.reliability)}{scores.reliability.denominator !== null && scores.reliability.denominator > 0 && <span className="cv3-score-sample">n={scores.reliability.denominator}</span>}</strong>
-                <small className="cv3-axis-measure">출처 명시 점수</small>
-                <small className="cv3-axis-caption">{!analysis ? '근거 출처 분석 대기' : !total ? '대조할 사실 주장 없음' : `출처 명시 ${tracedClaims}/${total} · 1차 자료 ${cited!.summary.traceable_primary}${cited!.summary.weak ? ` · 익명·전언 ${cited!.summary.weak}` : ''}`}</small>
+                <small className="cv3-axis-measure">출처 가중 근거</small>
+                <small className="cv3-axis-caption">{!analysis ? '근거 출처 분석 대기' : !total ? '대조할 사실 주장 없음' : `대조 ${weightedReady}/${total}주장 · 근거 ${evidenceGroups}집단`}</small>
+                {analysis&&total>0&&<small className="cv3-axis-caption">출처 명시 {scoreLabel(scores.attribution)} ({tracedClaims}/{total})</small>}
               </li>
             </ul>
           </div>
@@ -277,7 +281,8 @@ export default function CanvaDashboard({analysis, researchResults, biasArticleCo
         <summary>편향·자극·신뢰와 게이지는 이렇게 읽어요</summary>
         <dl>
           <dt>편향</dt><dd>{axisHelp.bias}</dd>
-          <dt>점수 기준</dt><dd>모든 점수는 0–100점입니다. 편향·자극은 높을수록 해당 특성이 많이 관찰됐고, 신뢰는 높을수록 사실 주장의 근거 출처가 명시됐다는 뜻입니다. 신뢰 점수는 출처 명시 점수이며 사실 정확도나 진실 확률로 해석하지 않습니다. 표본 건수와 외부 자료 대조 결과를 함께 확인해 주세요.</dd>
+          <dt>점수 기준</dt><dd>모든 점수는 0–100점입니다. 편향·자극은 높을수록 해당 특성이 많이 관찰됐고, 신뢰는 현재 대조한 자료에서 출처 가중치를 반영한 뒷받침 근거의 비중이 높다는 뜻입니다. 사실 정확도나 진실 확률로 해석하지 않습니다. 출처 명시 점수는 이름 있는 출처가 적혀 있는지를 나타내는 별도 보조 정보입니다. 표본 건수와 외부 자료 대조 결과를 함께 확인해 주세요.</dd>
+          <dt>신뢰 점수 산식·범위</dt><dd>{scores.reliability.note}</dd>
           <dt>자극</dt>
           <dd>
             {axisHelp.expression}
@@ -297,6 +302,18 @@ export default function CanvaDashboard({analysis, researchResults, biasArticleCo
               <small>{item.unresolvedAttribution ? '화자 미확인 · 앞 문장의 출처를 추측하지 않았습니다' : sourcingLabels[item.status]}{linked.map(source => ` · ${citedTypeLabels[source.type]}${source.name ? `: ${source.name}` : ''} (${source.reasons.join(', ')})`).join('')}</small>
             </article>;
           })}
+        </section>}
+        {analysis && sourceAssessment && total > 0 && <section aria-label="인용 출처의 원문 확인과 공개 가중">
+          <h3>인용 출처 원문 확인 · {sourceAssessment.summary.originalVerifiedClaims}/{total}주장</h3>
+          <p>{sourceAssessment.note}</p>
+          {sourceAssessment.sources.map(source=><article key={source.citedSourceId}>
+            <h4>{source.confirmedFromText.name??'익명·불특정 출처'}</h4>
+            <p>{source.originalCheck.status==='verified'?'동일 출처의 취득 원문에서 인용 구절 확인':'원문 미확인'} · {source.originalCheck.reason}</p>
+            {source.originalCheck.status==='verified'&&source.originalCheck.url&&<p><a href={source.originalCheck.url} target="_blank" rel="noopener noreferrer">확인한 출처 원문 ↗</a></p>}
+            <p>{source.publicPrior.status==='applied'?`공개 이용자 신뢰 보조 가중 ${source.publicPrior.value?.toFixed(2)} · ${source.publicPrior.version}`:'적용 가능한 공개 출처 가중치 없음'}</p>
+            <p>미확인: {source.unconfirmed.join(' · ')}</p>
+          </article>)}
+          {!sourceAssessment.sources.length&&<p>구체적인 인용 출처를 찾지 못했습니다. 원문이 없다는 뜻으로 단정하지 않습니다.</p>}
         </section>}
         {analysis && total > 0 && weightedObserved.length > 0 && <section aria-label="주장별 출처 가중 근거 구성">
           <h3>주장별 출처 가중 근거 구성 · {weightedReady}/{total} 주장 계산 가능</h3>

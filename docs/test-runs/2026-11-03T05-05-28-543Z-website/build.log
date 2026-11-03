@@ -1,0 +1,72 @@
+
+  vinext build  (Vite 8.0.13)
+
+(node:16712) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[1/5] analyze client references...
+[2Ktransforming...✓ 378 modules transformed.
+rendering chunks...
+[33m[PLUGIN_TIMINGS] [0mYour build spent significant time in plugins. Here is a breakdown:
+  - rsc:virtual-client-package (23%)
+  - vinext:css-data-url (15%)
+  - alias (12%)
+  - vinext:og-inline-fetch-assets (9%)
+  - vinext:middleware-server-only (6%)
+See https://rolldown.rs/options/checks#plugintimings for more details.
+
+✓ built in 4.64s
+[2/5] analyze server references...
+[2Ktransforming...✓ 214 modules transformed.
+rendering chunks...
+✓ built in 622ms
+[3/5] build rsc environment...
+[2Ktransforming...✓ 375 modules transformed.
+rendering chunks...
+computing gzip size...
+[33m[PLUGIN_TIMINGS] [0mYour build spent significant time in plugins. Here is a breakdown:
+  - vinext:og-inline-fetch-assets (18%)
+  - rsc:virtual-client-package (16%)
+  - vinext:css-data-url (10%)
+  - vinext:middleware-server-only (8%)
+  - alias (8%)
+See https://rolldown.rs/options/checks#plugintimings for more details.
+
+✓ built in 3.66s
+[4/5] build client environment...
+[2Ktransforming...✓ 2009 modules transformed.
+rendering chunks...
+computing gzip size...
+[33m[PLUGIN_TIMINGS] [0mYour build spent significant time in plugins. Here is a breakdown:
+  - vinext:css-data-url (17%)
+  - vinext:middleware-server-only (14%)
+  - vinext:og-inline-fetch-assets (13%)
+  - rsc:virtual-client-package (10%)
+  - alias (9%)
+See https://rolldown.rs/options/checks#plugintimings for more details.
+
+✓ built in 6.25s
+[5/5] build ssr environment...
+[2Ktransforming...✓ 220 modules transformed.
+rendering chunks...
+computing gzip size...
+✓ built in 2.21s
+[0m
+  Route (app)
+  ┌ ? /
+  ├ ? /analyze
+  ├ λ /api/analyze
+  ├ λ /api/capabilities
+  ├ λ /api/health
+  ├ λ /api/news
+  ├ λ /api/research
+  ├ λ /api/verify
+  ├ ? /methodology
+  └ ? /popup
+
+  λ API  ? Unknown
+
+  ? Some routes could not be classified. vinext currently uses static analysis
+    and cannot detect dynamic API usage (headers(), cookies(), etc.) at build time.
+    Automatic classification will be improved in a future release.
+
+  Build complete. Run `vinext start` to start the production server.

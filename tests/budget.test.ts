@@ -35,6 +35,23 @@ describe('IP 해시 (서버 HMAC)',()=>{
  it('비밀값이 없으면 해시하지 않고 요청을 닫는다',async()=>{await expect(actorHash(withIp('1.1.1.1'),{})).rejects.toMatchObject({code:'FEATURE_UNAVAILABLE'});});
 });
 describe('D1 실제 예약과 제한',()=>{
+ it('확인된 프로젝트 TPM이 예약값보다 작으면 DB예약·외부작업 전에 차단한다',async()=>{
+  const action=vi.fn();await expect(withBudget(req('small-project'),{...config(),GROQ_CONSOLE_TPM:'6499'},'small-project',1000,action)).rejects.toMatchObject({code:'PROJECT_MINUTE_LIMIT_UNSUPPORTED'});
+  expect(action).not.toHaveBeenCalled();expect(await db.prepare('SELECT COUNT(*) AS n FROM request_budget').first()).toMatchObject({n:0});
+ });
+ it('프로젝트 TPM6500~6999는 기존7000보다 엄격하게 전체사용자 토큰을 예약한다',async()=>{
+  const now=Date.now(),day=new Date(now).toISOString().slice(0,10);
+  await db.prepare('INSERT INTO request_budget (id,actor,day,created_at,reserved,consumed,active) VALUES (?,?,?,?,?,?,0)').bind('minute-seed','other',day,now,200,200).run();
+  const action=vi.fn();await expect(withBudget(req('strict-tpm'),{...config(),GROQ_CONSOLE_TPM:'6600'},'strict-tpm',1000,action)).rejects.toMatchObject({code:'CAPACITY_EXCEEDED'});
+  expect(action).not.toHaveBeenCalled();
+  await expect(withBudget(req('higher-project'),{...config(),GROQ_CONSOLE_TPM:'8000'},'higher-project',1000,async c=>{c.onUsage?.(1);return 'ok';})).resolves.toBe('ok');
+ });
+ it('확인된 RPM은 서로 다른 사용자의 순차 요청도 합쳐서 원자적으로 제한한다',async()=>{
+  const c={...config(),GROQ_CONSOLE_RPM:'2'};
+  for(let i=0;i<2;i++)await withBudget(req(`global-${i}`),c,`global-${i}`,1000,async current=>current.onUsage?.(1));
+  const action=vi.fn();await expect(withBudget(req('global-third'),c,'global-third',1000,action)).rejects.toMatchObject({code:'CAPACITY_EXCEEDED'});
+  expect(action).not.toHaveBeenCalled();expect(await db.prepare('SELECT COUNT(*) AS n FROM request_budget').first()).toMatchObject({n:2});
+ });
  it('다른 사용자도 전체 분당 토큰 예산을 공유한다',async()=>{
   const now=Date.now(),day=new Date(now).toISOString().slice(0,10);
   await db.prepare('INSERT INTO request_budget (id,actor,day,created_at,reserved,consumed,active) VALUES (?,?,?,?,?,?,0)').bind('seed','other',day,now,600,600).run();

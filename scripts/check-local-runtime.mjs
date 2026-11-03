@@ -25,7 +25,7 @@ assert.equal(privateConfig.status, 403, 'Worker local configuration must not be 
 const capabilityResponse = await request('/api/capabilities');
 assert.equal(capabilityResponse.status, 200);
 const capabilities = await capabilityResponse.json();
-assert.equal(capabilities.live, false, 'Local live analysis must stay disabled.');
+assert.equal(typeof capabilities.live, 'boolean');
 assert.equal(capabilities.webSearch, false, 'Local external search must stay disabled.');
 assert.equal(capabilities.webFetch, false, 'Local external article fetch must stay disabled.');
 const post = body => request('/api/analyze', {
@@ -36,15 +36,16 @@ assert.equal(demoResponse.status, 200);
 const demo = await demoResponse.json();
 assert.equal(demo.mode, 'demo');
 assert.ok(demo.sources.length > 0);
-const liveResponse = await post({
+// This smoke check never makes an inference call, even after live is enabled.
+const liveResponse = capabilities.live ? null : await post({
   kind: 'text', body: 'The fictional school garden opens at nine.',
   comments: [], transmissionConsent: true,
 });
-assert.equal(liveResponse.status, 503, 'Disabled live requests must fail before inference.');
+if(liveResponse)assert.equal(liveResponse.status, 503, 'Disabled live requests must fail before inference.');
 console.log(JSON.stringify({
-  check: 'local HTTP routes, demo analysis and disabled external features',
+  check: 'local HTTP routes, demo analysis, secret-file protection; no inference',
   status: 'passed', origin: origin.origin, pages: results,
   live: capabilities.live, webSearch: capabilities.webSearch, webFetch: capabilities.webFetch,
-  demoMode: demo.mode, disabledLiveRequestStatus: liveResponse.status,
+  demoMode: demo.mode, disabledLiveRequestStatus: liveResponse?.status??null,
   privateConfigRequestStatus: privateConfig.status,
 }, null, 2));

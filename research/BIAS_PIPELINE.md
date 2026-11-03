@@ -52,3 +52,58 @@ py -m unittest discover -s research -p test_train_bias.py
 ```
 
 이 검사는 합성 문장으로 그룹 분리, 데이터 거부 조건, 내보낸 계수의 추론 동등성, 방향 라벨이 학습에 들어가지 않는지, 기준 매체 누락과 잘못된 승인 메타데이터를 거부하는지 확인한다. 실측 모델 평가와 구분한다.
+
+## 실제 사람 평가를 준비하고 집계하기
+
+`review_bias_axis.py`는 실제 평가자를 대신하지 않고, 평가 양식과 실제 일치도 계산을 제공한다. 데이터와 평가자 신원·답안을 만들거나 온라인으로 보내지 않는다. 검토용 파일과 답안은 로컬에 보관한다.
+
+먼저 학습 산출물에서 두 평가자의 빈 CSV를 만든다. 출력 파일은 기존 파일을 덮어쓰지 않는다.
+
+```powershell
+py research/review_bias_axis.py prepare --artifact bias-model.local.json --reviewer-one reviewer-one.local.csv --reviewer-two reviewer-two.local.csv --sample-count 40
+```
+
+학습 기사와 분리된 평가 기사만 사용하며, 같은 원본 그룹이나 같은 본문 해시에서는 한 기사만 뽑는다. 모델 버전과 기사 ID로 정렬한 결정적 표본이므로 같은 자료로 반복 생성하면 같은 표본이 나온다. 원본 그룹·본문 해시가 학습/평가 양쪽에 있거나 실제 자료의 이용 조건 검토 기록이 누락되면 중단한다. 40개보다 적으면 확보된 양식만 만들고, 그 상태에서 승인은 불가능하다.
+
+두 CSV의 열은 `modelVersion,reviewSetId,articleId,url,publicationDate,reviewerId,label`이다. 모델 점수·매체 ID·모델의 좌우 분류는 넣지 않는다. URL로 매체를 짐작할 수 있으므로 완전한 매체 은폐는 아니다. 평가자는 서로 답안을 보지 않고 별도 사본에 각자의 실제 `reviewerId`와 `label`을 적는다. 라벨은 `left`, `center`, `right`, `undetermined` 중 하나다. 판정할 수 없으면 `undetermined`, 아직 읽지 않았다면 빈 칸으로 남긴다. 모델 버전·원문 URL·날짜·기사 ID·reviewSetId는 수정하지 않는다.
+
+평가 기준은 사전에 같은 주제·시점·명제에서의 기사 표현과 입장으로 합의한다. 매체 이름만 보고 라벨을 붙이지 않는다. `center`와 판단 불가인 `undetermined`를 구분하고, 자료 선정·라벨 정의·예외·원문 접근 실패를 별도 검토 기록에 남긴다. 평가자 ID를 다르게 적는 것만으로 실제 독립 검토가 증명되지는 않는다.
+
+두 답안만으로 먼저 측정 보고서를 만들 수 있다.
+
+```powershell
+py research/review_bias_axis.py report --artifact bias-model.local.json --reviewer-one reviewer-one.local.csv --reviewer-two reviewer-two.local.csv --output axis-review.local.json
+```
+
+보고서는 두 사람이 모두 라벨을 붙인 공통 표본의 Cohen κ와, `undetermined`를 제외한 공통 판단 가능 표본의 κ를 각각 계산한다. 관측 일치율·라벨 분포·표본 수·전체 적격 평가 자료 대비 커버리지도 표시한다. 두 평가자가 한 종류 라벨만 사용해 κ가 정의되지 않으면 1로 바꾸지 않고 `null`과 사유를 기록한다. κ는 사람끼리의 일치도이며 모델의 정확도가 아니다. 두 사람 모두 판단 가능한 서로 다른 원본 최소 40개가 필요하다.
+
+**높은 κ만으로 축을 승인하지 않는다.** 두 평가자는 블라인드 답안을 제출한 뒤 실제 축·좌표·실패 사례·주제 누수·제호 암기 여부를 따로 확인하고 축의 정치적 해석을 승인할지 결정해야 한다. 승인 결정을 기록한 로컬 JSON의 형식은 다음과 같다. 아래 값은 양식 설명용이며 실제 승인이나 평가자 신원이 아니다.
+
+```json
+{
+  "reviewedModelVersion": "실제 검토한 모델 버전",
+  "reviewedBy": "실제 검토 책임자 식별자",
+  "evidence": "실제 축 검토 기록의 로컬 경로",
+  "reviewers": [
+    {"reviewerId": "첫 CSV와 같은 실제 ID", "axisApproved": false, "independentReview": false, "evidence": "첫 평가자의 실제 축 검토 기록"},
+    {"reviewerId": "둘째 CSV와 같은 실제 ID", "axisApproved": false, "independentReview": false, "evidence": "둘째 평가자의 실제 축 검토 기록"}
+  ]
+}
+```
+
+독립 검토와 축 승인이 실제로 완료됐을 때만 각 평가자가 해당 boolean 값을 true로 기록한다. 그 결정을 집계하려면 `report`에 `--decision axis-decision.local.json`을 추가한다. 실제 자료, 정확히 일치하는 모델 버전, 최소 40개 공통 판단 가능 원본, 정의된 비음수 κ, 기존 평가 매체 축 분리 검사, 두 평가자의 명시적 독립 검토·축 승인과 근거 기록이 모두 있어야 보고서에 `humanAxisReview`를 생성한다. 합성 자료는 모든 답안과 승인을 채워도 계속 `research_only`다. 이 도구는 학습 모델·manifest·사이트 배포 파일을 자동 변경하지 않는다.
+
+보고서의 정확한 계약은 다음과 같다.
+
+- `schemaVersion: "bias-axis-human-review-1"`, `modelVersion`, `reviewSetId`, `dataKind`.
+- `status: "research_only" | "human_review_ready"`, `blockingReasons: string[]`.
+- `eligibleArticleCount`, `commonArticleCount`, `commonDeterminateArticleCount`, `commonEligibleCorpusCoverage`, 공통 기사 ID 목록 두 종류와 답안 파일 SHA256 두 개.
+- `reviewers: [{reviewerId,submittedRows,labeledRows,labelCounts,eligibleCorpusCoverage}]`.
+- `agreementAllCommon`, `agreementDeterminate`: 각각 `{sampleCount,observedAgreement,cohensKappa,undefinedReason}`. 빈 표본에서 두 수치는 null이다.
+- `humanAxisReview: null | {status:"approved",reviewedBy,reviewers:string[],sampleCount,evidence,reviewedModelVersion,interReviewerAgreement}`. 승인 메타데이터의 `sampleCount`와 `interReviewerAgreement`는 공통 판단 가능 표본의 실제 수와 κ다.
+
+`human_review_ready`는 사람 검토 메타데이터를 준비했다는 뜻이다. 실제 배포는 별도로 검토한다. 보고서의 `humanAxisReview`를 같은 모델의 로컬 manifest에 반영해 학습 명령을 같은 입력으로 다시 실행하고, 출력 모델 버전이 바뀌지 않았는지 확인한다. 표본·전처리·모델이 바뀌면 기존 승인을 재사용하지 않는다.
+
+```powershell
+py -m unittest discover -s research -p test_review_bias_axis.py
+```

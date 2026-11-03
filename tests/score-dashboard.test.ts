@@ -32,16 +32,17 @@ describe('score dashboard contract',()=>{
   });
   it('uses the actual named-source numerator and labels what its trust score measures',()=>{
     const html=render(article('정부에 따르면 예산이 늘었다. 통계청의 2025년 사회조사에 따르면 인구가 감소했다.'));
-    expect(html).toMatch(/cv3-axis-trust[\s\S]*?<strong[^>]*>50점/);
-    expect(html).toContain('출처 명시 점수');
-    expect(html).toContain('출처 명시 1/2');
+    expect(html).toMatch(/cv3-axis-trust[\s\S]*?<strong[^>]*>산출 대기/);
+    expect(html).toContain('출처 가중 근거');
+    expect(html).toContain('출처 명시 50점 (1/2)');
     expect(html).toContain('n=2');
   });
   it('displays unresolved speakers as a possible range and wholly unclassified expressions as pending',()=>{
     const analysis=article('그는 예산이 늘었다고 말했다.');analysis.expressions=[];
     const html=render(analysis);
     expect(html).toMatch(/cv3-axis-expression[\s\S]*?<strong[^>]*>산출 대기/);
-    expect(html).toMatch(/cv3-axis-trust[\s\S]*?<strong[^>]*>0–100점/);
+    expect(html).toMatch(/cv3-axis-trust[\s\S]*?<strong[^>]*>산출 대기/);
+    expect(html).toContain('출처 명시 0–100점');
     expect(html).toContain('화자 미확인');
   });
 });

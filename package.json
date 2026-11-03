@@ -17,6 +17,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "check:local": "node scripts/check-local-runtime.mjs",
+    "check:activation": "node scripts/check-activation-readiness.mjs",
     "check:record": "node scripts/check-record.mjs"
   },
   "dependencies": {

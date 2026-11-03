@@ -66,7 +66,19 @@ export type SourceReliabilityAssessment = {
 
 const clean = (s: unknown): s is string => typeof s === 'string' && !!s.trim();
 /** Case/space/www normalization is shared by weight and observation lookup. */
-const publisherKey = (value: string) => value.trim().toLowerCase().replace(/^www\./, '');
+export const canonicalPublisherHost = (value: string) => {
+  const host=value.trim().toLowerCase().replace(/^www\./, '');
+  const aliases:Readonly<Record<string,string>>={'m.khan.co.kr':'khan.co.kr','news.donga.com':'donga.com'};
+  return aliases[host]??host;
+};
+const publisherKey=canonicalPublisherHost;
+
+export function isValidPublisherWeightSet(value:PublisherWeightSet|null|undefined):value is PublisherWeightSet {
+  if(!value||!clean(value.version)||!clean(value.methodology)||!Array.isArray(value.weights)||!value.weights.length)return false;
+  if(!value.weights.every(w=>w&&clean(w.publisher)&&clean(w.evidence)&&Number.isFinite(w.value)&&w.value>0&&w.value<=1))return false;
+  const keys=value.weights.map(w=>publisherKey(w.publisher));
+  return new Set(keys).size===keys.length;
+}
 
 /**
  * Applies caller-supplied, documented source weights to claim-level evidence.
@@ -81,12 +93,7 @@ export function assessWeightedClaimEvidence(
   weightSet: PublisherWeightSet | null | undefined,
   claimIds?: readonly string[],
 ): SourceReliabilityAssessment {
-  const normalizedWeightKeys = weightSet?.weights.map(w => publisherKey(w.publisher)) ?? [];
-  const validSet = !!weightSet && clean(weightSet.version) && clean(weightSet.methodology)
-    && Array.isArray(weightSet.weights) && weightSet.weights.length > 0
-    && weightSet.weights.every(w => clean(w.publisher) && clean(w.evidence)
-      && Number.isFinite(w.value) && w.value > 0 && w.value <= 1)
-    && new Set(normalizedWeightKeys).size === normalizedWeightKeys.length;
+  const validSet = isValidPublisherWeightSet(weightSet);
   const byPublisher = new Map<string, PublisherWeight>();
   if (validSet && weightSet) for (const w of weightSet.weights) byPublisher.set(publisherKey(w.publisher), w);
 

@@ -17,9 +17,9 @@ async page => {
     await page.getByRole('button',{name:'분석근거 표시',exact:true}).click();
     await page.getByText('잘못된 부분이 있나요? 검토 기록 내보내기',{exact:true}).click();
     const exported=JSON.parse(await page.locator('.export-preview pre').textContent());
-    check(exported.schemaVersion==='2.4'&&exported.parentAnalysisId&&exported.inputState==='current'&&!exported.stale,`${example}: export identity`);
+    check(exported.schemaVersion==='2.5'&&exported.parentAnalysisId&&exported.inputState==='current'&&!exported.stale,`${example}: export identity`);
     check(!exported.citedSources&&!exported.analysis,`${example}: default raw data disclosure`);
-    for(const [axis,score] of Object.entries(exported.scores).filter(([key])=>key!=='version')){
+    for(const [axis,score] of Object.entries(exported.scores).filter(([key])=>['bias','stimulation','reliability'].includes(key))){
       const expected=score.value===null?score.status==='not_applicable'?'해당 없음':'산출 대기'
         :score.status==='partial'&&score.upperBound!==undefined&&score.upperBound!==score.value?`${score.value}–${score.upperBound}점`:`${score.value}점`;
       check(axes[axis].includes(expected),`${example}: ${axis} screen/export mismatch`);

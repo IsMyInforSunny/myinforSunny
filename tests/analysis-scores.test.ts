@@ -48,11 +48,11 @@ describe('descriptive analysis scores',()=>{
     const analysis=sourceAnalysis(body);
     analysis.claims=analysis.sources[0].sentences.map((sentence,index)=>({id:`claim_${index}`,text:body.slice(sentence.start,sentence.end),kind:'factual',
       origin:[{sourceId:analysis.sources[0].id,sentenceId:sentence.id,start:sentence.start,end:sentence.end,quote:body.slice(sentence.start,sentence.end)}]}));
-    const score=buildAnalysisScores(analysis).reliability;
+    const score=buildAnalysisScores(analysis).attribution;
     expect(score).toMatchObject({label:'근거 출처 명시 점수',value:67,status:'ready',numerator:2,denominator:3});
     expect(score.note).toContain('참일 확률');
     analysis.claims=analysis.claims.slice(0,1);
-    expect(buildAnalysisScores(analysis).reliability.value).toBe(100);
+    expect(buildAnalysisScores(analysis).attribution.value).toBe(100);
   });
   it('excludes generic government and research-team labels from named-source coverage',()=>{
     const body='정부에 따르면 예산이 증가했다. 연구팀에 따르면 인구가 감소했다.';
@@ -60,7 +60,7 @@ describe('descriptive analysis scores',()=>{
     analysis.claims=analysis.sources[0].sentences.map((sentence,index)=>({id:`claim_${index}`,text:body.slice(sentence.start,sentence.end),kind:'factual',
       origin:[{sourceId:analysis.sources[0].id,sentenceId:sentence.id,start:sentence.start,end:sentence.end,quote:body.slice(sentence.start,sentence.end)}]}));
     expect(citedSources.reviewCitedSources(analysis).summary.traceable_secondary).toBe(2);
-    expect(buildAnalysisScores(analysis).reliability).toMatchObject({value:0,status:'ready',numerator:0,denominator:2});
+    expect(buildAnalysisScores(analysis).attribution).toMatchObject({value:0,status:'ready',numerator:0,denominator:2});
   });
   it('keeps unresolved attribution outside the named numerator and within a partial upper bound',()=>{
     const body='그는 예산이 증가했다고 말했다.';
@@ -71,7 +71,7 @@ describe('descriptive analysis scores',()=>{
     // extraction rule changes, which have their own cited-sources tests.
     const spy=vi.spyOn(citedSources,'reviewCitedSources').mockReturnValue({...review,claims:review.claims.map(claim=>({...claim,unresolvedAttribution:true}))});
     try{
-      expect(buildAnalysisScores(analysis).reliability).toMatchObject({value:0,status:'partial',numerator:0,denominator:1,lowerBound:0,upperBound:100,unresolvedCount:1});
+      expect(buildAnalysisScores(analysis).attribution).toMatchObject({value:0,status:'partial',numerator:0,denominator:1,lowerBound:0,upperBound:100,unresolvedCount:1});
     }finally{spy.mockRestore();}
   });
   it('uses only available finite 0–100 bias output and preserves the distance denominator',()=>{
@@ -86,7 +86,7 @@ describe('descriptive analysis scores',()=>{
     const analysis=sourceAnalysis('출처나 표현 세부 원문을 내보내지 않는 가상 기사입니다.');
     const biasAssessment={...analyzeBiasCoordinate([],null),status:'ready' as const,gaugePercent:20,magnitude:0.4};
     const output=buildReviewExport({analysis,biasAssessment,checks:[],feedback:'',includeRaw:false,includeRefs:false,verifications:[],researchResults:[],researchStage:'not_started'});
-    expect(output.schemaVersion).toBe('2.4');
+    expect(output.schemaVersion).toBe('2.5');
     expect(output.scores.bias).toMatchObject({value:20,status:'ready'});
     expect(output.scores.stimulation).toMatchObject({value:0,denominator:1});
     expect(JSON.stringify(output)).not.toContain(analysis.sources[0].text);

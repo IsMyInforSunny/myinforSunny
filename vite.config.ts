@@ -5,6 +5,8 @@ import { readExecutionProfile } from "./scripts/execution-profile.mjs";
 import { configureToolEnvironment } from "./scripts/tool-environment.mjs";
 import { sites } from "./scripts/vite/sites-vite-plugin";
 import { connectorPreview } from "./scripts/vite/connector-preview-plugin.mjs";
+import { localGroqRuntime } from "./scripts/local-groq-runtime.mjs";
+import path from "node:path";
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "00000000-0000-4000-8000-000000000000";
@@ -39,6 +41,7 @@ const localBindingConfig = {
 
 export default defineConfig(async ({ command }) => {
   configureToolEnvironment(process.cwd());
+  const localGroq = localGroqRuntime({ command, root: process.cwd() });
 
   // Wrangler snapshots its log path while the Cloudflare plugin is imported.
   const { cloudflare } = await import("@cloudflare/vite-plugin");
@@ -57,10 +60,12 @@ export default defineConfig(async ({ command }) => {
       sites({ mockAuth: !managedLinux }),
       connectorPreview(),
       cloudflare({
+        ...(localGroq ? { configPath: localGroq.configPath } : {}),
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         inspectorPort: false,
         config: {
           ...localBindingConfig,
+          ...(localGroq ? { main: path.resolve("worker/index.ts"), secrets: localGroq.secrets } : {}),
           ...(command === "serve"
             ? {
                 services: [
