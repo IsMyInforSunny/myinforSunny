@@ -1,0 +1,16 @@
+{
+  "scope": "two independent read-only Codex reviews; no external API or extra test execution by reviewers",
+  "analysisGrammar": {"concreteDefectsFound": 0},
+  "corpusAndRelease": {
+    "fixedFindings": [
+      "include observed optional publishers in per-publisher training/evaluation deficits",
+      "reject claimed human review sample counts exceeding actual heldout groups or unique content",
+      "separate shared-original global lower bound from conservative publisher allocation",
+      "ensure the conservative allocation leaves train/evaluation slots for every participating publisher"
+    ],
+    "defaultAnchorCount": 7,
+    "globalOriginalLowerBound": 98,
+    "actualModelActivated": false
+  },
+  "limitations": "Arithmetic and schema checks do not authenticate real independent reviews or establish political-bias accuracy."
+}
