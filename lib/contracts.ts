@@ -25,7 +25,17 @@ export type TopicAssignment = { sourceId:string; topicIds:string[]; status:'assi
 export type BodyTopicAssignment = { sentenceId:string; topicIds:string[]; status:'assigned'|'other'|'undetermined'; reason?:string };
 export type Stance = { sourceId:string; label:z.infer<typeof stanceLabelSchema>; evidence:Span[]; reason?:string };
 export type CounterArgument = {claimId:string;kind:'counterpoint'|'qualification';text:string;reasoning:string;evidenceNeeded:string;basis:Span[];provenance:'ai_suggestion'|'curated_example'};
-export const searchQuerySchema=z.string().trim().min(3).max(100).regex(/^[A-Za-z0-9]+(?:[ -][A-Za-z0-9]+)*$/,'영문 핵심어를 입력해 주세요.');
+// Plain keywords only: keep Korean names/numbers instead of forcing translation.
+// Space separates words. Hyphen, decimal point, percent and middle dot are
+// allowed only inside a word; leading exclusion operators remain rejected.
+// Explicit Hangul ranges also support decomposed input, normalized before fetch.
+const searchAtom='[A-Za-z0-9\\u1100-\\u11FF\\u3130-\\u318F\\uAC00-\\uD7A3]+';
+const searchWord=`${searchAtom}(?:(?:-${searchAtom})|(?:\\.${searchAtom})|(?:%${searchAtom})|(?:·${searchAtom}))*%?`;
+const searchKeywords=new RegExp(`^${searchWord}(?: +${searchWord})*$`);
+export const searchQuerySchema=z.string()
+ .refine(value=>!/[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u2028-\u202E\u2060-\u206F\uFEFF]/.test(value),'제어문자 없는 검색어를 입력해 주세요.')
+ .trim().min(3).max(100).regex(searchKeywords,'한국어·영문·숫자로 된 핵심어를 입력해 주세요.')
+ .refine(value=>!/(?:^| )(?:AND|OR|NOT)(?: |$)/.test(value),'검색 연산자 없이 핵심어만 입력해 주세요.');
 export type SearchSuggestion={label:string;query:string};
 export type Analysis = {
   schemaVersion:'2.1'; analysisId:string; requestId:string; mode:'demo'|'live'; status:'success'|'partial';
@@ -69,7 +79,8 @@ export const rawAnalysisSchema=z.object({
   claims:z.array(z.object({id,text:text(1000),kind:z.enum(['factual','opinion','undetermined']),origin:z.array(quoteCandidate).min(1).max(5),targetTime:z.string().max(100)}).strict()).max(5),
   perspectiveQuestions:z.array(z.object({text:text(500),basis:z.array(quoteCandidate).min(1).max(5)}).strict()).max(2),
   counterArguments:z.array(z.object({claimId:id,kind:z.enum(['counterpoint','qualification','not_applicable']),text:text(350),reasoning:text(350),evidenceNeeded:text(250),basis:z.array(quoteCandidate).min(1).max(2)}).strict()).max(2),
-  searchSuggestions:z.array(z.object({label:text(60),query:searchQuerySchema}).strict()).max(2),
+  // Optional hints must not invalidate the core analysis when a model emits a bad query.
+  searchSuggestions:z.array(z.object({label:text(60),query:z.string().max(100)}).strict()).max(2),
   claimsMayBeOmitted:z.boolean(),
 }).strict();
 export type RawAnalysis=z.infer<typeof rawAnalysisSchema>;

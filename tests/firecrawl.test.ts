@@ -17,6 +17,23 @@ const articleText='학교 도서관의 운영 시간에 관해 학생과 교사�
 const article=(extra:Record<string,unknown>={})=>({success:true,data:{markdown:articleText,metadata:{sourceURL:'https://news.example/a',url:'https://news.example/a',statusCode:200,title:'가상 기사'},...extra}});
 
 describe('Firecrawl opt-in guards and provenance',()=>{
+ it('limits discovery to explicitly approved domains while preserving Korean query text',async()=>{
+  const f=vi.fn().mockResolvedValue(Response.json({success:true,data:{web:[]}}));vi.stubGlobal('fetch',f);
+  await searchFirecrawl('학교 도서관 운영 시간',{...config(),ALLOWED_RETRIEVAL_HOSTS:'news.example, www.news.example,news.example,https://bad.example,localhost'},signal());
+  const body=JSON.parse(f.mock.calls[0][1].body);expect(body.query).toBe('학교 도서관 운영 시간');expect(body.includeDomains).toEqual(['news.example','www.news.example']);
+ });
+ it.each(['AI 학습 이용 금지','AI 활용 금지','AI 학습·활용 금지','No AI training'])('does not admit an explicit AI-use restriction: %s',async notice=>{
+  vi.stubGlobal('fetch',vi.fn().mockResolvedValue(Response.json(article({markdown:articleText+' '+notice}))));
+  expect(await scrapeFirecrawl('https://news.example/a','r',config(),signal())).toBeNull();
+ });
+ it.each([
+  ['2026-11-03','2026-11-03'],['2026-11-03T20:00:00+09:00','2026-11-03T11:00:00.000Z'],
+  ['2026-11-03 20:00',undefined],['2026-02-30',undefined],
+  [['2026-11-03','2026-11-03'],'2026-11-03'],[['2026-11-03','2026-11-02'],undefined],
+ ])('keeps explicit publication dates without inventing a timezone (%j)',async(rawDate,publishedAt)=>{
+  vi.stubGlobal('fetch',vi.fn().mockResolvedValue(Response.json(article({metadata:{sourceURL:'https://news.example/a',url:'https://news.example/a',statusCode:200,publishedTime:rawDate}}))));
+  const ref=await scrapeFirecrawl('https://news.example/a','r',config(),signal());expect(ref).not.toBeNull();expect(ref?.publishedAt).toBe(publishedAt);
+ });
  it('disabled or unapproved accounts never call the network',async()=>{const f=vi.fn();vi.stubGlobal('fetch',f);for(const patch of [{ENABLE_NEWS_SEARCH:'false'},{FIRECRAWL_TERMS_APPROVED:'false'},{FIRECRAWL_SOURCE_TERMS_APPROVED:'false'},{FIRECRAWL_FREE_PLAN_CONFIRMED:'false'},{FIRECRAWL_CONSOLE_LIMITS_CONFIRMED:'false'},{FIRECRAWL_API_KEY:''},{FIRECRAWL_SEARCH_CREDIT_COST:''},{ALLOWED_RETRIEVAL_HOSTS:''}]){const c={...config(),...patch};expect(firecrawlReady(c)).toBe(false);expect(capabilities(c).webSearch).toBe(false);await expect(searchNews('school library',c,signal())).rejects.toMatchObject({code:'SEARCH_UNAVAILABLE'});}expect(f).not.toHaveBeenCalled();});
  it('accepts exact approved HTTPS hosts only',()=>{const c=config();for(const bad of ['http://news.example/a','https://evil.example/a','https://news.example.evil.test/a','https://news.example:8080/a','https://user:secret@news.example/a','https://127.0.0.1/a','https://localhost/a'])expect(approvedSourceUrl(bad,c)).toBeNull();expect(approvedSourceUrl('https://news.example/a#fragment',c)?.href).toBe('https://news.example/a');});
  it('uses fixed search endpoint, skips snippets, filters and deduplicates candidates',async()=>{const f=vi.fn().mockResolvedValue(Response.json({success:true,data:{web:[{url:'https://news.example/a?utm_source=x',title:'가상 기사',description:'검증되지 않은 검색 발췌',markdown:'not requested'},{url:'https://evil.example/b',title:'다른 기사'}],news:[{url:'https://news.example/a',title:'중복'}]}}));vi.stubGlobal('fetch',f);const result=await searchNews('school library',config(),signal());expect(result.provider).toBe('firecrawl');expect(result.articles).toHaveLength(1);expect(result.articles[0]).toMatchObject({url:'https://news.example/a',provenance:'search_result',stance:'not_checked',language:'not_verified'});expect(JSON.stringify(result)).not.toContain('검색 발췌');expect(f.mock.calls[0][0]).toBe('https://api.firecrawl.dev/v2/search');const body=JSON.parse(f.mock.calls[0][1].body);expect(body.scrapeOptions).toBeUndefined();expect(body.limit).toBe(5);});
@@ -38,6 +55,13 @@ describe('Firecrawl opt-in guards and provenance',()=>{
 });
 
 describe('Firecrawl free-credit D1 reservation',()=>{
+ it('retains a larger scrape charge reported in metadata and blocks the next dispatch',async()=>{
+  const c={...config(),FIRECRAWL_CREDIT_BUDGET:'3'};
+  const f=vi.fn().mockResolvedValue(Response.json(article({metadata:{sourceURL:'https://news.example/a',url:'https://news.example/a',statusCode:200,creditsUsed:5}})));vi.stubGlobal('fetch',f);
+  expect(await scrapeFirecrawl('https://news.example/a','r',c,signal())).not.toBeNull();
+  expect((await db.prepare('SELECT SUM(credits) AS n FROM firecrawl_credit_budget').first<{n:number}>())?.n).toBe(5);
+  await expect(searchFirecrawl('school library',c,signal())).rejects.toMatchObject({code:'SEARCH_CREDIT_LIMIT'});expect(f).toHaveBeenCalledTimes(1);
+ });
  it('uses 80% confirmed allowance and honors a lower configured cap',()=>{expect(firecrawlBudget(config()).limit).toBe(80);expect(firecrawlBudget({...config(),FIRECRAWL_CREDIT_BUDGET:'5'}).limit).toBe(5);expect(firecrawlBudget({...config(),FIRECRAWL_CONSOLE_CREDITS:'999999',FIRECRAWL_CREDIT_BUDGET:'999999'}).limit).toBe(800);});
  it('simultaneous reservations cannot exceed the free safety budget',async()=>{const c={...config(),FIRECRAWL_CREDIT_BUDGET:'4'};const results=await Promise.allSettled([reserveFirecrawlCredits(c,'search'),reserveFirecrawlCredits(c,'search'),reserveFirecrawlCredits(c,'search')]);expect(results.filter(r=>r.status==='fulfilled')).toHaveLength(2);expect((await db.prepare('SELECT SUM(credits) AS n FROM firecrawl_credit_budget').first<{n:number}>())?.n).toBe(4);});
  it('one-time credit budget does not silently reset next month',async()=>{const c={...config(),FIRECRAWL_CREDIT_BUDGET:'2'};await reserveFirecrawlCredits(c,'search',Date.UTC(2026,0,1));await expect(reserveFirecrawlCredits(c,'scrape',Date.UTC(2026,1,1))).rejects.toMatchObject({code:'SEARCH_CREDIT_LIMIT'});});

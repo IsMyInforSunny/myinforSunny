@@ -11,7 +11,7 @@ function reference(overrides: Partial<Reference> = {}): Reference {
   return {
     id: 'ref-1', provenance: 'web_fetched',
     url: 'https://www.alpha.example/story?utm_source=news',
-    text: 'Evidence quote.', truncated: false,
+    text: 'Evidence quote.', truncated: false, fetchedAt:'2026-01-01T00:00:00.000Z',
     retrievedTruncated: false, retrievedTextLength: 15, fullTextLength: 15,
     contentDigest: 'A'.repeat(43),
     ...overrides,
@@ -21,13 +21,14 @@ function reference(overrides: Partial<Reference> = {}): Reference {
 function verification(options: {
   parentAnalysisId?: string; mode?: 'live' | 'demo'; refs?: Reference[];
   execution?: 'completed' | 'failed' | 'skipped'; temporalFit?: 'matched' | 'mismatched' | 'unclear';
+  outcome?:ResearchVerification['checks'][number]['outcome'];
   relations?: ResearchVerification['checks'][number]['relations']; claimId?: string; createdAt?: string;
 } = {}): ResearchVerification {
   return {
     schemaVersion: '2.1', requestId: 'request-1', parentAnalysisId: options.parentAnalysisId ?? 'analysis-current',
     mode: options.mode ?? 'live', status: 'success', versions: {rubric: 'r', prompt: 'p', model: 'm', retriever: 's'},
     scope: 'retrieved_documents', references: options.refs ?? [reference()],
-    checks: [{claimId: options.claimId ?? 'claim-1', outcome: 'supported',
+    checks: [{claimId: options.claimId ?? 'claim-1', outcome: options.outcome??'supported',
       execution: options.execution ?? 'completed', temporalFit: options.temporalFit ?? 'matched',
       relations: options.relations ?? [{referenceId: 'ref-1', quote: 'Evidence quote.', start: 0, end: 15, relation: 'supports', explanation: 'quoted'}],
       explanation: 'reviewed', limitations: []}],
@@ -36,6 +37,16 @@ function verification(options: {
 }
 
 describe('observationsFromResearch', () => {
+  it('keeps an insufficient review out of conclusive weighted evidence even with a supportive quotation',()=>{
+    const result=observationsFromResearch(analysis(),[verification({outcome:'insufficient'})]);
+    expect(result).toHaveLength(1);expect(result[0].outcome).toBe('insufficient');
+    for(const outcome of ['unchecked','inaccessible','not_applicable'] as const)
+      expect(observationsFromResearch(analysis(),[verification({outcome})])).toEqual([]);
+  });
+  it('requires a real fetch timestamp and a valid verification timestamp',()=>{
+    for(const fetchedAt of [undefined,'invalid-date'])expect(observationsFromResearch(analysis(),[verification({refs:[reference({fetchedAt})]})])).toEqual([]);
+    expect(observationsFromResearch(analysis(),[verification({createdAt:'invalid-date'})])).toEqual([]);
+  });
   it('uses only live records bound to the current analysis and factual claims', () => {
     const result = observationsFromResearch(analysis(), [
       verification(),

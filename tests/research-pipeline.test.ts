@@ -15,6 +15,18 @@ const input=():ResearchInput=>{const a=demoAnalysis('conflict');return {sources:
 afterEach(()=>vi.restoreAllMocks());
 function planner(i:ResearchInput){return vi.spyOn(language,'structured').mockResolvedValue({queries:[{claimId:i.claims[0].id,label:'운영 시간',query:'school library closing time',purpose:'fact_check'}]});}
 describe('자동 조사 단계 연결 (모의 검색·모의 LLM, 실서비스 검증 아님)',()=>{
+ it('한국어 기관명·핵심어를 계획 토큰부터 실제 검색 호출까지 보존한다',async()=>{
+  const i=input(),query='통계청 도서관 운영 2025'.normalize('NFD');
+  const llm=vi.spyOn(language,'structured').mockResolvedValue({queries:[{claimId:i.claims[0].id,label:'운영 시간',query,purpose:'fact_check'}]});
+  const plan=await planResearch(request(),i,config,AbortSignal.timeout(1000));
+  expect(plan.queries[0].query).toBe(query.normalize('NFC'));
+  expect(llm.mock.calls[0][2]).toContain('한국어 기관명');
+  expect(llm.mock.calls[0][2]).not.toContain('검색어 하나를 영문으로');
+  vi.spyOn(searchBudget,'reserveSearch').mockResolvedValue(undefined);
+  const search=vi.spyOn(news,'searchNews').mockResolvedValue({provider:'gdelt',query,status:'empty',articles:[],searchedAt:new Date().toISOString(),scopeNote:'모의'});
+  await discoverEvidence(request(),i,plan.token,0,config,AbortSignal.timeout(1000));
+  expect(search.mock.calls[0][0]).toBe(query.normalize('NFC'));
+ });
  it('기사에 명시된 1차 출처를 같은 계획 호출의 미검증 힌트로 연결한다',async()=>{
   const body='통계청에 따르면 2025년 조사에서 인구가 10% 증가했다.';
   const sources=makeSources({kind:'text',body,comments:[]});const sentence=sources[0].sentences[0];
@@ -48,6 +60,39 @@ describe('자동 조사 단계 연결 (모의 검색·모의 LLM, 실서비스 �
   vi.spyOn(news,'searchNews').mockResolvedValue({provider:'firecrawl',query:'school library time',status:'success',articles:[{id:'n',title:'검색 제목',url:'https://news.example/a',publisherDomain:'news.example',language:'not_verified',provenance:'search_result',stance:'not_checked'}],searchedAt:new Date().toISOString(),scopeNote:'모의'});
   vi.spyOn(retrieval,'retrieve').mockResolvedValue({id:'web_0_0',url:'https://news.example/a',text:'도서관은 오후 9시에 문을 닫는다.',title:'취득 제목',provenance:'web_fetched',publishedAt:'2025-03-01T00:00:00Z',fetchedAt:'2026-11-01T00:00:00Z',truncated:true,fullTextLength:9000});
   const evidence=await discoverEvidence(request(),i,plan.token,0,config,AbortSignal.timeout(1000));expect(evidence.references[0]).toMatchObject({title:'취득 제목',publishedAt:'2025-03-01T00:00:00Z',truncated:true,fullTextLength:9000,extractionVersion:'firecrawl-markdown-1.0'});
+ });
+ it('같은 매체의 명시 별칭 두 곳이 두 번의 취득 예산을 차지하지 않는다',async()=>{
+  const i=input();planner(i);const c={...config,ALLOWED_RETRIEVAL_HOSTS:'news.donga.com,donga.com,hani.co.kr'};
+  const plan=await planResearch(request(),i,c,AbortSignal.timeout(1000));
+  vi.spyOn(searchBudget,'reserveSearch').mockResolvedValue(undefined);
+  const urls=['https://news.donga.com/a','https://donga.com/b','https://hani.co.kr/c'];
+  const articles=urls.map((url,index)=>({id:`n${index}`,title:'가상 자료',url,publisherDomain:new URL(url).hostname,language:'Korean',provenance:'search_result' as const,stance:'not_checked' as const}));
+  vi.spyOn(news,'searchNews').mockResolvedValue({provider:'gdelt',query:'school library time',status:'success',articles,searchedAt:new Date().toISOString(),scopeNote:'모의'});
+  const fetch=vi.spyOn(retrieval,'retrieve').mockImplementation(async(url,id)=>({id,url,text:url.includes('hani')?'지역 청소년이 이용한 도서관 현황에 관한 가상 공지입니다.':'운영 시간을 연장하는 학교의 가상 보도자료입니다.',provenance:'web_fetched',fetchedAt:'2026-11-01T00:00:00Z',truncated:false}));
+  const bundle=await discoverEvidence(request(),i,plan.token,0,c,AbortSignal.timeout(1000));
+  expect(fetch.mock.calls.map(call=>call[0])).toEqual([urls[0],urls[2]]);
+  expect(bundle.references).toHaveLength(2);
+ });
+ it('추적 매개변수·fragment·끝 슬래시만 다른 같은 기사 주소는 다시 취득하지 않는다',async()=>{
+  const i=input();planner(i);const plan=await planResearch(request(),i,config,AbortSignal.timeout(1000));
+  vi.spyOn(searchBudget,'reserveSearch').mockResolvedValue(undefined);
+  const urls=['https://news.example/a?id=1&utm_source=test','https://news.example/a/?id=1#headline','https://news.example/b'];
+  const articles=urls.map((url,index)=>({id:`n${index}`,title:'가상 자료',url,publisherDomain:'news.example',language:'Korean',provenance:'search_result' as const,stance:'not_checked' as const}));
+  vi.spyOn(news,'searchNews').mockResolvedValue({provider:'gdelt',query:'school library time',status:'success',articles,searchedAt:new Date().toISOString(),scopeNote:'모의'});
+  const fetch=vi.spyOn(retrieval,'retrieve').mockImplementation(async(url,id)=>({id,url,text:url.endsWith('/b')?'지역 어린이 독서 실태를 기록한 가상 자료입니다.':'도서관 운영 시간을 알리는 가상 자료입니다.',provenance:'web_fetched',fetchedAt:'2026-11-01T00:00:00Z',truncated:false}));
+  const bundle=await discoverEvidence(request(),i,plan.token,0,config,AbortSignal.timeout(1000));
+  expect(fetch.mock.calls.map(call=>call[0])).toEqual([urls[0],urls[2]]);
+  expect(bundle.attempts.some(a=>a.url===urls[1]&&a.status==='disallowed'&&a.reason?.includes('같은 주소'))).toBe(true);
+ });
+ it('허용되지 않은 별칭 주소가 같은 주소의 허용된 후보를 숨기지 않는다',async()=>{
+  const i=input();planner(i);const plan=await planResearch(request(),i,config,AbortSignal.timeout(1000));
+  vi.spyOn(searchBudget,'reserveSearch').mockResolvedValue(undefined);
+  const urls=['https://www.news.example/a','https://news.example/a'];
+  const articles=urls.map((url,index)=>({id:`n${index}`,title:'가상 자료',url,publisherDomain:new URL(url).hostname,language:'Korean',provenance:'search_result' as const,stance:'not_checked' as const}));
+  vi.spyOn(news,'searchNews').mockResolvedValue({provider:'gdelt',query:'school library time',status:'success',articles,searchedAt:new Date().toISOString(),scopeNote:'모의'});
+  const fetch=vi.spyOn(retrieval,'retrieve').mockImplementation(async(url,id)=>({id,url,text:'학교 도서관의 가상 운영 공지입니다.',provenance:'web_fetched',fetchedAt:'2026-11-01T00:00:00Z',truncated:false}));
+  await discoverEvidence(request(),i,plan.token,0,config,AbortSignal.timeout(1000));
+  expect(fetch.mock.calls.map(call=>call[0])).toEqual([urls[1]]);
  });
  it('의견만 있는 글도 다른 입장을 찾고 사실 판정 건수는 늘리지 않는다',async()=>{
   const a=demoAnalysis('no_comments');const i:ResearchInput={sources:a.sources,claims:[],position:a.claims[0],transmissionConsent:true,researchConsent:true};

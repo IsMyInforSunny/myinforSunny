@@ -2,7 +2,7 @@ import type {Reference} from '../contracts';
 import type {NewsResult,RelatedArticle} from '../news-contract';
 import type {RuntimeConfig} from './config';
 import {AppError} from './errors';
-import {articleTextPrefix} from './article-document';
+import {articleTextPrefix,publicationDate} from './article-document';
 
 const API='https://api.firecrawl.dev/v2/';
 const positive=(s:string|undefined)=>!!s&&/^\d+$/.test(s)&&Number.isSafeInteger(Number(s))&&Number(s)>0?Number(s):0;
@@ -46,14 +46,17 @@ async function call(operation:'search'|'scrape',body:object,c:RuntimeConfig,sign
  if(!response.ok){await response.body?.cancel();throw new AppError(response.status===429?429:503,response.status===429?'SEARCH_RATE_LIMITED':'SEARCH_UNAVAILABLE','외부 자료 수집이 중단되었습니다. 서비스 한도·설정을 확인해 주세요.',response.status===429);}
  const value=await readBounded(response);
  // Never reduce the conservative reservation, including on partial/failed results.
- const actual=value.creditsUsed;
- if(typeof actual==='number'&&Number.isSafeInteger(actual)&&actual>reserved.cost)await c.DB!.prepare('UPDATE firecrawl_credit_budget SET credits=? WHERE id=?').bind(actual,reserved.id).run();
+ const data=value.data&&typeof value.data==='object'?value.data as Record<string,unknown>:null;
+ const metadata=data?.metadata&&typeof data.metadata==='object'?data.metadata as Record<string,unknown>:null;
+ const actual=Math.max(reserved.cost,...[value.creditsUsed,data?.creditsUsed,metadata?.creditsUsed].filter((n):n is number=>typeof n==='number'&&Number.isSafeInteger(n)&&n>=0));
+ if(actual>reserved.cost)await c.DB!.prepare('UPDATE firecrawl_credit_budget SET credits=? WHERE id=?').bind(actual,reserved.id).run();
  if(value.success!==true||!value.data||typeof value.data!=='object')throw new AppError(502,'SEARCH_INVALID_RESPONSE','외부 자료를 확보하지 못했습니다.');
  return value.data as Record<string,unknown>;
 }
 export async function searchFirecrawl(query:string,c:RuntimeConfig,signal:AbortSignal):Promise<NewsResult>{
  // No scrapeOptions, summaries, paid proxies, agents or model-generated answers.
- const data=await call('search',{query,sources:[{type:'web'},{type:'news'}],limit:5,country:'KR',timeout:12000},c,signal);
+ const includeDomains=[...new Set((c.ALLOWED_RETRIEVAL_HOSTS??'').split(',').map(h=>h.trim().toLowerCase()).filter(h=>approvedSourceUrl(`https://${h}/`,c)))];
+ const data=await call('search',{query,includeDomains,sources:[{type:'web'},{type:'news'}],limit:5,country:'KR',timeout:12000},c,signal);
  const rows=[...(Array.isArray(data.web)?data.web:[]),...(Array.isArray(data.news)?data.news:[])];
  const seen=new Set<string>(),domains=new Map<string,number>(),articles:RelatedArticle[]=[];
  for(const item of rows.slice(0,20)){
@@ -76,9 +79,11 @@ export async function scrapeFirecrawl(url:string,id:string,c:RuntimeConfig,signa
  const urls=[m.sourceURL,m.url].filter(v=>v!==undefined);if(typeof m.url!=='string'||urls.some(value=>approvedSourceUrl(value,c)?.href!==target.href))return null;
  if(m.statusCode!==undefined&&m.statusCode!==200||m.error)return null;
  const markdown=typeof data.markdown==='string'?data.markdown.trim():'';
- if(markdown.length<80||markdown.length>200000||/(paywall|robots.?txt|access denied|sign in to continue|구독 후|유료 회원|AI\s*학습\s*(?:및|과)?\s*활용\s*금지)/i.test(`${String(data.warning??'')} ${markdown}`))return null;
+ if(markdown.length<80||markdown.length>200000||/(paywall|robots.?txt|access denied|sign in to continue|구독 후|유료 회원|AI\s*(?:학습|활용|이용)(?:\s*(?:및|과|·|,|\/)?\s*(?:학습|활용|이용)){0,2}\s*금지|(?:no|prohibit(?:ed)?)\s+AI\s+(?:training|use))/i.test(`${String(data.warning??'')} ${markdown}`))return null;
  const title=typeof m.title==='string'?articleTextPrefix(m.title,250):undefined;
- const rawDate=m.publishedTime??m.publishedAt??m['article:published_time'];const publishedAt=typeof rawDate==='string'&&Number.isFinite(Date.parse(rawDate))?new Date(rawDate).toISOString():undefined;
+ const rawDate=m.publishedTime??m.publishedAt??m['article:published_time'];
+ const dates=[...new Set((Array.isArray(rawDate)?rawDate:[rawDate]).filter((v):v is string=>typeof v==='string').map(publicationDate).filter((v):v is string=>v!==undefined))];
+ const publishedAt=dates.length===1?dates[0]:undefined;
  const text=articleTextPrefix(markdown,8000);
  return {id,provenance:'web_fetched',url:target.href,text,title,publishedAt,fetchedAt:new Date().toISOString(),truncated:text.length<markdown.length,fullTextLength:markdown.length,extractionVersion:'firecrawl-markdown-1.1'};
 }

@@ -2,20 +2,15 @@ import type {Analysis, Reference} from './contracts';
 import type {ResearchVerification} from './research-contract';
 import {normalizeSourceUrl} from './source-quality';
 import type {EvidenceObservation} from './source-reliability';
+import {canonicalPublisherHost} from './source-reliability';
 
 type CurrentAnalysis = Pick<Analysis, 'analysisId' | 'mode' | 'claims'>;
 
-/** Exact same-brand hosts verified to redirect to the weighted publisher host. */
-const VERIFIED_PUBLISHER_HOST_ALIASES: Readonly<Record<string, string>> = {
-  'm.khan.co.kr': 'khan.co.kr',
-  'news.donga.com': 'donga.com',
-};
-
 function validPublicReference(ref: Reference): {host: string; canonicalUrl: string} | null {
-  if (ref.provenance !== 'web_fetched') return null;
+  if (ref.provenance !== 'web_fetched'||!ref.fetchedAt||!Number.isFinite(Date.parse(ref.fetchedAt))) return null;
   const normalized = normalizeSourceUrl(ref.url);
   if (normalized.status !== 'ok' || !normalized.host || !normalized.url) return null;
-  return {host: VERIFIED_PUBLISHER_HOST_ALIASES[normalized.host] ?? normalized.host, canonicalUrl: normalized.url};
+  return {host: canonicalPublisherHost(normalized.host), canonicalUrl: normalized.url};
 }
 
 function validRelation(ref: Reference, relation: ResearchVerification['checks'][number]['relations'][number]): boolean {
@@ -64,6 +59,8 @@ export function observationsFromResearch(
 
   for (const {verification, check} of latestCheckByClaim.values()) {
     if (check.execution !== 'completed' || check.temporalFit !== 'matched') continue;
+    if(!Number.isFinite(Date.parse(verification.createdAt)))continue;
+    if(!['supported','contradicted','conflicting','insufficient'].includes(check.outcome))continue;
     // A bundle may carry references retrieved for other claims. Attribute only
     // sources the current check explicitly cited.
     const citedReferenceIds = new Set(check.relations.map(relation => relation.referenceId));
@@ -76,7 +73,9 @@ export function observationsFromResearch(
       // Malformed quotes are not evidence observations. Insufficient is reserved
       // for a valid context-only citation.
       if (!relations.length) continue;
-      const evidenceRelations = new Set(relations.map(r => r.relation).filter(r => r === 'supports' || r === 'contradicts'));
+      // An overall insufficient review cannot become conclusive just because
+      // one selected quotation looks supportive without its missing context.
+      const evidenceRelations = new Set(check.outcome==='insufficient'?[]:relations.map(r => r.relation).filter(r => r === 'supports' || r === 'contradicts'));
       const outcome: EvidenceObservation['outcome'] = evidenceRelations.size > 1 ? 'conflicting'
         : evidenceRelations.has('supports') ? 'supports'
           : evidenceRelations.has('contradicts') ? 'contradicts' : 'insufficient';

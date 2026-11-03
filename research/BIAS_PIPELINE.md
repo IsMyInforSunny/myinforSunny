@@ -20,6 +20,37 @@ manifest는 `axisId`, `profiles: [{publisherId, orientation}]`를 받는다. 기
 
 최소 매체 2곳, 각 6개의 독립 기사 그룹이 필요하다. 원본 그룹을 나누어 각 매체의 학습 3개·평가 3개 이상을 확보하지 못하면 중단한다. 동일 본문이 서로 다른 원본 그룹에 들어가면 중단한다. 유사한 전재·재작성은 수집 검토자가 같은 그룹으로 묶어야 하며 정확한 본문 해시만으로 모든 누수를 찾을 수는 없다.
 
+## 실제 취득 기사와 사람 검토를 결합하는 준비 단계
+
+`prepare_bias_corpus.py`는 수집 도구의 출력과 실제 검토 기록 사이의 누락을 확인하는 오프라인 준비 도구다. 네트워크 요청·기사 취득·정치 라벨 생성·사용권 승인·학습·모델 활성화를 하지 않는다. 원문 저장 자체의 이용 조건은 취득 전에 확인해야 하며, 이 도구의 통과가 그 확인을 대신하지 않는다.
+
+입력 `fetched.local.jsonl`은 실제 수집기가 취득한 기사당 한 줄이며 `id`, `publisherId`, `url`, `publishedAt`, `fetchedAt`, `text`, `extractionVersion`, `provenance: "public_article"`를 담는다. `publisherId`는 위 학습 계약의 루트 매체 도메인이다. `publishedAt`과 `fetchedAt`은 실제 발행·취득 시점이고, 본문은 제호·광고·기자 반복 푸터의 처리 버전을 `extractionVersion`으로 남긴다. 이 필드는 처리 절차를 수행했다는 사실을 자동 증명하지 않는다. 후보 제목·URL만으로 본문이나 날짜를 만들지 않는다.
+
+사람 검토 JSON의 최상위 항목은 `comparisonGroup`(실제 비교할 명제), `windowStart`, `windowEnd`(비교 기간의 ISO 시각), `articles`다. 날짜만 쓰면 한국 시간 자정으로 해석하고, 비교 기간의 끝 날짜는 한국 시간 하루 전체를 포함한다. 시각까지 쓰면 `Z` 또는 UTC 오프셋이 반드시 있어야 하며 시간대 없는 시각은 보류한다. 하루 전체를 비교할 때는 시작 `T00:00:00Z`, 끝 `T23:59:59Z`를 명시한다. 각 `articles` 항목은 다음과 같다.
+
+| 필드 | 실제로 남겨야 하는 기록 |
+| --- | --- |
+| `articleId` | 취득 파일의 실제 `id`와 동일한 값 |
+| `sourceGroupId` | 원본·전재·가까운 재작성 기사를 검토해 묶은 원본 그룹. 기사 ID에서 자동 생성하지 않음 |
+| `topicReview` | `{comparisonGroup, reviewedBy, evidence}`. 같은 주제라는 제목 유사성만으로 채우지 않고 실제 동일 명제·형식·시점을 검토한 기록 |
+| `usage` | `{textStorageAllowed, trainingAllowed, evaluationAllowed, modelDistributionAllowed, basisUrl, reviewedBy, reviewedAt}`. 네 가지 사용 범위를 실제로 검토한 boolean, 공개 HTTPS 근거와 실제 검토자·날짜 |
+
+모르는 권한은 `false` 또는 미기입으로 남긴다. 위 항목은 양식 설명이며 사용권·검토자·승인 기록을 자동 생성하는 예제가 아니다. 정치 방향의 사람 정답은 학습 타깃에 넣지 않는다. 아래의 블라인드 평가 CSV에서 실제로 제출받으며, 매체 ID만 SVM 타깃으로 사용한다.
+
+```powershell
+py research/prepare_bias_corpus.py --input .sites-runtime/fetched.local.jsonl --reviews .sites-runtime/corpus-reviews.local.json --manifest research/bias-orientation.example.json --report .sites-runtime/corpus-readiness.local.json
+```
+
+보고서는 원문 없이 URL·발행일·매체·원본 그룹·본문 해시·미충족 조건을 담는다. 본문이 없는 검색 결과, 미검토 사용권·주제·원본 그룹, 비교 기간 밖 기사, 발행일보다 이른 취득 시점, 매체-URL 불일치(정확한 호스트 또는 명시한 별칭 불일치), 미래 발행·취득·검토 시각, 알려지지 않은 검토 ID를 차단한다. 매체 별칭은 준비기에서 정규 매체 ID로 바꾸어 anchor 누락 집계도 일치시킨다. HTTPS URL 형식은 검사하지만 DNS·원문 접근 성공 여부를 재검증하지 않는다. `www`·추적 쿼리·fragment·끝 슬래시 변형은 동일 URL로 세고, 나머지 식별용 쿼리는 보존한다. 기존 `train_bias.validate`의 동일 본문/원본 그룹 검사와 매체2곳·각6개 독립 기사 하한을 그대로 적용한다. 학습·평가 양쪽에 매체별3개를 나누는 실제 그룹 분리는 다음 학습 단계에서 수행하므로 보고서의 `groupSplitVerified`는 `null`이다.
+
+모든 준비 조건이 맞을 때만 `--export .sites-runtime/articles.local.jsonl`을 같은 명령에 추가해 원문 포함 학습 입력을 명시적으로 내보낸다. `.local.jsonl` 출력은 Git에 넣지 않는다. 불완전하면 메타데이터 보고서만 남기고 원문 내보내기는 거절한다. 기존 보고서·원문·검토 파일을 덮어쓰지 않으므로 재실행 시 새 출력 이름을 사용한다. 이 도구는 기존 사이트 모델 파일을 수정하지 않는다.
+
+`train_input_ready`는 입력 준비 형식이 맞다는 뜻이며 모델 승인 상태가 아니다. 누락된 참고 축 매체와 독립 원본 수를 별도로 보고하고 `releaseReady`는 항상 `false`다. 제공 manifest의 좌4곳·우3곳을 자료가 없다는 이유로 지우지 않는다. 아래 학습·분리 평가와 실제 두 평가자의 최소40개 독립 평가 원본 검토가 여전히 필요하다. 권리 검토 boolean·검토자 문자열이 있다는 것만으로 실제 독립 검토의 진위가 인증되는 것도 아니다.
+
+```powershell
+py -m unittest discover -s research -p test_prepare_bias_corpus.py
+```
+
 ## 산출 방법과 한계
 
 1. 학습 기사만으로 대소문자를 유지하는 문자 2–4gram TF-IDF(최대 20,000개)를 만든다. 공백은 한 칸으로 합치고 양끝 공백을 제거한다. 부분 문자열은 유니코드 코드 포인트 단위다. TF는 `1 + ln(count)`, IDF는 sklearn smooth IDF, 마지막에 L2 정규화한다.

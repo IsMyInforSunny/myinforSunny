@@ -29,14 +29,15 @@ export function normalizeArticles(value:unknown):RelatedArticle[]{
  return accepted;
 }
 export async function searchNews(query:string,config:RuntimeConfig,signal:AbortSignal):Promise<NewsResult>{
- if(config.NEWS_PROVIDER==='firecrawl')return searchFirecrawl(query,config,signal);
+ const searchTerm=query.normalize('NFC');
+ if(config.NEWS_PROVIDER==='firecrawl')return searchFirecrawl(searchTerm,config,signal);
  if(config.NEWS_PROVIDER&&config.NEWS_PROVIDER!=='gdelt')throw new AppError(503,'SEARCH_UNAVAILABLE','검색 제공자 설정을 확인해 주세요.');
  if(config.ENABLE_NEWS_SEARCH!=='true'||config.NEWS_TERMS_APPROVED!=='true'||!config.DB)throw new AppError(503,'SEARCH_UNAVAILABLE','관련 기사 검색을 준비 중입니다. 잠시 후 다시 확인해 주세요.');
  const now=Date.now();
  // Atomic across Worker instances. No query text, original article, or identity is stored.
  const lock=await config.DB.prepare(`INSERT INTO provider_backoff (id,until_at) VALUES ('gdelt',?) ON CONFLICT(id) DO UPDATE SET until_at=excluded.until_at WHERE provider_backoff.until_at<=?`).bind(now+6000,now).run();
  if(!lock.meta.changes)throw new AppError(429,'SEARCH_RATE_LIMITED','기사 검색 요청이 많습니다. 잠시 기다린 후 다시 검색해 주세요.',true);
- const url=new URL(ENDPOINT);Object.entries({query:`${query} sourcelang:korean`,mode:'artlist',format:'json',maxrecords:'20',timespan:'30d',sort:'hybridrel'}).forEach(([k,v])=>url.searchParams.set(k,v));
+ const url=new URL(ENDPOINT);Object.entries({query:`${searchTerm} sourcelang:korean`,mode:'artlist',format:'json',maxrecords:'20',timespan:'30d',sort:'hybridrel'}).forEach(([k,v])=>url.searchParams.set(k,v));
  let response:Response;
  try{response=await fetch(url,{headers:{Accept:'application/json'},redirect:'error',signal:AbortSignal.any([signal,AbortSignal.timeout(12000)])});}
  catch{throw new AppError(503,'SEARCH_UNAVAILABLE','기사 검색 서비스에 연결하지 못했습니다. 검색 결과를 만들어 대신 표시하지 않습니다.',true);}
@@ -49,5 +50,5 @@ export async function searchNews(query:string,config:RuntimeConfig,signal:AbortS
  let parsed:unknown;try{parsed=JSON.parse(new TextDecoder().decode(bytes));}catch{throw new AppError(502,'SEARCH_INVALID_RESPONSE','기사 검색 응답 형식을 확인하지 못했습니다.',true);}
  if(!parsed||typeof parsed!=='object'||!('articles' in parsed))throw new AppError(502,'SEARCH_INVALID_RESPONSE','기사 목록을 확인하지 못했습니다.');
  const articles=normalizeArticles((parsed as {articles:unknown}).articles);
- return {provider:'gdelt',query,status:articles.length?'success':'empty',articles,searchedAt:new Date().toISOString(),scopeNote:'최근 30일간 GDELT에 수집된 한국어 기사 중 검색어와 관련된 후보입니다. 본문·반대 입장·내용의 정확성을 확인한 결과가 아닙니다. 수집 시각은 발행일과 다를 수 있습니다.'};
+ return {provider:'gdelt',query:searchTerm,status:articles.length?'success':'empty',articles,searchedAt:new Date().toISOString(),scopeNote:'최근 30일간 GDELT에 수집된 한국어 기사 중 검색어와 관련된 후보입니다. 본문·반대 입장·내용의 정확성을 확인한 결과가 아닙니다. 수집 시각은 발행일과 다를 수 있습니다.'};
 }

@@ -57,3 +57,5 @@ __pycache__/
 /research/runs/
 /research/data/
 /research/model-cache/
+
+/.firecrawl/

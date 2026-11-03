@@ -7,7 +7,7 @@ import {runtimeConfig} from '@/lib/server/config';
 import {AppError,errorResponse,json,readJson} from '@/lib/server/errors';
 async function handlePost(request:Request){const id=crypto.randomUUID();try{
  const parsed=newsRequestSchema.safeParse(await readJson(request));
- if(!parsed.success)throw new AppError(422,'VALIDATION_ERROR','검색 전송 확인과 영문 핵심어 3~100자를 확인해 주세요.');
+ if(!parsed.success)throw new AppError(422,'VALIDATION_ERROR','검색 전송 확인과 한국어·영문 핵심어 3~100자를 확인해 주세요. 연산자·주소·제어문자는 사용할 수 없습니다.');
  if(containsContactInfo(parsed.data.query))throw new AppError(422,'PRIVACY_INPUT_REJECTED','개인 연락처를 검색어로 사용할 수 없습니다.');
  const config=await runtimeConfig();await reserveSearch(request,config,id);
  return json(await searchNews(parsed.data.query,config,request.signal));

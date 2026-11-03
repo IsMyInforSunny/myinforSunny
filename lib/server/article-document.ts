@@ -87,7 +87,7 @@ function semanticBodies(html:string,tag:'article'|'main'|'title'){
  }
  return bodies;
 }
-function publicationDate(value:string|undefined){
+export function publicationDate(value:string|undefined){
  // A date alone stays a calendar date: do not invent a timezone or time of day.
  if(!value)return undefined;
  const day=/^\d{4}-\d\d-\d\d/.exec(value)?.[0];if(!day)return undefined;
