@@ -66,3 +66,26 @@
 - 배포 ID: `appgdep_6ae9ba3db4788191b193d21d72f470fd`
 - 상태: `succeeded`, 설정 리비전 6
 - GitHub 게시 브랜치 체크아웃에서는 Vitest 658 통과/13 건너뜀, Python 34 통과를 확인했다. 추가 42개 검사는 해당 작업 브랜치에 있던 검사를 포함한다.
+## 버전25 라이브 경로 점검
+
+버전25 공개 API에서 `GET /api/health`는 `ok`, capabilities는 `live:true`, `webSearch:false`, `webFetch:false`를 반환했다. 검색 경로는 의도대로 비활성이다.
+
+합성 문장으로 실제 Groq 분석을 한 번 요청했을 때 `mode: live` 응답은 왔지만 `status: partial`, 추출 주장 0건이었다. 두 번째 합성 요청은 `/api/analyze`에서 HTTP503을 반환했고, 재시도하지 않았다. Cloudflare 요청 ID `a91d95b26decd9a0225d7ee3be08b91b`, trace ID `9b819ea4b37305c2d1f59eccf5a14912`로 로그에서 응답 상태를 확인했다. 이는 v26의 선택 검색어 스키마 방어를 배포하기 전 확인한 결과이며, 전체 AI 분석 성공으로 확대 해석하지 않는다.
+# 공개 버전26 배포 — 2026-11-03 19:51 KST
+
+- 주소: https://naeinfo-clear-code2026.mseohyeon190.chatgpt.site
+- Sites 소스 커밋: `de7468ca91a133418c82bc8fe6a188d822afcb70`
+- 버전: 26
+- 배포 ID: `appgdep_6ae9bca508c4819186dcb4cbbd26beaa`
+- 상태: `succeeded`, 설정 리비전 6
+- 타입 검사·Vinext 빌드 통과. 전체 회귀 검사: Vitest 616 통과/13 건너뜀, Python 34 통과.
+- 배포 후 health `ok`, `live:true`, 검색·원문 취득 `false`를 확인했다.
+- 실제 Firecrawl 인증·원문 사용 조건 및 기사 코퍼스는 아직 확보되지 않았다. 편향 모델은 `null`을 유지한다.
+# 공개 버전27 문서 동기화 — 2026-11-03 19:55 KST
+
+버전27은 버전26의 동일한 웹사이트 코드와 설정을 유지한 문서 기록 동기화 배포다.
+
+- Sites 소스 커밋: `1b302565efc7906c0ccbf33a967aebd47d294982`
+- 버전: 27
+- 배포 ID: `appgdep_6ae9bd84ca6c8191bac83c157bba6858`
+- 상태: `succeeded`, 설정 리비전 6

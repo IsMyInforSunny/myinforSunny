@@ -79,8 +79,8 @@ export const rawAnalysisSchema=z.object({
   claims:z.array(z.object({id,text:text(1000),kind:z.enum(['factual','opinion','undetermined']),origin:z.array(quoteCandidate).min(1).max(5),targetTime:z.string().max(100)}).strict()).max(5),
   perspectiveQuestions:z.array(z.object({text:text(500),basis:z.array(quoteCandidate).min(1).max(5)}).strict()).max(2),
   counterArguments:z.array(z.object({claimId:id,kind:z.enum(['counterpoint','qualification','not_applicable']),text:text(350),reasoning:text(350),evidenceNeeded:text(250),basis:z.array(quoteCandidate).min(1).max(2)}).strict()).max(2),
-  // Optional hints must not invalidate the core analysis when a model emits a bad query.
-  searchSuggestions:z.array(z.object({label:text(60),query:z.string().max(100)}).strict()).max(2),
+  // Optional hints are sanitized per item after parsing; they must not invalidate analysis.
+  searchSuggestions:z.array(z.unknown()),
   claimsMayBeOmitted:z.boolean(),
 }).strict();
 export type RawAnalysis=z.infer<typeof rawAnalysisSchema>;

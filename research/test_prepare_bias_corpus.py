@@ -89,6 +89,7 @@ class CorpusPreparationTests(unittest.TestCase):
 
     def test_timezone_free_clock_and_future_fetch_times_are_rejected(self):
         for value, expected in [('2026-05-29T09:00:00', 'fetchedAt_missing_or_invalid'),
+                                ('20260529T090000Z', 'fetchedAt_missing_or_invalid'),
                                 ('2099-05-29T09:00:00Z', 'fetched_at_in_future')]:
             with self.subTest(value=value):
                 articles, reviews, manifest = fixture()
@@ -103,6 +104,20 @@ class CorpusPreparationTests(unittest.TestCase):
         reviews['windowEnd'] = '2026-05-28'
         report, _ = prepare(articles, reviews, manifest)
         self.assertNotIn('outside_comparison_publication_window', report['articles'][0]['issues'])
+
+        articles, reviews, manifest = fixture()
+        articles[0]['publishedAt'] = '2026-05-28'
+        reviews['windowStart'] = '2026-05-28T00:00:00+09:00'
+        reviews['windowEnd'] = '2026-05-28T23:59:59.999999+09:00'
+        report, _ = prepare(articles, reviews, manifest)
+        self.assertNotIn('publication_precision_insufficient_for_window', report['articles'][0]['issues'])
+
+        articles, reviews, manifest = fixture()
+        articles[0]['publishedAt'] = '2026-05-28'
+        reviews['windowStart'] = '2026-05-28T00:00:00Z'
+        reviews['windowEnd'] = '2026-05-28T23:59:59Z'
+        report, _ = prepare(articles, reviews, manifest)
+        self.assertIn('publication_precision_insufficient_for_window', report['articles'][0]['issues'])
 
     def test_known_publisher_alias_is_allowed_but_unrelated_subdomain_is_not(self):
         articles, reviews, manifest = fixture()
@@ -120,6 +135,31 @@ class CorpusPreparationTests(unittest.TestCase):
         articles[0]['url'] = 'https://biz.chosun.com/news/1'
         report, _ = prepare(articles, reviews, manifest)
         self.assertIn('publisher_url_mismatch', report['articles'][0]['issues'])
+
+    def test_manifest_alias_is_canonicalized_before_training_validation(self):
+        articles, reviews, manifest = fixture()
+        for article in articles:
+            if article['publisherId'] == 'one.example':
+                article['publisherId'] = 'imbc.com'
+                article['url'] = article['url'].replace('https://one.example', 'https://imnews.imbc.com')
+        manifest['profiles'][0]['publisherId'] = 'imnews.imbc.com'
+        report, _ = prepare(articles, reviews, manifest)
+        self.assertEqual(report['status'], 'train_input_ready', report['trainingValidationError'])
+        self.assertEqual(report['missingAnchorPublishers'], [])
+
+        manifest['profiles'].append({'publisherId': 'imbc.com', 'orientation': 'right'})
+        report, _ = prepare(articles, reviews, manifest)
+        self.assertIn('existing_training_validation_failed', report['blockingReasons'])
+
+    def test_date_only_fetch_record_covers_its_whole_day(self):
+        articles, reviews, manifest = fixture()
+        articles[0]['publishedAt'] = '2026-05-28T15:00:00+09:00'
+        articles[0]['fetchedAt'] = '2026-05-28'
+        report, _ = prepare(articles, reviews, manifest)
+        self.assertNotIn('publication_after_fetch_time', report['articles'][0]['issues'])
+        articles[0]['fetchedAt'] = '2026-05-27'
+        report, _ = prepare(articles, reviews, manifest)
+        self.assertIn('publication_after_fetch_time', report['articles'][0]['issues'])
 
     def test_existing_duplicate_and_sample_safeguards_are_preserved(self):
         articles, reviews, manifest = fixture()

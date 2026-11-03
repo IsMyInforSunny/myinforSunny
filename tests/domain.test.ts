@@ -31,9 +31,18 @@ describe('모델 정규화에서 제외한 항목의 부분 결과 표시',()=>{
     expect(result.coverage).toMatchObject({totalSentences:2,naturalSentences:2,claimsMayBeOmitted:true});
   });
   it('잘못된 선택 검색어만 제거하고 핵심 분석 결과는 유지한다',()=>{
-    const raw=proposal();raw.searchSuggestions=[{label:'검증 자료',query:'통계청 3.5% 예산'},{label:'잘못된 검색 연산자',query:'통계청 OR 학교'}];
+    const raw=proposal();raw.searchSuggestions=[
+      {label:'검증 자료',query:'통계청'.normalize('NFD')+' 3.5% 예산'},
+      {label:'잘못된 검색 연산자',query:'통계청 OR 학교'},
+      {label:'x'.repeat(61),query:'정상 자료'},
+      '형식이 잘못된 항목',
+      {label:'추가 제안',query:'정상 추가 자료'},
+    ];
     const result=assembleAnalysis(req,raw,'invalid-optional-search-hint','mock');
-    expect(result.status).toBe('success');expect(result.searchSuggestions).toEqual([{label:'검증 자료',query:'통계청 3.5% 예산'}]);
+    expect(result.status).toBe('success');expect(result.searchSuggestions).toEqual([
+      {label:'검증 자료',query:'통계청 3.5% 예산'},
+      {label:'추가 제안',query:'정상 추가 자료'},
+    ]);
   });
   it('존재하지 않는 문장의 상세 표현을 제외하고 정상 문장 수·정상 분류를 유지하며 경고한다',()=>{
     const raw=proposal();raw.expressions.push({sentenceId:'phantom',status:'flagged',criteria:['mockery'],severity:'strong',context:'direct',explanation:'존재하지 않는 문장에 붙은 모델 분류',evidence:[{sentenceId:'body_s0',quote:req.body}]});

@@ -16,6 +16,8 @@ from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from train_bias import content_hash, validate
 
 KST = timezone(timedelta(hours=9))
+DATE_ONLY = re.compile(r'^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+ISO_TIMESTAMP = re.compile(r'^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(?::[0-9]{2}(?:\.[0-9]{1,6})?)?(?:Z|[+-][0-9]{2}:[0-9]{2})$')
 
 
 def nonempty(value):
@@ -48,20 +50,18 @@ def public_url(value):
 def timestamp(value):
     if not nonempty(value):
         raise ValueError('Missing timestamp')
-    if re.fullmatch(r'\d{4}-\d{2}-\d{2}', value):
+    if DATE_ONLY.fullmatch(value):
         return datetime.combine(date.fromisoformat(value), time.min, tzinfo=KST)
-    has_clock = bool(re.search(r'[T ]\d{2}:\d{2}', value))
-    has_zone = bool(re.search(r'(?:Z|[+-]\d{2}:?\d{2})$', value, re.IGNORECASE))
-    if has_clock and not has_zone:
-        raise ValueError('Timestamp with a clock time needs an explicit timezone')
+    if not ISO_TIMESTAMP.fullmatch(value):
+        raise ValueError('Timestamp must use an extended ISO date and explicit timezone')
     result = datetime.fromisoformat(value.replace('Z', '+00:00'))
-    return result.replace(tzinfo=timezone.utc) if result.tzinfo is None else result
+    return result
 
 
 def window_boundary(value, *, end=False):
     if not nonempty(value):
         raise ValueError('Missing window boundary')
-    if re.fullmatch(r'\d{4}-\d{2}-\d{2}', value):
+    if DATE_ONLY.fullmatch(value):
         bound = time.max if end else time.min
         return datetime.combine(date.fromisoformat(value), bound, tzinfo=KST)
     return timestamp(value)
@@ -151,10 +151,20 @@ def prepare(articles, reviews, manifest):
                     issues.append('fetched_at_in_future')
                 if field == 'publishedAt' and when > datetime.now(timezone.utc):
                     issues.append('published_at_in_future')
-                if field == 'publishedAt' and not start <= when <= end:
-                    issues.append('outside_comparison_publication_window')
+                if field == 'publishedAt':
+                    if DATE_ONLY.fullmatch(article['publishedAt']):
+                        day_end = when + timedelta(days=1) - timedelta(microseconds=1)
+                        if day_end < start or when > end:
+                            issues.append('outside_comparison_publication_window')
+                        elif when < start or day_end > end:
+                            issues.append('publication_precision_insufficient_for_window')
+                    elif not start <= when <= end:
+                        issues.append('outside_comparison_publication_window')
             except (ValueError, TypeError):
                 issues.append(field + '_missing_or_invalid')
+        # A date-only fetch record covers its whole Korean calendar day; compare against the day's end.
+        if 'fetchedAt' in dates and DATE_ONLY.fullmatch(article['fetchedAt']):
+            dates['fetchedAt'] += timedelta(days=1) - timedelta(microseconds=1)
         if len(dates) == 2 and dates['publishedAt'] > dates['fetchedAt']:
             issues.append('publication_after_fetch_time')
         if article.get('provenance') != 'public_article':
@@ -204,9 +214,15 @@ def prepare(articles, reviews, manifest):
     if extra_reviews:
         blockers.append('reviews_reference_unknown_articles')
     training_validation_error = None
+    # Rows carry canonical publisher IDs, so the manifest must be compared in the same form.
+    # Two profiles collapsing onto one canonical ID are rejected by validate() as a duplicate.
+    canonical_manifest = {**manifest, 'profiles': [
+        {**p, 'publisherId': canonical_publisher_host(p['publisherId'])}
+        if isinstance(p, dict) and nonempty(p.get('publisherId')) else p
+        for p in manifest['profiles']]}
     if not blockers:
         try:
-            validate(output_rows, manifest, synthetic=False)
+            validate(output_rows, canonical_manifest, synthetic=False)
         except (ValueError, KeyError, TypeError, AttributeError) as error:
             blockers.append('existing_training_validation_failed')
             training_validation_error = str(error) if isinstance(error, ValueError) else 'Malformed orientation manifest'

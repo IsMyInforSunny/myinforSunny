@@ -58,7 +58,13 @@ export function assembleAnalysis(req:TextRequest,raw:RawAnalysis,requestId:strin
     return [{...c,kind:c.kind,basis,provenance:'ai_suggestion' as const}];
   });
   if(damaged)warnings.push({code:'PARTIAL_EVIDENCE',message:'일부 항목의 원문 근거를 확인하지 못해 제외하거나 판단을 유보했습니다.'});
-  const searchSuggestions=raw.searchSuggestions.flatMap(suggestion=>{const query=searchQuerySchema.safeParse(suggestion.query);return query.success?[{...suggestion,query:query.data}]:[];});
+  const searchSuggestions=raw.searchSuggestions.flatMap(value=>{
+    if(!value||typeof value!=='object'||Array.isArray(value))return [];
+    const suggestion=value as {label?:unknown;query?:unknown};
+    if(typeof suggestion.label!=='string'||!suggestion.label.trim()||suggestion.label.length>60)return [];
+    const query=searchQuerySchema.safeParse(suggestion.query);
+    return query.success?[{label:suggestion.label,query:query.data.normalize('NFC')}]:[];
+  }).slice(0,2);
   const a:Analysis={schemaVersion:'2.1',analysisId:crypto.randomUUID(),requestId,mode:'live',status:damaged?'partial':'success',versions:{rubric:RUBRIC,prompt:'analysis-4.8',model,segmenter:SEGMENTER},sources,proposition:req.proposition,topics,topicAssignments,bodyTopicAssignments,stances,expressions,claims,perspectiveQuestions:questions,counterArguments,searchSuggestions,indicators:null as unknown as Analysis['indicators'],coverage:{totalSentences:expressions.length,naturalSentences:naturalSentenceCount(sources),factualClaimsExtracted:claims.filter(c=>c.kind==='factual').length,claimsMayBeOmitted:raw.claimsMayBeOmitted||claims.length===5||damaged,scopeNote:'제출한 자료 안에서 추출한 결과입니다. 아직 외부 자료와 대조하지 않았으며, 모든 주장을 빠짐없이 추출했다고 보장하지 않습니다.'},warnings,createdAt:new Date().toISOString()};a.indicators=indicators(a);assertAnalysis(a);return a;
 }
 export async function analyze(req:TextRequest,config:RuntimeConfig,requestId:string,signal:AbortSignal){

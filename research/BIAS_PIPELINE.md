@@ -13,7 +13,7 @@ py research/train_bias.py --input articles.local.jsonl --manifest orientation.lo
 - `id`, `publisherId`: 고유 기사 ID와 정규화한 매체 도메인. 예를 들어 MBC는 `imbc.com`이고 URL은 그 하위 도메인일 수 있다.
 - `text`, `sourceGroupId`: 본문과 동일 원본·전재 그룹 ID. 원문은 로컬 입력에서만 사용하고 출력하지 않는다.
 - `comparisonGroup`: 동일한 주제·명제·기간·기사 형식을 검토해 붙인 공통 비교 그룹. 한 번의 학습에는 한 그룹만 허용한다.
-- `url`, `publishedAt`: 해당 매체의 HTTPS 공개 URL과 ISO 발행일.
+- `url`, `publishedAt`: 해당 매체의 HTTPS 공개 URL과 실제 발행일. 날짜만 있으면 한국 시간 날짜로, 시각이 있으면 `YYYY-MM-DDTHH:MM[:SS[.ffffff]]Z` 또는 `±HH:MM`을 명시한 확장 ISO 형식으로 기록한다.
 - `provenance: "public_article"`, `usage: {trainingAllowed: true, modelDistributionAllowed: true, basisUrl: "이용 근거 URL", reviewedBy: "검토자", reviewedAt: "검토일"}`. 필드는 사용 조건 검토 기록이며 프로그램이 법적 허가를 확인하는 것은 아니다.
 
 manifest는 `axisId`, `profiles: [{publisherId, orientation}]`를 받는다. 기존 15개 매체와 정확히 같은 축·구분을 담은 `research/bias-orientation.example.json`을 로컬 복사해 사용한다. 템플릿에는 사람 검토 승인이나 가상의 성능값이 없다. orientation은 기존 `lib/bias-profile-set.ts`와 같은 값을 사용한다. 제외 매체와 미등록 매체는 입력을 거부한다. 좌·우 참고 매체가 모두 필요하다.
@@ -26,7 +26,7 @@ manifest는 `axisId`, `profiles: [{publisherId, orientation}]`를 받는다. 기
 
 입력 `fetched.local.jsonl`은 실제 수집기가 취득한 기사당 한 줄이며 `id`, `publisherId`, `url`, `publishedAt`, `fetchedAt`, `text`, `extractionVersion`, `provenance: "public_article"`를 담는다. `publisherId`는 위 학습 계약의 루트 매체 도메인이다. `publishedAt`과 `fetchedAt`은 실제 발행·취득 시점이고, 본문은 제호·광고·기자 반복 푸터의 처리 버전을 `extractionVersion`으로 남긴다. 이 필드는 처리 절차를 수행했다는 사실을 자동 증명하지 않는다. 후보 제목·URL만으로 본문이나 날짜를 만들지 않는다.
 
-사람 검토 JSON의 최상위 항목은 `comparisonGroup`(실제 비교할 명제), `windowStart`, `windowEnd`(비교 기간의 ISO 시각), `articles`다. 날짜만 쓰면 한국 시간 자정으로 해석하고, 비교 기간의 끝 날짜는 한국 시간 하루 전체를 포함한다. 시각까지 쓰면 `Z` 또는 UTC 오프셋이 반드시 있어야 하며 시간대 없는 시각은 보류한다. 하루 전체를 비교할 때는 시작 `T00:00:00Z`, 끝 `T23:59:59Z`를 명시한다. 각 `articles` 항목은 다음과 같다.
+사람 검토 JSON의 최상위 항목은 `comparisonGroup`(실제 비교할 명제), `windowStart`, `windowEnd`(비교 기간의 ISO 시각), `articles`다. 날짜만 쓰면 한국 시간 자정으로 해석하고, 비교 기간의 끝 날짜는 한국 시간 하루 전체를 포함한다. 시각까지 쓰면 `Z` 또는 UTC 오프셋이 반드시 있어야 하며 시간대 없는 시각은 보류한다. 시간대가 포함된 경계를 쓸 때는 확장 ISO 형식만 허용한다. 하루 전체의 시각 경계를 쓰려면 한국 시간 `T00:00:00+09:00`부터 `T23:59:59.999999+09:00`까지 지정한다. 날짜만 입력하는 방식도 같은 한국 날짜 전체를 포함한다. 각 `articles` 항목은 다음과 같다.
 
 | 필드 | 실제로 남겨야 하는 기록 |
 | --- | --- |
@@ -43,7 +43,7 @@ py research/prepare_bias_corpus.py --input .sites-runtime/fetched.local.jsonl --
 
 보고서는 원문 없이 URL·발행일·매체·원본 그룹·본문 해시·미충족 조건을 담는다. 본문이 없는 검색 결과, 미검토 사용권·주제·원본 그룹, 비교 기간 밖 기사, 발행일보다 이른 취득 시점, 매체-URL 불일치(정확한 호스트 또는 명시한 별칭 불일치), 미래 발행·취득·검토 시각, 알려지지 않은 검토 ID를 차단한다. 매체 별칭은 준비기에서 정규 매체 ID로 바꾸어 anchor 누락 집계도 일치시킨다. HTTPS URL 형식은 검사하지만 DNS·원문 접근 성공 여부를 재검증하지 않는다. `www`·추적 쿼리·fragment·끝 슬래시 변형은 동일 URL로 세고, 나머지 식별용 쿼리는 보존한다. 기존 `train_bias.validate`의 동일 본문/원본 그룹 검사와 매체2곳·각6개 독립 기사 하한을 그대로 적용한다. 학습·평가 양쪽에 매체별3개를 나누는 실제 그룹 분리는 다음 학습 단계에서 수행하므로 보고서의 `groupSplitVerified`는 `null`이다.
 
-모든 준비 조건이 맞을 때만 `--export .sites-runtime/articles.local.jsonl`을 같은 명령에 추가해 원문 포함 학습 입력을 명시적으로 내보낸다. `.local.jsonl` 출력은 Git에 넣지 않는다. 불완전하면 메타데이터 보고서만 남기고 원문 내보내기는 거절한다. 기존 보고서·원문·검토 파일을 덮어쓰지 않으므로 재실행 시 새 출력 이름을 사용한다. 이 도구는 기존 사이트 모델 파일을 수정하지 않는다.
+모든 준비 조건이 맞을 때만 `--export .sites-runtime/articles.local.jsonl`을 같은 명령에 추가해 원문 포함 학습 입력을 명시적으로 내보낸다. `.local.jsonl` 출력은 Git에 넣지 않는다. 불완전하면 메타데이터 보고서만 남기고 원문 내보내기는 거절한다. 기존 보고서·원문·검토 파일을 덮어쓰지 않으므로 재실행 시 새 출력 이름을 사용한다. `*.local.json`, `*.local.jsonl`, `*.local.csv`는 Git에서 무시한다. 이 도구는 기존 사이트 모델 파일을 수정하지 않는다.
 
 `train_input_ready`는 입력 준비 형식이 맞다는 뜻이며 모델 승인 상태가 아니다. 누락된 참고 축 매체와 독립 원본 수를 별도로 보고하고 `releaseReady`는 항상 `false`다. 제공 manifest의 좌4곳·우3곳을 자료가 없다는 이유로 지우지 않는다. 아래 학습·분리 평가와 실제 두 평가자의 최소40개 독립 평가 원본 검토가 여전히 필요하다. 권리 검토 boolean·검토자 문자열이 있다는 것만으로 실제 독립 검토의 진위가 인증되는 것도 아니다.
 
