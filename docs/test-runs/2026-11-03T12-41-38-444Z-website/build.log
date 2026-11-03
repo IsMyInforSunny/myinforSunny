@@ -1,0 +1,14 @@
+
+  vinext build  (Vite 8.0.13)
+
+(node:30744) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Error: EPERM, Permission denied: 'C:\Users\pp\Desktop\대회\디지털 새싹\디지털새싹_cmd\.sites-runtime\github-sync\.sites-runtime\publish-2230\dist'
+    at Object.rmSync (node:fs:1593:18)
+    at cleanBuildOutput (file:///C:/Users/pp/Desktop/%EB%8C%80%ED%9A%8C/%EB%94%94%EC%A7%80%ED%84%B8%20%EC%83%88%EC%8B%B9/%EB%94%94%EC%A7%80%ED%84%B8%EC%83%88%EC%8B%B9_cmd/node_modules/vinext/dist/build/clean-output.js:24:5)
+    at buildApp (file:///C:/Users/pp/Desktop/%EB%8C%80%ED%9A%8C/%EB%94%94%EC%A7%80%ED%84%B8%20%EC%83%88%EC%8B%B9/%EB%94%94%EC%A7%80%ED%84%B8%EC%83%88%EC%8B%B9_cmd/node_modules/vinext/dist/cli.js:319:2) {
+  errno: 1,
+  code: 'EPERM',
+  path: 'C:\\Users\\pp\\Desktop\\대회\\디지털 새싹\\디지털새싹_cmd\\.sites-runtime\\github-sync\\.sites-runtime\\publish-2230\\dist',
+  syscall: 'rm'
+}

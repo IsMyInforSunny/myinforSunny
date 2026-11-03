@@ -33,12 +33,42 @@ class CollectionPlanTests(unittest.TestCase):
             for reviews in (40, 60, 80):
                 count = minimum_originals(publishers, reviews)
                 evaluation = math.ceil(count * EVALUATION_FRACTION)
-                self.assertGreaterEqual(evaluation, max(reviews, publishers * 3))
-                self.assertGreaterEqual(count - evaluation, publishers * 3)
-                if count > publishers * 6:
+                self.assertGreaterEqual(evaluation, reviews)
+                self.assertGreaterEqual(count - evaluation, 3)
+                if count > 6:
                     previous_evaluation = math.ceil((count - 1) * EVALUATION_FRACTION)
-                    self.assertTrue(previous_evaluation < max(reviews, publishers * 3)
-                                    or count - 1 - previous_evaluation < publishers * 3)
+                    self.assertTrue(previous_evaluation < reviews
+                                    or count - 1 - previous_evaluation < 3)
+
+    def test_observed_optional_publisher_has_its_own_training_deficit(self):
+        articles, reviews, manifest = fixture()
+        report, _ = prepare(articles, reviews, manifest)
+        manifest['profiles'].append({'publisherId': 'optional.example', 'orientation': 'unspecified'})
+        row = copy.deepcopy(report['articles'][0])
+        row.update(articleId='optional', publisherId='optional.example', sourceGroupId='optional-original',
+                   contentHash='f' * 64, url='https://optional.example/one')
+        report['articles'].append(row)
+        result = collection_plan(manifest, report)
+        self.assertEqual(result['participatingPublisherCount'], 3)
+        target = next(t for t in result['publisherTargets'] if t['publisherId'] == 'optional.example')
+        self.assertFalse(target['isRequiredAnchor'])
+        self.assertEqual(target['observedReviewedOriginals'], 1)
+        self.assertEqual(target['missingForMinimum'], 5)
+
+    def test_large_publisher_set_does_not_multiply_the_global_original_lower_bound(self):
+        manifest = {'axisId': 'synthetic', 'profiles': [
+            {'publisherId': f'p{i}.example', 'orientation': 'left' if i < 8 else 'right'} for i in range(15)]}
+        result = collection_plan(manifest)
+        self.assertEqual(result['evaluationSplitOriginalLowerBound'], 98)
+        self.assertEqual(result['balancedPublisherArticleTarget'], 120)
+        self.assertGreaterEqual(result['balancedPlanEvaluationSlots'], 15 * 3)
+        self.assertTrue(result['balancedPlanAssumesDistinctOriginalsAcrossPublishers'])
+        self.assertTrue(all(t['minimumBeforeGroupSplit'] == 6 for t in result['publisherTargets']))
+        for publishers in (2, 7, 13, 14, 15, 40):
+            profiles = [{'publisherId': f'p{i}.example', 'orientation': 'left' if i == 0 else 'right'} for i in range(publishers)]
+            plan = collection_plan({'axisId': 'synthetic', 'profiles': profiles})
+            self.assertGreaterEqual(plan['balancedPlanEvaluationSlots'], publishers * 3)
+            self.assertGreaterEqual(plan['balancedPublisherArticleTarget'] - plan['balancedPlanEvaluationSlots'], publishers * 3)
 
     def test_counts_only_reviewed_originals_without_copying_body_or_reviewer_data(self):
         articles, reviews, manifest = fixture()

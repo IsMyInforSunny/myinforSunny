@@ -1,0 +1,65 @@
+
+> naeinfo-clear@0.1.0 build
+> node scripts/run-framework.mjs build
+
+
+  vinext build  (Vite 8.0.13)
+
+npm.cmd : (node:3888) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` ins
+tead.
+위치 줄:3 문자:1
++ npm.cmd run build 2>&1 | Tee-Object -FilePath 'docs/test-runs/2026-11 ...
++ ~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ((node:3888) [DE...oks()` instead.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[1/5] analyze client references...
+[2K
+transforming...✓ 379 modules transformed.
+rendering chunks...
+✓ built in 1.76s
+[2/5] analyze server references...
+[2K
+transforming...✓ 214 modules transformed.
+rendering chunks...
+✓ built in 258ms
+[3/5] build rsc environment...
+[2K
+transforming...✓ 376 modules transformed.
+rendering chunks...
+computing gzip size...
+✓ built in 1.49s
+[4/5] build client environment...
+[2K
+transforming...✓ 2009 modules transformed.
+rendering chunks...
+computing gzip size...
+✓ built in 2.33s
+[5/5] build ssr environment...
+[2K
+transforming...✓ 220 modules transformed.
+rendering chunks...
+computing gzip size...
+✓ built in 618ms
+[0m
+  Route (app)
+  ┌ ? /                
+  ├ ? /analyze         
+  ├ λ /api/analyze     
+  ├ λ /api/capabilities
+  ├ λ /api/health      
+  ├ λ /api/news        
+  ├ λ /api/research    
+  ├ λ /api/verify      
+  ├ ? /methodology     
+  └ ? /popup           
+
+  λ API  ? Unknown
+
+  ? Some routes could not be classified. vinext currently uses static analysis
+    and cannot detect dynamic API usage (headers(), cookies(), etc.) at build time.
+    Automatic classification will be improved in a future release.
+
+  Build complete. Run `vinext start` to start the production server.
+

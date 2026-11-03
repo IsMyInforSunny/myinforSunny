@@ -9,14 +9,15 @@ import {readResearchToken,signResearchToken} from '../lib/server/research-token'
 const evidence={axisId:'test',coordinateSpace:'synthetic',modelId:'publisher-char-tfidf-linear-svm',modelVersion:'test',task:'publisher_identity_relative_coordinate',
   trainingDataId:'train',evaluationDataId:'heldout',evaluation:{split:'held_out_articles' as const,heldOutUnit:'original_source_group' as const,
     groupSplitId:'split',trainingPublisherIds:['left.test','right.test'],evaluationPublisherIds:['left.test','right.test'],
-    trainingSourceGroupIds:['train0','train1','train2'],evaluationSourceGroupIds:['heldout0','heldout1','heldout2'],metrics:['left.test','right.test'].map(publisherId=>({publisherId,sampleCount:3,coordinateMae:0.1,publisherAccuracy:0.8}))}};
+    trainingSourceGroupIds:Array.from({length:100},(_,i)=>i).filter(i=>i%50<30).map(i=>`train${i}`),
+    evaluationSourceGroupIds:Array.from({length:100},(_,i)=>i).filter(i=>i%50>=30).map(i=>`heldout${i}`),metrics:['left.test','right.test'].map(publisherId=>({publisherId,sampleCount:20,coordinateMae:0.1,publisherAccuracy:0.8}))}};
 const fixture={schemaVersion:'publisher-coordinate-svm-1',synthetic:false,dataKind:'real',status:'validated',comparisonGroup:'synthetic subject',
   classifierEvidence:evidence,vectorizer:{analyzer:'char',ngramRange:[2,4],lowercase:false,whitespace:'collapse',norm:'l2',sublinearTf:true,
     vocabulary:{'가 ':2,' 😀':1,'가 😀':4,'나 ':5,'나 😀':6,' 나':0,'가 나':3},
     idf:[1.6931471805599454,1.2876820724517808,1.2876820724517808,1.6931471805599454,1.6931471805599454,1.6931471805599454,1.6931471805599454]},
   projection:{coefficients:[0.1,0.2,0.3,0.4,0.5,0.6,0.7],offset:-0.2,scale:2},
-  lineage:Array.from({length:12},(_,i)=>({articleId:`fixture_${i}`,publisherId:i<6?'left.test':'right.test',url:`https://${i<6?'left.test':'right.test'}/fixture-${i}`,
-    publishedAt:'2026-01-01T00:00:00Z',sourceGroupId:`${i%6<3?'train':'heldout'}${i%3}`,contentHash:i.toString(16).padStart(64,'0'),split:i%6<3?'training':'evaluation',
+  lineage:Array.from({length:100},(_,i)=>({articleId:`fixture_${i}`,publisherId:i<50?'left.test':'right.test',url:`https://${i<50?'left.test':'right.test'}/fixture-${i}`,
+    publishedAt:'2026-01-01T00:00:00Z',sourceGroupId:`${i%50<30?'train':'heldout'}${i}`,contentHash:i.toString(16).padStart(64,'0'),split:i%50<30?'training':'evaluation',
     usage:{trainingAllowed:true,modelDistributionAllowed:true,basisUrl:'https://fixture.test/usage',reviewedBy:'synthetic fixture',reviewedAt:'2026-01-01'}})),
   validation:{heldoutAnchorSeparation:true,humanAxisReview:{status:'approved',reviewedBy:'synthetic reviewer',evidence:'synthetic test only',
     reviewedModelVersion:'test',reviewers:['synthetic-a','synthetic-b'],sampleCount:40,interReviewerAgreement:0.8}}};
@@ -29,7 +30,7 @@ describe('portable bias inference',()=>{
       const publisherId=i%4<2?'left.test':'right.test',split=i%2===0?'training':'evaluation';
       const sourceGroupId=`${split}_${i}_${'x'.repeat(100)}`;
       large.lineage.push({...structuredClone(large.lineage[0]),articleId:`large_${i}`,publisherId,
-        url:`https://${publisherId}/large-${i}`,sourceGroupId,split,contentHash:(i+20).toString(16).padStart(64,'0')});
+        url:`https://${publisherId}/large-${i}`,sourceGroupId,split,contentHash:(i+1000).toString(16).padStart(64,'0')});
       const ids=split==='training'?large.classifierEvidence.evaluation.trainingSourceGroupIds:large.classifierEvidence.evaluation.evaluationSourceGroupIds;
       ids.push(sourceGroupId);
     }
@@ -74,6 +75,18 @@ describe('portable bias inference',()=>{
     expect(parseBiasModel({...fixture,validation:{...fixture.validation,humanAxisReview:{...fixture.validation.humanAxisReview,reviewedModelVersion:'other'}}})).toBeNull();
     expect(parseBiasModel({...fixture,classifierEvidence:{...evidence,evaluation:{...evidence.evaluation,evaluationSourceGroupIds:['train']}}})).toBeNull();
   });
+  it('rejects review counts exceeding actual heldout originals or unique content',()=>{
+    const exaggerated=structuredClone(fixture);
+    exaggerated.validation.humanAxisReview.sampleCount=41;
+    expect(parseBiasModel(exaggerated)).toBeNull();
+    const shared=structuredClone(fixture),heldout=shared.lineage.filter(r=>r.split==='evaluation');
+    heldout[heldout.length-1].sourceGroupId=heldout[0].sourceGroupId;
+    shared.classifierEvidence.evaluation.evaluationSourceGroupIds=[...new Set(heldout.map(r=>r.sourceGroupId))];
+    expect(parseBiasModel(shared)).toBeNull();
+    const duplicateText=structuredClone(fixture),duplicates=duplicateText.lineage.filter(r=>r.split==='evaluation');
+    duplicates[duplicates.length-1].contentHash=duplicates[0].contentHash;
+    expect(parseBiasModel(duplicateText)).toBeNull();
+  });
   it('rejects training references by canonical URL or normalized body hash',async()=>{
     const model=parseBiasModel(fixture)!;
     expect(await isBiasTrainingArticle(model,'https://left.test/fixture-0#fragment','new text')).toBe(true);
@@ -85,7 +98,7 @@ describe('portable bias inference',()=>{
   it('rejects duplicate originals, hidden text leakage and incompatible feature spaces in a release',()=>{
     const duplicateOrigin=structuredClone(fixture);duplicateOrigin.lineage[1].sourceGroupId=duplicateOrigin.lineage[0].sourceGroupId;
     expect(parseBiasModel(duplicateOrigin)).toBeNull();
-    const leakage=structuredClone(fixture);leakage.lineage[3].contentHash=leakage.lineage[0].contentHash;
+    const leakage=structuredClone(fixture);leakage.lineage.find(row=>row.split==='evaluation')!.contentHash=leakage.lineage[0].contentHash;
     expect(parseBiasModel(leakage)).toBeNull();
     const wrongNgram={...fixture,vectorizer:{...fixture.vectorizer,vocabulary:{'a':0,...Object.fromEntries(Object.entries(fixture.vectorizer.vocabulary).filter(([,index])=>index!==0))}}};
     expect(parseBiasModel(wrongNgram)).toBeNull();

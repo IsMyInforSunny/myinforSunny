@@ -1,0 +1,6 @@
+{
+    "exitCode":  0,
+    "command":  "npm run build",
+    "reason":  "Stopped the task-owned built server holding Windows output files before retrying only the failed build",
+    "durationMs":  9513
+}

@@ -73,6 +73,8 @@ export function parseBiasModel(value:unknown):PortableBiasModel|null{
     ||model.classifierEvidence.modelId!=='publisher-char-tfidf-linear-svm'||model.classifierEvidence.task!=='publisher_identity_relative_coordinate'
     ||!review.reviewedBy.trim()||!review.evidence.trim()||review.reviewers.some(name=>!name.trim())
     ||review.reviewedModelVersion!==model.classifierEvidence.modelVersion||new Set(review.reviewers.map(name=>name.trim())).size<2
+    ||review.sampleCount>new Set(heldout.map(row=>row.sourceGroupId)).size
+    ||review.sampleCount>new Set(heldout.map(row=>row.contentHash)).size
     ||!sameSet(e.trainingPublisherIds,publishers)||!sameSet(e.evaluationPublisherIds,publishers)
     ||!sameSet(e.trainingSourceGroupIds,[...new Set(train.map(row=>row.sourceGroupId))])
     ||!sameSet(e.evaluationSourceGroupIds,[...new Set(heldout.map(row=>row.sourceGroupId))])

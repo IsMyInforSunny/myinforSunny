@@ -17,12 +17,14 @@ from train_bias import EVALUATION_FRACTION, MIN_AXIS_REVIEW_ORIGINALS, MIN_SAMPL
 
 
 def minimum_originals(publisher_count, review_samples):
-    """Match ceil(n_groups * test_size), while leaving train/test publisher minima."""
+    """Global group bound; one group may contain articles from several publishers."""
+    if type(publisher_count) is not int or publisher_count < 2:
+        raise ValueError('Need at least two participating publishers')
     fraction = Fraction(str(EVALUATION_FRACTION))
-    required_evaluation = max(review_samples, publisher_count * MIN_SAMPLES)
-    count = max(publisher_count * MIN_SAMPLES * 2,
+    required_evaluation = max(review_samples, MIN_SAMPLES)
+    count = max(MIN_SAMPLES * 2,
                 math.floor(Fraction(required_evaluation - 1) / fraction) + 1)
-    while count - math.ceil(count * fraction) < publisher_count * MIN_SAMPLES:
+    while count - math.ceil(count * fraction) < MIN_SAMPLES:
         count += 1
     return count
 
@@ -48,8 +50,6 @@ def collection_plan(manifest, preparation_report=None, review_samples=MIN_AXIS_R
     if not {'left', 'right'}.issubset(orientations.values()):
         raise ValueError('Both unchanged orientation anchor groups are required')
     anchors = sorted(p for p, orientation in orientations.items() if orientation in ('left', 'right'))
-    lower_bound = minimum_originals(len(anchors), review_samples)
-    balanced_target = math.ceil(lower_bound / len(anchors))
     by_publisher, original_groups = defaultdict(set), set()
     observed = preparation_report is not None
     comparison = None
@@ -85,10 +85,23 @@ def collection_plan(manifest, preparation_report=None, review_samples=MIN_AXIS_R
             ids.add(row['articleId']); urls.add(url)
             by_publisher[publisher].add(group)
             original_groups.add(group)
+    participating = sorted(set(anchors) | {p for p, groups in by_publisher.items() if groups})
+    lower_bound = minimum_originals(len(participating), review_samples)
+    balanced_target = max(MIN_SAMPLES * 2, (lower_bound + len(participating) - 1) // len(participating))
+    fraction = Fraction(str(EVALUATION_FRACTION))
+    # This conservative allocation assumes a different original for every article.
+    # It must leave at least three train and evaluation slots per participant.
+    while True:
+        total = balanced_target * len(participating)
+        evaluation_slots = math.ceil(total * fraction)
+        if min(evaluation_slots, total - evaluation_slots) >= MIN_SAMPLES * len(participating):
+            break
+        balanced_target += 1
     targets = []
-    for publisher in anchors:
+    for publisher in participating:
         count = len(by_publisher[publisher]) if observed else None
-        targets.append({'publisherId': publisher, 'minimumBeforeGroupSplit': MIN_SAMPLES * 2,
+        targets.append({'publisherId': publisher, 'isRequiredAnchor': publisher in anchors,
+                        'minimumBeforeGroupSplit': MIN_SAMPLES * 2,
                         'balancedCollectionTarget': balanced_target,
                         'observedReviewedOriginals': count,
                         'missingForMinimum': max(0, MIN_SAMPLES * 2 - count) if observed else None,
@@ -96,6 +109,7 @@ def collection_plan(manifest, preparation_report=None, review_samples=MIN_AXIS_R
     return {'schemaVersion': 'bias-collection-plan-1', 'status': 'planning_only',
             'axisId': manifest['axisId'], 'sameComparisonGroupRequired': True,
             'comparisonGroup': comparison, 'anchorPublisherCount': len(anchors),
+            'participatingPublisherCount': len(participating),
             'minimumTrainArticlesPerPublisher': MIN_SAMPLES,
             'minimumEvaluationArticlesPerPublisher': MIN_SAMPLES,
             'evaluationGroupFraction': EVALUATION_FRACTION,
@@ -103,6 +117,9 @@ def collection_plan(manifest, preparation_report=None, review_samples=MIN_AXIS_R
                             'minimumLabelDecisions': 2 * review_samples},
             'evaluationSplitOriginalLowerBound': lower_bound,
             'balancedAnchorOriginalTarget': balanced_target * len(anchors),
+            'balancedPublisherArticleTarget': balanced_target * len(participating),
+            'balancedPlanAssumesDistinctOriginalsAcrossPublishers': True,
+            'balancedPlanEvaluationSlots': math.ceil(balanced_target * len(participating) * fraction),
             'publisherTargets': targets,
             'optionalPublishers': sorted(p for p, o in orientations.items() if o == 'unspecified'),
             'excludedPublishers': sorted(p for p, o in orientations.items() if o == 'excluded'),

@@ -99,6 +99,44 @@ class TrainingTests(unittest.TestCase):
         self.assertFalse(artifact['validation']['heldoutAnchorSeparation'])
         self.assertEqual(artifact['status'], 'research_only')
 
+    def test_real_path_metadata_cannot_claim_more_reviewed_originals_than_held_out(self):
+        # Fictional metadata exercises the real-path guard; no real corpus is trained or saved.
+        rows, manifest = fixture()
+        for row in rows:
+            row['provenance'] = 'public_article'
+            row['usage'] = {'trainingAllowed': True, 'modelDistributionAllowed': True,
+                            'basisUrl': 'https://synthetic.example/fixture-only',
+                            'reviewedBy': 'synthetic metadata fixture', 'reviewedAt': '2026-01-01'}
+        first = train_model(rows, manifest)
+        self.assertLess(len(first['classifierEvidence']['evaluation']['evaluationSourceGroupIds']), 40)
+        manifest['humanAxisReview'] = {'status': 'approved', 'reviewedBy': 'synthetic reviewer',
+                                      'reviewers': ['synthetic one', 'synthetic two'], 'sampleCount': 40,
+                                      'evidence': 'synthetic metadata fixture only', 'interReviewerAgreement': .8,
+                                      'reviewedModelVersion': first['classifierEvidence']['modelVersion']}
+        self.assertEqual(train_model(rows, manifest)['status'], 'research_only')
+
+    def test_review_count_can_match_forty_actual_heldout_fixture_originals(self):
+        originals, manifest = fixture()
+        rows = []
+        for publisher in ('left.example', 'right.example'):
+            base = next(row for row in originals if row['publisherId'] == publisher)
+            for i in range(50):
+                rows.append({**base, 'id': f'{publisher}-{i}', 'url': f'https://{publisher}/{i}',
+                             'sourceGroupId': f'{publisher}-original-{i}', 'text': base['text'] + f' 별도 합성 원본 {i}',
+                             'provenance': 'public_article',
+                             'usage': {'trainingAllowed': True, 'modelDistributionAllowed': True,
+                                       'basisUrl': 'https://synthetic.example/fixture-only',
+                                       'reviewedBy': 'synthetic fixture', 'reviewedAt': '2026-01-01'}})
+        first = train_model(rows, manifest)
+        self.assertEqual(len(first['classifierEvidence']['evaluation']['evaluationSourceGroupIds']), 40)
+        manifest['humanAxisReview'] = {'status': 'approved', 'reviewedBy': 'synthetic reviewer',
+                                      'reviewers': ['synthetic one', 'synthetic two'], 'sampleCount': 40,
+                                      'evidence': 'synthetic metadata fixture only', 'interReviewerAgreement': .8,
+                                      'reviewedModelVersion': first['classifierEvidence']['modelVersion']}
+        self.assertEqual(train_model(rows, manifest)['status'], 'validated')
+        manifest['humanAxisReview']['sampleCount'] = 41
+        self.assertEqual(train_model(rows, manifest)['status'], 'research_only')
+
     def test_review_boundary_rejects_malformed_or_truthy_metadata(self):
         review = {'status': 'approved', 'reviewedBy': 'reviewer', 'evidence': 'review-record',
                   'reviewedModelVersion': 'version', 'reviewers': ['one', 'two'],

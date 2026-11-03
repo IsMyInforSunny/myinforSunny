@@ -177,7 +177,9 @@ def train_model(rows, manifest, synthetic=False, seed=42):
                                'trainingSourceGroupIds': training_groups, 'evaluationSourceGroupIds': evaluation_groups,
                                'metrics': metrics}}
     review = manifest.get('humanAxisReview', {})
-    human_reviewed = reviewed_axis(review, model_version)
+    human_reviewed = (reviewed_axis(review, model_version)
+                      and review['sampleCount'] <= len(evaluation_groups)
+                      and review['sampleCount'] <= len({content_hash(texts[i]) for i in test}))
     # Evaluation articles are reference samples; they never trained the model.
     references = [{'articleId': rows[i]['id'], 'publisherId': rows[i]['publisherId'],
                    'comparisonGroup': rows[i]['comparisonGroup'],
