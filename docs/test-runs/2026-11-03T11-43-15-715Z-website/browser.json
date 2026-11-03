@@ -1,0 +1,30 @@
+{
+  "scope": "local built server and public version 28; synthetic inputs; text analysis intercepted in browser",
+  "externalInferenceRequests": 0,
+  "checks": [
+    "example transition and reset clear export selections and feedback",
+    "disabled runtime blocks custom reference verification",
+    "stale input coordinate warning remains visible",
+    "selection fragment initializes editor and is removed",
+    "body edit and undo revoke consent",
+    "comment addition and edit revoke consent",
+    "proposition edit revokes consent",
+    "reference edit revokes consent",
+    "unconsented analysis dispatch is blocked",
+    "text request includes true consent and filtered comments",
+    "422 response shows allowlisted validation fields and excludes unknown paths",
+    "cancelled or reset examples cannot reopen coordinates or restore cleared input",
+    "successful example navigation still opens coordinates",
+    "manual comparison describes required pasted reference text",
+    "actual popup opens without opener or automatic input transfer",
+    "popup arrow, Home and End keys synchronize selected review tabs",
+    "popup citation highlights the analyzed source",
+    "560px and 375px popup has one open dialog and no horizontal overflow"
+  ],
+  "localApiBoundary": {
+    "missingConsent": {"http": 422, "code": "VALIDATION_ERROR", "field": "transmissionConsent"},
+    "validInputDisabledRuntime": {"http": 503, "code": "FEATURE_UNAVAILABLE"}
+  },
+  "publicRuntime": {"healthHttp": 200, "health": "ok", "capabilitiesHttp": 200, "live": true, "webSearch": false, "webFetch": false},
+  "limitations": ["Original production 422 and 503 causes remain unknown", "No live inference or article acquisition evaluated"]
+}
