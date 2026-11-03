@@ -20,6 +20,8 @@ type Props = {
   /** Kept for existing preview and report consumers; not used as gauge input. */
   checks?: Check[];
   researchStage?: ResearchStage;
+  /** Known service/model availability; null means it has not been checked yet. */
+  availability?: {biasModelReady:boolean;articleResearchReady:boolean} | null;
   biasArticleCoordinates?: BiasArticleCoordinate[];
   biasOrientationSet?: BiasOrientationSet | null;
   selectedBiasArticleId?: string;
@@ -113,7 +115,7 @@ function needle(angle: number) {
 }
 
 export default function CanvaDashboard({analysis, researchResults, biasArticleCoordinates = [], biasOrientationSet = null, selectedBiasArticleId,
-  reliabilityObservations = [], sourceWeightSet = null, stale = false, onEvidence, onArticles, onInput, onCoordinates}: Props) {
+  reliabilityObservations = [], sourceWeightSet = null, researchStage = 'not_started', availability = null, stale = false, onEvidence, onArticles, onInput, onCoordinates}: Props) {
   const id = useId();
   const isDemo = analysis?.mode === 'demo';
   const results = analysis ? currentResearch(analysis, researchResults) : [];
@@ -136,6 +138,20 @@ export default function CanvaDashboard({analysis, researchResults, biasArticleCo
   const emptySlots = Math.max(0, 3 - visibleCards.length);
   const measured = bias.status === 'ready' && bias.gaugePercent !== null;
   const partial = analysis?.status === 'partial';
+  const pendingReasons:string[]=[];
+  if(analysis?.mode==='live'&&!stale){
+    if(scores.bias.status==='pending')pendingReasons.push(availability?.biasModelReady===false
+      ?'편향: 비교 모델과 검토 기사 자료를 준비 중이에요.'
+      :'편향: 같은 명제의 비교 기사나 모델 검증 조건이 부족해요. 매체 좌표에서 준비 상태를 확인해 주세요.');
+    if(scores.stimulation.status==='pending')pendingReasons.push('자극: 표현을 판단할 수 있는 분석 결과가 부족해요. 분석근거에서 미판정 문장을 확인해 주세요.');
+    if(scores.reliability.status==='pending'){
+      const reasons=[...new Set(weightedObserved.flatMap(claim=>claim.status==='weighted_evidence_available'?[]:[weightedPendingLabels[claim.status]]))];
+      pendingReasons.push(reasons.length?`신뢰: ${reasons.join(' · ')}.`
+        :availability?.articleResearchReady===false?'신뢰: 관련 기사 검색과 원문 수집을 연결 중이에요. 아직 외부 근거를 대조하지 못했어요.'
+        :['planning','searching','fetching','waiting','comparing'].includes(researchStage)?'신뢰: 외부 자료를 조사하고 있어요. 조사 진행 상태는 추천·조사 창에서 확인해 주세요.'
+        :'신뢰: 외부 근거 대조가 필요해요. 추천·조사 창에서 조사 상태와 확보한 자료를 확인해 주세요.');
+    }
+  }
   const angle = measured ? 180 + 180 * bias.gaugePercent! / 100 : null;
   const prefix = `${stale ? '이전 입력 결과: ' : ''}${isDemo ? '가상 예시: ' : ''}`;
   const gaugeLabel = measured
@@ -177,6 +193,7 @@ export default function CanvaDashboard({analysis, researchResults, biasArticleCo
         </p>
       )}
       {partial && <p className="cv3-notice" role="note">일부 분석만 완료된 결과입니다. 빠진 내용과 분석 한계를 근거 화면에서 확인해주세요.</p>}
+      {!!pendingReasons.length&&<aside className="cv3-notice" aria-label="산출 대기 이유"><strong>산출 대기 이유</strong>{pendingReasons.map(reason=><p key={reason}>{reason}</p>)}</aside>}
 
       <div className="cv3-frame">
         <div className={`cv3-board${measured ? '' : ' is-waiting'}${analysis && stale ? ' is-stale' : ''}`}>

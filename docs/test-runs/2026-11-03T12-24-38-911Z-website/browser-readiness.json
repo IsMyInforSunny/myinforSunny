@@ -1,0 +1,11 @@
+{
+  "scope": "local built server; synthetic analysis responses intercepted in browser",
+  "externalInferenceRequests": 0,
+  "passed": [
+    "no pending explanation before an analysis",
+    "known model and article collection prerequisites explained",
+    "available research offers next step without claiming it started",
+    "existing expression score remains visible",
+    "375px guide has no horizontal overflow"
+  ]
+}

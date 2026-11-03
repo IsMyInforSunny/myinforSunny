@@ -19,6 +19,46 @@ const render=(analysis:Analysis,extra:Partial<Parameters<typeof CanvaDashboard>[
   {analysis,researchResults:[],onEvidence:()=>{},onArticles:()=>{},onCoordinates:()=>{},...extra}));
 
 describe('score dashboard contract',()=>{
+  it('explains unavailable model and article collection without suggesting that a score is processing',()=>{
+    const html=render(article('공개 가상 기사다.'),{availability:{biasModelReady:false,articleResearchReady:false}});
+    expect(html).toContain('산출 대기 이유');
+    expect(html).toContain('편향: 비교 모델과 검토 기사 자료를 준비 중이에요.');
+    expect(html).toContain('신뢰: 관련 기사 검색과 원문 수집을 연결 중이에요.');
+    expect(html).not.toContain('신뢰: 외부 자료를 조사하고 있어요.');
+  });
+  it('only describes an investigation as running when its current stage is active',()=>{
+    const analysis=article('공개 가상 기사다.');
+    const html=render(analysis,{availability:{biasModelReady:true,articleResearchReady:true},researchStage:'searching'});
+    expect(html).toContain('신뢰: 외부 자료를 조사하고 있어요.');
+    expect(render(analysis,{availability:{biasModelReady:true,articleResearchReady:true},researchStage:'failed'})).toContain('신뢰: 외부 근거 대조가 필요해요.');
+  });
+  it('does not confuse demo, stale results, or no factual claims with unavailable trust scoring',()=>{
+    const analysis=article('공개 가상 기사다.');
+    for(const extra of [{stale:true},{}]){
+      const target=extra.stale?analysis:{...analysis,mode:'demo' as const};
+      expect(render(target,{...extra,availability:{biasModelReady:false,articleResearchReady:false}})).not.toContain('aria-label="산출 대기 이유"');
+    }
+    const withoutFacts={...analysis,claims:[]};
+    expect(render(withoutFacts,{availability:{biasModelReady:false,articleResearchReady:false}})).not.toContain('신뢰: 관련 기사 검색');
+  });
+  it('retains actual evidence reasons when search becomes unavailable',()=>{
+    const analysis=article('공개 가상 기사다.');
+    const html=render(analysis,{availability:{biasModelReady:false,articleResearchReady:false},
+      reliabilityObservations:[{claimId:analysis.claims[0].id,articleId:'a',originId:'origin-a',publisher:'unknown.test',outcome:'supports'}]});
+    expect(html).toContain('신뢰: 가중치가 없는 출처가 있어 계산 보류.');
+    expect(html).not.toContain('신뢰: 관련 기사 검색');
+  });
+  it('does not replace an existing weighted score with a service availability message',()=>{
+    const analysis=article('공개 가상 기사다.');
+    const html=render(analysis,{availability:{biasModelReady:false,articleResearchReady:false},
+      sourceWeightSet:{version:'synthetic',methodology:'synthetic test weights',weights:[
+        {publisher:'a.test',value:0.7,evidence:'synthetic A'},{publisher:'b.test',value:0.3,evidence:'synthetic B'}]},
+      reliabilityObservations:[
+        {claimId:analysis.claims[0].id,articleId:'a',originId:'origin-a',publisher:'a.test',outcome:'supports'},
+        {claimId:analysis.claims[0].id,articleId:'b',originId:'origin-b',publisher:'b.test',outcome:'contradicts'}]});
+    expect(html).toMatch(/cv3-axis-trust[\s\S]*?<strong[^>]*>70점/);
+    expect(html).not.toContain('신뢰: 관련 기사 검색');
+  });
   it('keeps the numeric bias score visible alongside its coordinate action',()=>{
     const analysis=article('합성 입력이다.');
     const set:BiasOrientationSet={axisId:'synthetic',version:'fixture',source:'synthetic only',note:'fixture only',profiles:[{publisherId:'left.test',orientation:'left'},{publisherId:'right.test',orientation:'right'}]};

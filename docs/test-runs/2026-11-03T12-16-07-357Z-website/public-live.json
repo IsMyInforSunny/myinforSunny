@@ -1,0 +1,19 @@
+{
+  "siteVersion": 29,
+  "scope": "one actual Groq analysis from the public browser with fictional school text and explicit transmission consent",
+  "dispatched": 1,
+  "http": 200,
+  "requestId": "4925bc1a-5e97-4ba7-987e-2a103d94464b",
+  "cloudflareRay": "a54b561a9c0257d8-ICN",
+  "mode": "live",
+  "status": "success",
+  "factualClaims": 1,
+  "opinionClaims": 1,
+  "expressionUnits": 2,
+  "warnings": [],
+  "promptVersion": "analysis-4.8",
+  "visibleScores": {"bias": "pending", "stimulation": 0, "stimulationDenominator": 2, "reliability": "pending", "reliabilityDenominator": 1},
+  "inferenceRetries": 0,
+  "articleSearchRequests": 0,
+  "limitations": ["Connectivity and formatting check, not independent accuracy evaluation", "Original historical 422 and 503 causes not established", "Comparison model and retrieved evidence still unavailable"]
+}

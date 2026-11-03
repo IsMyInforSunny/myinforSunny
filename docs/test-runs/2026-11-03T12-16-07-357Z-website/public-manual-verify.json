@@ -1,0 +1,16 @@
+{
+  "siteVersion": 29,
+  "scope": "one actual Groq comparison of the existing fictional live analysis with one pasted fictional reference",
+  "dispatched": 1,
+  "http": 200,
+  "requestId": "d84c2d4e-f789-4dd9-a3e9-9e56d300063b",
+  "cloudflareRay": "a54b63b17c7d57d8-ICN",
+  "mode": "live",
+  "status": "success",
+  "verificationScope": "provided_text",
+  "checks": [{"outcome": "supported", "temporalFit": "matched", "relations": 1}],
+  "referenceProvenance": ["provided_text"],
+  "inferenceRetries": 0,
+  "articleSearchRequests": 0,
+  "limitations": ["Pasted fictional text comparison only", "No real website source verified", "Not eligible evidence for a weighted trust score", "Not independent accuracy evaluation"]
+}

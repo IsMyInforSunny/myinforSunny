@@ -115,7 +115,8 @@ export default function Workbench(){
     {busy&&view===null&&<div className="notice" role="status"><LoaderCircle size={16} className="spin"/><span>{busy==='analyze'?'기사 분석이 진행 중입니다.':'참고자료 대조가 진행 중입니다.'}</span><button type="button" className="small-button" onClick={()=>setView(busy==='analyze'?'input':'evidence')}>진행 화면 열기</button><button type="button" className="small-button" onClick={cancel}>요청 취소</button></div>}
     <div aria-live="polite" aria-atomic="true">{error&&<div className="notice error" role="alert"><Info size={16}/>{error}</div>}{cancelled&&<div className="notice">요청을 취소했습니다.</div>}</div>
     <div ref={reportRef} tabIndex={-1} aria-label="기사 분석 작업 공간" className="canva-screen-focus">
-      <CanvaDashboard analysis={analysis} researchResults={researchResults}
+      <CanvaDashboard analysis={analysis} researchResults={researchResults} researchStage={researchStage}
+        availability={cap?{biasModelReady:!!releasedBiasModel,articleResearchReady:!!cap.webSearch&&!!cap.webFetch}:null}
         reliabilityObservations={evidenceObservations}
         sourceWeightSet={SOUTH_KOREA_PUBLIC_TRUST_PRIOR_2025} biasArticleCoordinates={biasCoordinates} biasOrientationSet={CLAUDE_MEDIA_ORIENTATION_SET} selectedBiasArticleId={analysis?.analysisId}
         stale={stale} onInput={()=>setView('input')} onCoordinates={()=>setView('coordinates')} onEvidence={()=>showDetails('evidence')} onArticles={()=>showDetails('articles')}/>
