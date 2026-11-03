@@ -13,7 +13,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
-from train_bias import content_hash, validate
+from train_bias import content_hash, validate, MIN_AXIS_REVIEW_ORIGINALS
 
 KST = timezone(timedelta(hours=9))
 DATE_ONLY = re.compile(r'^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
@@ -233,7 +233,7 @@ def prepare(articles, reviews, manifest):
               'comparisonGroup': comparison, 'articleCount': len(articles), 'reviewedArticleCount': len(output_rows),
               'publisherCounts': dict(sorted(counts.items())), 'missingAnchorPublishers': sorted(anchors - set(counts)),
               'independentOriginalGroupCount': len({row['sourceGroupId'] for row in output_rows}),
-              'humanAxisReviewMinimumOriginals': 40, 'groupSplitVerified': None,
+              'humanAxisReviewMinimumOriginals': MIN_AXIS_REVIEW_ORIGINALS, 'groupSplitVerified': None,
               'unknownReviewedArticleIds': extra_reviews, 'blockingReasons': blockers,
               'trainingValidationError': training_validation_error, 'articles': report_rows,
               'releaseReady': False,

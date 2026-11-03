@@ -103,6 +103,14 @@ export function analysisModelSchema(sources:InputSource[],hasProposition:boolean
   claims:z.array(rawAnalysisSchema.shape.claims.element.extend({origin:z.array(quote).min(1).max(5)})).max(5),
   perspectiveQuestions:z.array(rawAnalysisSchema.shape.perspectiveQuestions.element.extend({basis:z.array(quote).min(1).max(5)})).max(2),
   counterArguments:z.array(rawAnalysisSchema.shape.counterArguments.element.extend({basis:z.array(quote).min(1).max(2)})).min(1).max(2),
+  // The provider's strict JSON grammar must never contain an untyped {} item.
+  searchSuggestions:z.array(z.object({label:z.string().max(60),query:z.string().max(100)}).strict()).max(2),
+ });
+}
+/** Optional discovery hints cannot invalidate otherwise usable core analysis. */
+export function analysisResponseSchema(sources:InputSource[],hasProposition:boolean){
+ return analysisModelSchema(sources,hasProposition).extend({
+  searchSuggestions:z.unknown().optional().transform(value=>Array.isArray(value)?value:[]),
  });
 }
 export const rawVerificationSchema=z.object({checks:z.array(z.object({claimId:id,originMatches:z.boolean(),outcome:outcomeSchema,relations:z.array(z.object({referenceId:id,quote:text(8000),relation:z.enum(['supports','contradicts','context']),explanation:text(1000)}).strict()).max(10),explanation:text(1000),temporalFit:z.enum(['matched','mismatched','unclear']),limitations:z.array(z.string().max(500)).max(8)}).strict()).max(2)}).strict();

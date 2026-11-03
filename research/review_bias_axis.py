@@ -12,7 +12,7 @@ import warnings
 from collections import Counter
 from pathlib import Path
 
-from train_bias import digest
+from train_bias import digest, MIN_AXIS_REVIEW_ORIGINALS
 
 LABELS = ('left', 'center', 'right', 'undetermined')
 FIELDS = ('modelVersion', 'reviewSetId', 'articleId', 'url', 'publicationDate', 'reviewerId', 'label')
@@ -79,7 +79,7 @@ def review_corpus(artifact):
     return version, set_id, eligible
 
 
-def prepare(artifact, output_one, output_two, sample_count=40):
+def prepare(artifact, output_one, output_two, sample_count=MIN_AXIS_REVIEW_ORIGINALS):
     if type(sample_count) is not int or sample_count < 1:
         raise ValueError('Sample count must be a positive integer')
     if Path(output_one).resolve() == Path(output_two).resolve():
@@ -96,7 +96,7 @@ def prepare(artifact, output_one, output_two, sample_count=40):
             writer = csv.DictWriter(stream, fieldnames=FIELDS)
             writer.writeheader(); writer.writerows(rows)
     return {'modelVersion': version, 'reviewSetId': set_id, 'eligibleArticleCount': len(eligible),
-            'templateArticleCount': len(rows), 'minimumForRelease': 40}
+            'templateArticleCount': len(rows), 'minimumForRelease': MIN_AXIS_REVIEW_ORIGINALS}
 
 
 def read_review(path, version, set_id, eligible):
@@ -173,7 +173,7 @@ def build_report(artifact, path_one, path_two, decision=None):
     real = artifact.get('dataKind') == 'real' and artifact.get('synthetic') is False
     if not real:
         reasons.append('synthetic_or_unconfirmed_data_kind')
-    if len(determinate) < 40:
+    if len(determinate) < MIN_AXIS_REVIEW_ORIGINALS:
         reasons.append('fewer_than_40_common_determinate_originals')
     kappa = known_agreement['cohensKappa']
     if kappa is None or not 0 <= kappa <= 1:
@@ -196,7 +196,7 @@ def build_report(artifact, path_one, path_two, decision=None):
                 'eligibleCorpusCoverage': marked / eligible_count if eligible_count else 0}
     return {'schemaVersion': 'bias-axis-human-review-1', 'modelVersion': version, 'reviewSetId': set_id,
             'dataKind': artifact.get('dataKind'), 'status': 'human_review_ready' if metadata else 'research_only',
-            'minimumCommonDeterminateSamples': 40, 'eligibleArticleCount': eligible_count,
+            'minimumCommonDeterminateSamples': MIN_AXIS_REVIEW_ORIGINALS, 'eligibleArticleCount': eligible_count,
             'commonArticleCount': len(common), 'commonDeterminateArticleCount': len(determinate),
             'commonArticleIds': common, 'commonDeterminateArticleIds': determinate,
             'reviewFileHashes': [hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in (path_one, path_two)],
@@ -215,7 +215,7 @@ def main():
     make.add_argument('--artifact', required=True, type=Path)
     make.add_argument('--reviewer-one', required=True, type=Path)
     make.add_argument('--reviewer-two', required=True, type=Path)
-    make.add_argument('--sample-count', type=int, default=40)
+    make.add_argument('--sample-count', type=int, default=MIN_AXIS_REVIEW_ORIGINALS)
     report = commands.add_parser('report')
     report.add_argument('--artifact', required=True, type=Path)
     report.add_argument('--reviewer-one', required=True, type=Path)

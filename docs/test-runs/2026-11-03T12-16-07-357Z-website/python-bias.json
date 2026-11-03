@@ -1,0 +1,8 @@
+{
+  "command": "py -m unittest discover -s research -p 'test_*bias*.py'",
+  "exitCode": 0,
+  "passed": 38,
+  "scope": "synthetic bias-training, corpus-preparation, human-review and collection-plan infrastructure checks",
+  "realArticleTraining": false,
+  "measuredPoliticalBiasAccuracy": null
+}

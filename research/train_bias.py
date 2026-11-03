@@ -16,6 +16,8 @@ from urllib.parse import urlparse
 
 VERSION = 'publisher-coordinate-svm-1'
 MIN_SAMPLES = 3
+EVALUATION_FRACTION = .4
+MIN_AXIS_REVIEW_ORIGINALS = 40
 
 
 def digest(value):
@@ -45,7 +47,7 @@ def reviewed_axis(review, model_version):
         return False
     count, agreement = review.get('sampleCount'), review.get('interReviewerAgreement')
     return (review.get('status') == 'approved' and review['reviewedModelVersion'] == model_version
-            and type(count) is int and count >= 40
+            and type(count) is int and count >= MIN_AXIS_REVIEW_ORIGINALS
             and type(agreement) in (int, float) and math.isfinite(agreement) and 0 <= agreement <= 1)
 
 
@@ -104,7 +106,7 @@ def grouped_split(rows, seed=42):
     labels = [r['publisherId'] for r in rows]
     groups = [r['sourceGroupId'] for r in rows]
     publishers = set(labels)
-    for train, test in GroupShuffleSplit(n_splits=256, test_size=.4, random_state=seed).split(rows, labels, groups):
+    for train, test in GroupShuffleSplit(n_splits=256, test_size=EVALUATION_FRACTION, random_state=seed).split(rows, labels, groups):
         if all(Counter(labels[i] for i in part)[p] >= MIN_SAMPLES
                for part in (train, test) for p in publishers):
             return train, test
