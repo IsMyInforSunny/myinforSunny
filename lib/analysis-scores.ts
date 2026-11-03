@@ -3,7 +3,7 @@ import type {BiasAnalysisResult} from './bias-analysis';
 import {expressionSummary,naturalSentences} from './domain';
 import {reviewCitedSources} from './cited-sources';
 
-export const ANALYSIS_SCORES_VERSION='descriptive-scores-1.0';
+export const ANALYSIS_SCORES_VERSION='descriptive-scores-1.1';
 export type Score={
   label:string;
   value:number|null;

@@ -35,7 +35,8 @@ async page => {
         check(await openDialog('기사 입력').isVisible(),'Cancelled example reopened coordinates over the reset editor');
         check(await page.getByRole('textbox',{name:'본문 필수'}).inputValue()==='','Cancelled example restored reset input');
       }else check(await page.locator('dialog[open]').count()===0,'Cancelled example reopened coordinates');
-      check(await page.getByRole('button',{name:'분석근거 표시',exact:true}).isDisabled(),'Cancelled example restored an analysis');
+      // Reset keeps the editor dialog open, so the background button is inert.
+      check(await page.getByRole('button',{name:'분석근거 표시',exact:true,includeHidden:true}).isDisabled(),'Cancelled example restored an analysis');
       log.push(reset?'reset suppresses late example navigation and input restoration':'cancel suppresses late example navigation');
     }finally{release();await page.unroute('**/api/analyze',hold);}
   };

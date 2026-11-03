@@ -82,6 +82,15 @@ describe('portable bias inference',()=>{
     expect(await isBiasTrainingArticle(model,'https://right.test/new',' 가\t\n나 ')).toBe(true);
     expect(await isBiasTrainingArticle(model,'https://right.test/new','different text')).toBe(false);
   });
+  it('rejects duplicate originals, hidden text leakage and incompatible feature spaces in a release',()=>{
+    const duplicateOrigin=structuredClone(fixture);duplicateOrigin.lineage[1].sourceGroupId=duplicateOrigin.lineage[0].sourceGroupId;
+    expect(parseBiasModel(duplicateOrigin)).toBeNull();
+    const leakage=structuredClone(fixture);leakage.lineage[3].contentHash=leakage.lineage[0].contentHash;
+    expect(parseBiasModel(leakage)).toBeNull();
+    const wrongNgram={...fixture,vectorizer:{...fixture.vectorizer,vocabulary:{'a':0,...Object.fromEntries(Object.entries(fixture.vectorizer.vocabulary).filter(([,index])=>index!==0))}}};
+    expect(parseBiasModel(wrongNgram)).toBeNull();
+    expect(parseBiasModel({...fixture,comparisonGroup:'x'.repeat(161)})).toBeNull();
+  });
   it('accepts a target without publisher identity and collapses shared originals',()=>{
     const article=(articleId:string,publisherId:string,coordinate:number):BiasArticleCoordinate=>({articleId,publisherId,comparisonGroup:'synthetic',classifier:{...evidence,coordinate}});
     const rows=[article('target','input',-0.8),...Array.from({length:3},(_,i)=>article(`l${i}`,'left.test',-0.5)),...Array.from({length:3},(_,i)=>article(`r${i}`,'right.test',0.5))];

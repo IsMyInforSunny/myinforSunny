@@ -6,7 +6,7 @@
  */
 import type {Analysis} from './contracts';
 
-export const CITED_SOURCES_VERSION = 'cited-sources-0.1';
+export const CITED_SOURCES_VERSION = 'cited-sources-0.2';
 
 export type CitedSourceType =
   | 'official_statistics' // 통계청·한국은행 등 공식 통계
@@ -67,7 +67,7 @@ const TYPE_RULES: {type: CitedSourceType; pattern: RegExp}[] = [
 ];
 const PRIMARY_TYPES = new Set<CitedSourceType>(['official_statistics', 'public_agency', 'research']);
 /* Names that point to a kind of institution rather than a specific one a reader could look up. */
-const GENERIC_NAME = /^(?:연구팀|연구진|정부|당국|학계|전문가|경찰|검찰|학교\s?측|시\s?당국|관련\s?기관|해외\s?연구|한\s?연구)$/;
+const GENERIC_NAME = /^(?:연구팀|연구진|정부|당국|학계|전문가|경찰|검찰|위원회|학교\s?측|시\s?당국|관련\s?기관|해외\s?연구|한\s?연구)$/;
 
 /* Attribution phrases. Each yields the cited name (or none) and the phrase span. */
 const ACCORDING_TO = /([^\s,.“”"'‘’「」(){}][^,.。“”"]{0,30}?)\s*(?:에\s?따르면|에\s?의하면|에\s?의해\s?발표된)/g;
@@ -80,6 +80,21 @@ const SUBJECT_AT_START = /^\s*[“"]?([^,.\s“”"][^,.“”"]{0,24}?)(?:은|�
 const PRONOUN = /^(?:그|그녀|이들|그들|이|해당|이번|이날|당시|또|또한|한편|하지만|이에|이와\s?관련해)$/;
 /* Pronouns that stand for a person or group who is speaking. Connectives in PRONOUN are not speakers. */
 const SPEAKER_PRONOUN = /^(?:그|그녀|이들|그들|그녀들|그분|이분|저들)$/;
+/* "그에 따르면", "이에 의하면": a bare pronoun points back to an earlier sentence. */
+const REFERENCE_ONLY = /^(?:그|이|저|그녀|이들|그들|이것|그것|이곳|그곳)$/;
+/* "이 보고서", "이번 조사", "해당 연구", "이 같은 자료": a demonstrative before a common noun. */
+const DEMONSTRATIVE = /^(?:이|그|저|해당|이번|같은|앞의|앞선|상기|이\s?같은|그\s?같은)(?:\s+|$)/;
+/* A specific institution that survives after the demonstrative ("이번 통계청 조사" → 통계청). */
+const SPECIFIC_NAME = /[가-힣]{2,}(?:청|부|처|은행|공사|공단|연구원|연구소|위원회|대학교|협회|재단)(?=\s|$)|[가-힣]{2,}(?:시|도|군)(?=\s|$)|[A-Z]{2,}/;
+
+/** Returns the usable name, or null when the phrase only refers back to something unnamed. */
+function resolveReference(name: string): string | null {
+  if (REFERENCE_ONLY.test(name)) return null;
+  const demonstrative = DEMONSTRATIVE.exec(name);
+  if (!demonstrative) return name;
+  const rest = name.slice(demonstrative[0].length).trim();
+  return rest && SPECIFIC_NAME.test(rest) ? rest : null;
+}
 const UNATTRIBUTED_PASSIVE = /(?:으로|로)\s?(?:알려졌다|전해졌다|파악됐다|관측된다|보인다|예상된다|나타났다)|(?:라는|다는)\s?(?:지적|분석|관측|전망|평가|우려|주장)이\s?(?:나온다|나왔다|제기됐다|있다)|(?:다|라)고\s?(?:한다|들었다)(?=[.\s”"]|$)/;
 const DOCUMENT = /자료|보고서|조사|통계|발표문|보도자료|백서|논문|판결문|공시|[「『《'‘].+?[」』》'’]/;
 const DATED = /\d{4}\s?년|\d{1,2}\s?월|\d{1,2}\s?일|지난해|올해|작년|전년|분기/;
@@ -117,12 +132,16 @@ export function reviewCitedSources(analysis: Pick<Analysis, 'sources' | 'claims'
       const signals = {documentNamed: DOCUMENT.test(text), dated: DATED.test(text), quantified: QUANTIFIED.test(text)};
       const found: {name: string | null; at: number; length: number; type: CitedSourceType}[] = [];
 
+      const sentenceKey = `${source.id}\u0000${sentence.id}`;
+      let referenced = false;
       for (const match of text.matchAll(ACCORDING_TO)) {
-        const name = cleanName(match[1]!);
+        // "그에 따르면", "이 보고서에 따르면": the phrase points back to something unnamed. Do not count it as a source.
+        const name = resolveReference(cleanName(match[1]!));
+        if (name === null) { referenced = true; unresolvedSentences.add(sentenceKey); continue; }
         const type = classify(name) ?? 'organization';
         found.push({name, at: match.index!, length: match[0].length, type});
       }
-      const foundIn = !found.length ? FOUND_IN.exec(text) : null;
+      const foundIn = !found.length && !referenced ? FOUND_IN.exec(text) : null;
       if (foundIn) {
         // "이 같은 내용은 국회 회의록에서 확인됐다": the document name follows the topic marker.
         const name = cleanName(foundIn[1]!.replace(/^.*[은는]\s+/, ''));
@@ -130,19 +149,22 @@ export function reviewCitedSources(analysis: Pick<Analysis, 'sources' | 'claims'
         // The cited document itself names the record, so treat it as a named document.
         if (type) { found.push({name, at: foundIn.index, length: foundIn[0].length, type}); signals.documentNamed = true; }
       }
-      if (!found.length && SAYING_VERB.test(text)) {
+      if (!found.length && !referenced && SAYING_VERB.test(text)) {
         const subject = SUBJECT_AT_START.exec(text);
-        const name = subject ? cleanName(subject[1]!) : '';
-        // A pronoun refers back to an earlier sentence. Record it as unresolved instead of guessing the name.
-        if (name && SPEAKER_PRONOUN.test(name) && SPEECH_VERB.test(text)) unresolvedSentences.add(`${source.id}\u0000${sentence.id}`);
-        if (name && !PRONOUN.test(name) && !SPEAKER_PRONOUN.test(name)) {
+        const raw = subject ? cleanName(subject[1]!) : '';
+        // A pronoun or "이 보고서는" refers back to an earlier sentence. Record it as unresolved instead of guessing the name.
+        const name = !raw || SPEAKER_PRONOUN.test(raw) ? null : PRONOUN.test(raw) ? '' : resolveReference(raw);
+        if (raw && name === null) {
+          referenced = true;
+          if (SPEECH_VERB.test(text)) unresolvedSentences.add(sentenceKey);
+        } else if (name) {
           // An unknown subject of a speech verb is still a named speaker (often a company or group).
           const type = classify(name) ?? (SPEECH_VERB.test(text) ? 'organization' : null);
           if (type) found.push({name, at: subject!.index + subject![0].indexOf(subject![1]!), length: subject![1]!.length, type});
         }
       }
       const passive = UNATTRIBUTED_PASSIVE.exec(text);
-      if (!found.length && passive) found.push({name: null, at: passive.index, length: passive[0].length, type: 'anonymous'});
+      if (!found.length && !referenced && passive) found.push({name: null, at: passive.index, length: passive[0].length, type: 'anonymous'});
 
       for (const item of found) {
         const generic = !!item.name && GENERIC_NAME.test(item.name);

@@ -12,7 +12,7 @@ const evidenceSchema=z.object({
 });
 const artifactSchema=z.object({
   schemaVersion:z.literal('publisher-coordinate-svm-1'),synthetic:z.literal(false),dataKind:z.literal('real'),status:z.literal('validated'),
-  comparisonGroup:z.string().min(1),classifierEvidence:evidenceSchema,
+  comparisonGroup:z.string().min(1).max(160),classifierEvidence:evidenceSchema,
   vectorizer:z.object({analyzer:z.literal('char'),ngramRange:z.tuple([z.literal(2),z.literal(4)]),lowercase:z.literal(false),
     whitespace:z.literal('collapse'),norm:z.literal('l2'),sublinearTf:z.literal(true),vocabulary:z.record(z.string(),z.number().int().nonnegative()),idf:z.array(finite.positive()).min(1).max(100000)}),
   projection:z.object({coefficients:z.array(finite).min(1).max(100000),offset:finite,scale:finite.positive()}),
@@ -63,8 +63,10 @@ export function parseBiasModel(value:unknown):PortableBiasModel|null{
     &&a.length===b.length&&a.every(item=>b.includes(item));
   const publishers=e.metrics.map(m=>m.publisherId);
   const train=model.lineage.filter(row=>row.split==='training'),heldout=model.lineage.filter(row=>row.split==='evaluation');
+  const trainingHashes=new Set(train.map(row=>row.contentHash));
   if(ids.length!==n||new Set(ids).size!==n||ids.some(i=>i>=n)||model.projection.coefficients.length!==n
     ||!model.projection.coefficients.some(v=>v!==0)
+    ||Object.keys(model.vectorizer.vocabulary).some(term=>Array.from(term).length<2||Array.from(term).length>4)
     ||model.classifierEvidence.trainingDataId===model.classifierEvidence.evaluationDataId
     ||e.trainingSourceGroupIds.some(id=>e.evaluationSourceGroupIds.includes(id))
     ||new Set(e.metrics.map(m=>m.publisherId)).size!==e.metrics.length
@@ -78,6 +80,8 @@ export function parseBiasModel(value:unknown):PortableBiasModel|null{
       ||heldout.filter(row=>row.publisherId===m.publisherId).length!==m.sampleCount)
     ||new Set(model.lineage.map(row=>row.articleId)).size!==model.lineage.length
     ||new Set(model.lineage.map(row=>row.url)).size!==model.lineage.length
+    ||new Set(model.lineage.map(row=>JSON.stringify([row.publisherId,row.sourceGroupId]))).size!==model.lineage.length
+    ||heldout.some(row=>trainingHashes.has(row.contentHash))
     ||model.lineage.some(row=>{const url=new URL(row.url);return url.protocol!=='https:'||!!url.username||!!url.password
       ||!publishers.includes(row.publisherId)||!(url.hostname===row.publisherId||url.hostname.endsWith(`.${row.publisherId}`))
       ||!Number.isFinite(Date.parse(row.publishedAt));})

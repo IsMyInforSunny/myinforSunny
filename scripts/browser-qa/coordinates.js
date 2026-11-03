@@ -50,7 +50,7 @@ async page => {
   check(received.every(r=>r.proposition===proposition&&r.claims===2),'Explicit proposition was dropped or counted as a fact');
   check((await region.innerText()).includes('대조 완료 2개'),'Perspective query inflated factual completion');
   await test.keyboard.press('Escape');
-  await test.getByRole('img',{name:/사실 주장 2개 중 2개 대조 완료/}).waitFor();
+  await test.getByRole('img',{name:/편향 정도 계산 대기/}).waitFor();
   await test.getByRole('button',{name:'좌표 보기',exact:true}).click();
   await test.getByLabel('직접 지정한 입력 기사 입장',{exact:true}).selectOption('1');
   check((await test.getByLabel('입장 차이의 절댓값',{exact:true}).innerText()).includes('1.000'),'Six-article publisher baseline did not update from the same research');

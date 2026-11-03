@@ -144,6 +144,53 @@ describe('reviewCitedSources', () => {
     });
   });
 
+  describe('demonstrative and pronoun references', () => {
+    it.each([
+      '그에 따르면 예산이 증가했다.',
+      '이에 의하면 인구가 감소했다.',
+      '이 보고서에 따르면 예산이 증가했다.',
+      '이번 조사에 따르면 인구가 감소했다.',
+      '해당 연구에 따르면 학생 수가 줄었다.',
+      '이 같은 자료에 따르면 독서율은 40%다.',
+      '이 대학 연구팀에 따르면 수면 시간이 줄었다.',
+      '이 보고서는 예산이 늘었다고 밝혔다.',
+    ])('does not count "%s" as a named source', body => {
+      const r = review(body);
+      expect(r.sources).toHaveLength(0);
+      expect(r.claims[0]).toMatchObject({status: 'unattributed', sourceIds: [], unresolvedAttribution: true});
+      expect(r.summary).toMatchObject({traceable_primary: 0, traceable_secondary: 0, unresolvedAttributionClaims: 1});
+    });
+
+    it('keeps a specific institution that follows a demonstrative and preserves the phrase offsets', () => {
+      const body = '이번 통계청 조사에 따르면 인구가 감소했다.';
+      const r = review(body);
+      const s = r.sources[0]!;
+      expect(s).toMatchObject({name: '통계청 조사', type: 'official_statistics', tier: 'traceable_primary'});
+      expect(s.signals.named).toBe(true);
+      expect(body.slice(s.start, s.end)).toBe(s.quote);
+      expect(s.quote.startsWith('이번 통계청 조사')).toBe(true);
+      expect(r.claims[0]!.unresolvedAttribution).toBeUndefined();
+    });
+
+    it.each([
+      ['통계청 2025년 사회조사에 따르면 독서율은 52%다.', '통계청 2025년 사회조사', 'traceable_primary'],
+      ['서울시에 따르면 교통비 지원이 늘었다.', '서울시', 'traceable_secondary'],
+      ['이마트에 따르면 매출이 10% 늘었다.', '이마트', 'traceable_secondary'],
+    ])('keeps the named source in "%s"', (body, name, status) => {
+      const r = review(body);
+      expect(r.sources[0]!.name).toBe(name);
+      expect(r.sources[0]!.signals.named).toBe(true);
+      expect(r.claims[0]!.status).toBe(status);
+      expect(r.claims[0]!.unresolvedAttribution).toBeUndefined();
+    });
+
+    it('treats a bare "위원회" as a generic, unnamed institution', () => {
+      const r = review('위원회에 따르면 회의는 3회 열렸다.');
+      expect(r.sources[0]!.signals.named).toBe(false);
+      expect(r.claims[0]!.status).toBe('traceable_secondary');
+    });
+  });
+
   it('states that rule-based extraction can miss sources', () => {
     const note = review('도서관은 6시에 닫는다.').note;
     expect(note).toContain('찾지 못할 수 있어');
