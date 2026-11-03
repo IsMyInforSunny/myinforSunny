@@ -1,0 +1,14 @@
+
+ RUN  v5.0.5 C:/Users/pp/Desktop/대회/디지털 새싹/디지털새싹_cmd/.sites-runtime/github-sync/.sites-runtime/publish-2230
+
+(node:21888) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+ Test Files  50 passed | 1 skipped (51)
+      Tests  616 passed | 13 skipped (629)
+   Start at  20:43:22
+   Duration  8.54s (import 52%, tests 42%, transform 4%, worker 2%)
+
+    Isolate  51 workers spawned · ~410ms startup each (spawn + environment, per file)
+             at least ~2.57s faster with isolate: false — reuses workers across files instead of one per file
+

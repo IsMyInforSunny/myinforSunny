@@ -1,6 +1,6 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, ArrowUpRight, BookOpen, ChevronDown, CircleHelp, Download, FileText, Info, LoaderCircle, LockKeyhole, MessageCircle, Plus, RotateCcw, Search, ShieldCheck, Sparkles, Sun, X } from 'lucide-react';
+import { useEffect, useEffectEvent, useRef, useState, type SetStateAction } from 'react';
+import { ArrowRight, ArrowUpRight, BookOpen, ChevronDown, CircleHelp, Download, FileText, Info, LoaderCircle, LockKeyhole, MessageCircle, Plus, RotateCcw, Search, Sparkles, X } from 'lucide-react';
 import type { Analysis, Capabilities, Check, Reference, Span, Verification } from '@/lib/contracts';
 import { LABELS } from '@/lib/contracts';
 import {containsContactInfo} from '@/lib/privacy';
@@ -29,7 +29,7 @@ import {biasCoordinatesFromResearch} from '@/lib/bias-model-adapter';
 import type {ResearchStage,ResearchVerification} from '@/lib/research-contract';
 import {PROVIDER_NAME,MIN_N_FOR_PERCENT,DAILY_LIMIT_MESSAGE,countLabel,percentLabel,headline,readerExplanation,outcomeExplanation} from '@/lib/display';
 import {reportStatus} from '@/lib/report-status';
-import { indicators, bodyTopicDistribution, naturalSentenceCount } from '@/lib/domain';
+import { indicators, naturalSentenceCount } from '@/lib/domain';
 import { fixtures, fixtureInput, demoVerification } from '@/lib/fixtures';
 
 type CommentInput={id:string;text:string};
@@ -41,18 +41,24 @@ function EvidenceButton({span,onSelect}:{span:Span;onSelect:(span:Span)=>void}){
 
 export default function Workbench(){
   const [view,setView]=useState<'input'|'evidence'|'coordinates'|'tools'|null>(null);
-  const [body,setBody]=useState('');const [comments,setComments]=useState<CommentInput[]>([]);const [proposition,setProposition]=useState('');
+  const [body,updateBody]=useState('');const [comments,updateComments]=useState<CommentInput[]>([]);const [proposition,updateProposition]=useState('');
   const [fixtureId,setFixtureId]=useState<string|null>(null);const [analysis,setAnalysis]=useState<Analysis|null>(null);const [snapshot,setSnapshot]=useState('');
   const [verification,setVerification]=useState<Verification|null>(null);const [verificationHistory,setVerificationHistory]=useState<Verification[]>([]);const [checkSources,setCheckSources]=useState<Record<string,Reference[]>>({});const [checks,setChecks]=useState<Check[]>([]);const [selectedClaims,setSelectedClaims]=useState<string[]>([]);
-  const [references,setReferences]=useState<RefInput[]>([]);const [cap,setCap]=useState<Capabilities|null>(null);const [tab,setTab]=useState<ReviewTab>('overview');const [detailsVisible,setDetailsVisible]=useState(false);
+  const [references,updateReferences]=useState<RefInput[]>([]);const [cap,setCap]=useState<Capabilities|null>(null);const [tab,setTab]=useState<ReviewTab>('overview');const [detailsVisible,setDetailsVisible]=useState(false);
   const [busy,setBusy]=useState<'analyze'|'verify'|null>(null);const [error,setError]=useState('');const [highlight,setHighlight]=useState<Span|null>(null);const [cancelled,setCancelled]=useState(false);
   const [transmissionConsent,setTransmissionConsent]=useState(false);
   const [researchResults,setResearchResults]=useState<ResearchVerification[]>([]);const [researchStage,setResearchStage]=useState<ResearchStage>('not_started');
-  useEffect(()=>setTransmissionConsent(false),[body,comments,proposition,references]);
+  // Invalidate in the same event as every edit, including edits later undone.
+  // Waiting for an effect leaves a render where changed text still has consent.
+  function setBody(value:SetStateAction<string>){setTransmissionConsent(false);updateBody(value);}
+  function setComments(value:SetStateAction<CommentInput[]>){setTransmissionConsent(false);updateComments(value);}
+  function setProposition(value:SetStateAction<string>){setTransmissionConsent(false);updateProposition(value);}
+  function setReferences(value:SetStateAction<RefInput[]>){setTransmissionConsent(false);updateReferences(value);}
   const [feedback,setFeedback]=useState('');const [includeRaw,setIncludeRaw]=useState(false);const [includeRefs,setIncludeRefs]=useState(false);
   const controller=useRef<AbortController|null>(null);const sequence=useRef(0);const inputRef=useRef<HTMLTextAreaElement>(null);const originRef=useRef<HTMLElement>(null);const reportRef=useRef<HTMLDivElement>(null);
   const currentSignature=JSON.stringify({body,comments:comments.filter(c=>c.text.trim()),proposition});const stale=!!analysis&&snapshot!==currentSignature;
-  useEffect(()=>{fetch('/api/capabilities').then(r=>r.json() as Promise<Capabilities>).then(setCap).catch(()=>{});const example=new URLSearchParams(window.location.search).get('example');if(example&&fixtures.some(f=>f.id===example))void loadExample(example);else if(window.location.hash.startsWith('#selection=')){try{const selection=decodeURIComponent(window.location.hash.slice(11));if(selection.length>2000)setError('선택한 글이 2,000자를 넘습니다. 내용을 나누어 직접 입력해 주세요.');else {setBody(selection);setView('input');}window.history.replaceState(null,'',window.location.pathname+window.location.search);}catch{setError('선택한 글을 읽지 못했습니다. 직접 붙여 넣어 주세요.');}}return ()=>controller.current?.abort();},[]);
+  const initializeFromLocation=useEffectEvent(()=>{const example=new URLSearchParams(window.location.search).get('example');if(example&&fixtures.some(f=>f.id===example))void loadExample(example);else if(window.location.hash.startsWith('#selection=')){try{const selection=decodeURIComponent(window.location.hash.slice(11));if(selection.length>2000)setError('선택한 글이 2,000자를 넘습니다. 내용을 나누어 직접 입력해 주세요.');else {setBody(selection);setView('input');}window.history.replaceState(null,'',window.location.pathname+window.location.search);}catch{setError('선택한 글을 읽지 못했습니다. 직접 붙여 넣어 주세요.');}}});
+  useEffect(()=>{const bootstrap=new AbortController();fetch('/api/capabilities',{signal:bootstrap.signal}).then(r=>r.json() as Promise<Capabilities>).then(value=>{if(!bootstrap.signal.aborted)setCap(value);}).catch(()=>{});const timer=setTimeout(()=>initializeFromLocation(),0);return ()=>{clearTimeout(timer);bootstrap.abort();controller.current?.abort();};},[]);
   function focusReport(){requestAnimationFrame(()=>{reportRef.current?.scrollIntoView({behavior:'smooth',block:'start'});reportRef.current?.focus({preventScroll:true});});}
   function showRequestError(e:unknown,event:'analysis'|'verification'='analysis'){recordActivity(event,'failed');const err=e as Error&{code?:string};setError(err.code==='FREE_QUOTA_EXHAUSTED'?DAILY_LIMIT_MESSAGE:err.message);if(err.code==='FREE_QUOTA_EXHAUSTED'){setCap(c=>c?{...c,live:false,reason:DAILY_LIMIT_MESSAGE}:c);const fallback=loadExample('mixed');const fallbackSequence=sequence.current;void fallback.then(()=>{if(sequence.current===fallbackSequence)setError(DAILY_LIMIT_MESSAGE);});}}
   function begin(type:'analyze'|'verify'){recordActivity(type==='analyze'?'analysis':'verification','started');controller.current?.abort();const c=new AbortController();controller.current=c;const n=++sequence.current;setBusy(type);setError('');setCancelled(false);return {c,n};}
