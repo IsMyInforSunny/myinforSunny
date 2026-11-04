@@ -165,7 +165,53 @@ def grouped_topic_split(rows, seed=42):
                      'two topics per publisher in each split, and three samples per publisher each')
 
 
-def train_model(rows, manifest, synthetic=False, seed=42, cross_topic=False):
+def publisher_decision_matrix(coefficients, publishers):
+    """Return one decision coefficient row per publisher in class order.
+
+    LinearSVC stores only the positive-class decision for binary fitting. Its
+    negative-class score has coefficients -w, not another copy of +w.
+    """
+    import numpy as np
+    classes = list(publishers)
+    matrix = np.asarray(coefficients, dtype=float)
+    if (len(classes) < 2 or len(set(classes)) != len(classes)
+            or any(not isinstance(p, str) or not p.strip() for p in classes)
+            or matrix.ndim != 2 or matrix.shape[1] == 0 or not np.isfinite(matrix).all()):
+        raise ValueError('Need finite publisher decision coefficients and unique class identities')
+    if len(classes) == 2 and matrix.shape[0] == 1:
+        return np.concatenate((-matrix, matrix), axis=0)
+    if matrix.shape[0] != len(classes):
+        raise ValueError('Decision coefficient rows must match publisher classes')
+    return matrix.copy()
+
+
+def anchor_contrast_projection(coefficients, publishers, reference_left, reference_right):
+    """Unit-L2 mean right decision coefficients minus mean left coefficients.
+
+    Reference membership defines a supplied relative contrast. This calculation
+    does not authenticate political labels or approve the interpretation.
+    """
+    import numpy as np
+    classes = list(publishers)
+    matrix = publisher_decision_matrix(coefficients, classes)
+    groups = [list(reference_left), list(reference_right)]
+    if any(not group or len(set(group)) != len(group) for group in groups):
+        raise ValueError('Both reference groups must be nonempty and unique')
+    if set(groups[0]) & set(groups[1]):
+        raise ValueError('Left and right reference groups must not overlap')
+    if any(p not in classes for group in groups for p in group):
+        raise ValueError('Every reference publisher must occur in the fitted classifier')
+    contrast = (np.mean(matrix[[classes.index(p) for p in groups[1]]], axis=0)
+                - np.mean(matrix[[classes.index(p) for p in groups[0]]], axis=0))
+    length = float(np.linalg.norm(contrast))
+    if not math.isfinite(length) or length <= 1e-10:
+        raise ValueError('Reference decision contrast is a zero or nonfinite vector')
+    return contrast / length
+
+
+def train_model(rows, manifest, synthetic=False, seed=42, cross_topic=False, projection_method='svd'):
+    if projection_method not in ('svd', 'anchor_contrast'):
+        raise ValueError('Unknown coordinate projection method')
     profiles = validate(rows, manifest, synthetic, cross_topic)
     import numpy as np
     from sklearn.feature_extraction.text import TfidfVectorizer
@@ -182,9 +228,13 @@ def train_model(rows, manifest, synthetic=False, seed=42, cross_topic=False):
     labels = np.array([r['publisherId'] for r in rows])
     svm = LinearSVC(C=1.0, class_weight='balanced', random_state=seed, max_iter=10000)
     svm.fit(x_train, labels[train])
-    # SVD of the publisher classifier's learned feature weights. No anchor
-    # labels enter vectorization, fitting, or selection of the first component.
-    coefficients = np.linalg.svd(svm.coef_, full_matrices=False)[2][0]
+    reference_left = sorted(p for p, orientation in profiles.items() if orientation == 'left')
+    reference_right = sorted(p for p, orientation in profiles.items() if orientation == 'right')
+    # Both paths share publisher-identity fitting. The optional contrast uses
+    # supplied reference membership only after fitting; legacy SVD is unchanged.
+    coefficients = (anchor_contrast_projection(svm.coef_, svm.classes_, reference_left, reference_right)
+                    if projection_method == 'anchor_contrast'
+                    else np.linalg.svd(svm.coef_, full_matrices=False)[2][0])
     raw_train = np.asarray(x_train @ coefficients).reshape(-1)
     centroids = {p: float(np.mean(raw_train[labels[train] == p])) for p in svm.classes_}
     offset = -float(np.mean(list(centroids.values())))
@@ -198,7 +248,7 @@ def train_model(rows, manifest, synthetic=False, seed=42, cross_topic=False):
     right = [publisher_centroids[p] for p in publisher_centroids if profiles[p] == 'right']
     if not left or not right:
         raise ValueError('Both anchor groups must occur in the training set')
-    sign = 1 if np.mean(left) < np.mean(right) else -1
+    sign = 1 if projection_method == 'anchor_contrast' or np.mean(left) < np.mean(right) else -1
     coefficients *= sign; offset *= sign
     training_coordinates *= sign; evaluation_coordinates *= sign
     publisher_centroids = {p: c * sign for p, c in publisher_centroids.items()}
@@ -226,6 +276,9 @@ def train_model(rows, manifest, synthetic=False, seed=42, cross_topic=False):
                      'coefficients': coefficients.tolist(), 'offset': offset, 'scale': scale}
     if scope:
         version_input['topicScope'] = scope
+    if projection_method == 'anchor_contrast':
+        version_input['projectionMethod'] = projection_method
+        version_input['projectionReferences'] = {'left': reference_left, 'right': reference_right}
     model_version = digest(version_input)[:20]
     evidence = {'axisId': manifest['axisId'], 'coordinateSpace': f'{VERSION}:{model_version}',
                 'modelId': 'publisher-char-tfidf-linear-svm', 'modelVersion': model_version,
@@ -264,6 +317,13 @@ def train_model(rows, manifest, synthetic=False, seed=42, cross_topic=False):
             'references': references, 'lineage': lineage}
     if scope:
         artifact['topicScope'] = scope
+    if projection_method == 'anchor_contrast':
+        artifact['projection'].update({'method': projection_method,
+                                      'referenceLeftPublisherIds': reference_left,
+                                      'referenceRightPublisherIds': reference_right,
+                                      'coefficientConvention': 'binary_minus_w_plus_w_or_multiclass_decisions',
+                                      'normalization': 'unit_l2_then_training_publisher_center_and_training_max_scale',
+                                      'meaning': 'supplied_reference_decision_contrast_requires_independent_axis_review'})
     return artifact
 
 
@@ -277,11 +337,13 @@ def main():
     parser.add_argument('--cross-topic', action='store_true',
                         help='Hold out complete topics as well as original groups; requires at least five reviewed topics')
     parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--projection-method', choices=('svd', 'anchor_contrast'), default='svd',
+                        help='Default reproducible SVD or an explicit supplied-reference decision contrast')
     args = parser.parse_args()
     rows = [json.loads(line) for source in args.input
             for line in source.read_text(encoding='utf-8-sig').splitlines() if line.strip()]
     manifest = json.loads(args.manifest.read_text(encoding='utf-8-sig'))
-    artifact = train_model(rows, manifest, args.synthetic, args.seed, args.cross_topic)
+    artifact = train_model(rows, manifest, args.synthetic, args.seed, args.cross_topic, args.projection_method)
     args.output.write_text(json.dumps(artifact, ensure_ascii=False, indent=2, allow_nan=False), encoding='utf-8')
     print(json.dumps({'status': artifact['status'], 'modelVersion': artifact['classifierEvidence']['modelVersion'],
                       'referenceCount': len(artifact['references'])}))

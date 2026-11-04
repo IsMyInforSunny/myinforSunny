@@ -2,7 +2,7 @@
 import copy
 import unittest
 
-from train_bias import grouped_topic_split, normalize, reviewed_axis, train_model, validate
+from train_bias import anchor_contrast_projection, grouped_topic_split, normalize, publisher_decision_matrix, reviewed_axis, train_model, validate
 
 
 def fixture():
@@ -36,6 +36,61 @@ def topic_fixture():
 
 
 class TrainingTests(unittest.TestCase):
+    def test_binary_decision_matrix_and_reference_contrast_follow_class_signs(self):
+        import numpy as np
+        weights = np.array([[2., -1., 3.]])
+        classes = ['one.example', 'two.example']
+        matrix = publisher_decision_matrix(weights, classes)
+        np.testing.assert_array_equal(matrix, np.array([[-2., 1., -3.], [2., -1., 3.]]))
+        actual = anchor_contrast_projection(weights, classes, ['one.example'], ['two.example'])
+        np.testing.assert_allclose(actual, weights[0] / np.linalg.norm(weights[0]))
+        np.testing.assert_allclose(anchor_contrast_projection(weights, classes, ['two.example'], ['one.example']), -actual)
+
+    def test_multiclass_reference_contrast_is_equal_publisher_means_and_rejects_bad_groups(self):
+        import numpy as np
+        weights = np.array([[1., 2.], [3., 1.], [8., 5.], [4., 9.]])
+        classes = ['a', 'b', 'c', 'd']
+        expected = weights[[2, 3]].mean(axis=0) - weights[[0, 1]].mean(axis=0)
+        actual = anchor_contrast_projection(weights, classes, ['a', 'b'], ['c', 'd'])
+        np.testing.assert_allclose(actual, expected / np.linalg.norm(expected))
+        for left, right in [([], ['c']), (['a'], []), (['a'], ['a']), (['a', 'a'], ['c']), (['missing'], ['c'])]:
+            with self.subTest(left=left, right=right), self.assertRaises(ValueError):
+                anchor_contrast_projection(weights, classes, left, right)
+        for bad in [np.zeros((4, 2)), np.full((4, 2), float('nan')), np.ones((3, 2))]:
+            with self.assertRaises(ValueError):
+                anchor_contrast_projection(bad, classes, ['a'], ['c'])
+
+    def test_optional_projection_preserves_legacy_default_and_has_its_own_identity(self):
+        rows, manifest = fixture()
+        first = train_model(rows, manifest, synthetic=True)
+        explicit = train_model(rows, manifest, synthetic=True, projection_method='svd')
+        contrast = train_model(rows, manifest, synthetic=True, projection_method='anchor_contrast')
+        self.assertEqual(first, explicit)
+        self.assertNotIn('method', first['projection'])
+        self.assertEqual(contrast['projection']['method'], 'anchor_contrast')
+        self.assertEqual(contrast['projection']['referenceLeftPublisherIds'], ['left.example'])
+        self.assertEqual(contrast['projection']['referenceRightPublisherIds'], ['right.example'])
+        self.assertNotEqual(first['classifierEvidence']['modelVersion'], contrast['classifierEvidence']['modelVersion'])
+        self.assertEqual(contrast['status'], 'research_only')
+        self.assertEqual([m['publisherAccuracy'] for m in first['classifierEvidence']['evaluation']['metrics']],
+                         [m['publisherAccuracy'] for m in contrast['classifierEvidence']['evaluation']['metrics']])
+
+    def test_diagnostic_candidate_fingerprint_is_numeric_not_container_based(self):
+        import numpy as np
+        from diagnose_publisher_corpus import coordinate_diagnostic
+        matrix = np.array([[-2., 0.], [-1., 0.], [1., 0.], [2., 0.]])
+        labels = np.array(['a', 'a', 'b', 'b'] * 2)
+        args = (np.array([1., 0.]), matrix, matrix, labels, np.arange(4), np.arange(4, 8),
+                ['a', 'b'], 'synthetic-numeric-fingerprint', 'anchor_contrast', ['a'], ['b'])
+        first, _, _ = coordinate_diagnostic(*args)
+        second, _, _ = coordinate_diagnostic(*args)
+        self.assertEqual(first['candidateModelVersion'], second['candidateModelVersion'])
+        self.assertTrue(first['anchorOrdering']['heldout']['strictlySeparated'])
+        self.assertEqual(first['referenceGroups']['status'], 'unreviewed_hypotheses')
+        self.assertFalse(first['politicalAxisApproved'])
+        changed = coordinate_diagnostic(*((*args[:7], 'different-preprocessing-fingerprint', *args[8:])))[0]
+        self.assertNotEqual(first['candidateModelVersion'], changed['candidateModelVersion'])
+
     def test_cross_topic_mode_holds_out_complete_topics_and_originals(self):
         rows, manifest = topic_fixture()
         artifact = train_model(rows, manifest, synthetic=True, cross_topic=True)
