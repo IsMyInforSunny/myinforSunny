@@ -12,7 +12,9 @@ const base=path.resolve(process.argv[2]??'.sites-runtime/collection-1000-2026110
 if(!base.startsWith(path.resolve('.sites-runtime')+path.sep))throw Error('Local ignored output required');
 await mkdir(base,{recursive:true});await mkdir(path.join(base,'raw'),{recursive:true});
 const UA='NaeInfoClearResearch/0.2 (OpenAI-assisted local research; public news corpus)';
-const HOSTS=new Set(['www.dailian.co.kr','www.newdaily.co.kr']);
+const SEARCH_HOSTS=['www.dailian.co.kr','www.newdaily.co.kr'];
+// Keep edition identity in sourceEditionHost; model evaluation separates biz.
+const HOSTS=new Set([...SEARCH_HOSTS,'biz.newdaily.co.kr']);
 const topics={medical_school_quota:{q:['의대 정원','의대 증원'],re:/의대|의과대|의사\s*정원/},pension_reform:{q:['국민연금','연금개혁'],re:/국민연금|연금개혁|연금\s*개혁|소득대체율|보험료율/},minimum_wage:{q:['최저임금'],re:/최저임금|생활임금/},electricity_prices:{q:['전기요금','전기료'],re:/전기\s*(?:요금|료)|전력\s*요금/},housing_supply:{q:['주택 공급','주택공급'],re:/주택|부동산|아파트/},nuclear_energy:{q:['원전','원자력'],re:/원전|원자력|핵폐기/}};
 const DROP=/\[포토\]|\[영상\]|\[화보\]|\[카드뉴스\]|\[사진\]|\[인사\]|\[부고\]|ETF|펀드|업무협약|MOU|심포지엄|세미나|성료|포상|공모|특징주|원전주|강세|맞손|제휴|준공식|홍보|수익률|상장|운용|수주|협약/;
 const hash=t=>createHash('sha256').update(t).digest('hex');
@@ -75,13 +77,13 @@ async function collect(r){
 async function drain(){const queues={};for(const r of candidates.values())(queues[r.publisherId+':'+r.topicId]??=[]).push(r);candidates.clear();let active=true;while(active){active=false;for(const list of Object.values(queues)){if(list.length){active=true;await collect(list.shift());}}}}
 await drain();
 // New pages only; do not repeat already discovered search requests after restart.
-const searchDone=new Set((await lines(path.join(base,'search-log.local.jsonl'))).map(r=>r.url));
+const searchDone=new Set((await lines(path.join(base,'search-log.local.jsonl'))).filter(r=>r.discoveryVersion==='editions-2').map(r=>r.url));
 for(let page=1;page<=30&&Object.values(counts).some(n=>n<250)&&requests<MAX_REQUESTS;page++){
- for(const [topic,{q}]of Object.entries(topics))for(const query of q)for(const host of HOSTS){
+ for(const [topic,{q}]of Object.entries(topics))for(const query of q)for(const host of SEARCH_HOSTS){
   const pub=host==='www.dailian.co.kr'?'dailian.co.kr':'newdaily.co.kr';if((counts[pub]??0)>=250||(byTopic[pub+':'+topic]??0)>=45||blocked.has(host))continue;
   const url=host==='www.dailian.co.kr'?`https://${host}/search?shwords=${encodeURIComponent(query)}&c=&t=999&sbj=title&page=${page}`:`https://${host}/news/search_result.html?search=${encodeURIComponent(query)}&s=&t=date&pn=${page}`;
-  if(searchDone.has(url))continue;searchDone.add(url);const log={url,topic,publisherId:pub};
-  try{const r=await get(url);const doc=new DOMParser().parseFromString(r.text,'text/html');let found=0;for(const a of doc.querySelectorAll('a[href]')){let u;try{u=new URL(a.getAttribute('href'),url);}catch{continue;}if(u.hostname!==host||!(host==='www.dailian.co.kr'?/^\/news\/view\/\d+\/?$/:/^\/site\/data\/html\/\d{4}\/\d{2}\/\d{2}\/\d+\.html$/).test(u.pathname))continue;const row={publisherId:pub,topicId:topic,url:u.href,title:norm(a.textContent),query};if(topics[topic].re.test(row.title)&&!DROP.test(row.title)){candidate(row);await appendFile(path.join(base,'discovery.local.jsonl'),JSON.stringify(row)+'\n');found++;}}log.found=found;}catch(e){log.error=e.message;}
+  if(searchDone.has(url))continue;searchDone.add(url);const log={url,topic,publisherId:pub,discoveryVersion:'editions-2'};
+  try{const r=await get(url);const doc=new DOMParser().parseFromString(r.text,'text/html');let found=0;for(const a of doc.querySelectorAll('a[href]')){let u;try{u=new URL(a.getAttribute('href'),url);}catch{continue;}const validHost=host==='www.dailian.co.kr'?u.hostname===host:['www.newdaily.co.kr','biz.newdaily.co.kr'].includes(u.hostname);if(!validHost||!(host==='www.dailian.co.kr'?/^\/news\/view\/\d+\/?$/:/^\/site\/data\/html\/\d{4}\/\d{2}\/\d{2}\/\d+\.html$/).test(u.pathname))continue;const row={publisherId:pub,topicId:topic,url:u.href,title:norm(a.textContent),query};if(topics[topic].re.test(row.title)&&!DROP.test(row.title)){candidate(row);await appendFile(path.join(base,'discovery.local.jsonl'),JSON.stringify(row)+'\n');found++;}}log.found=found;}catch(e){log.error=e.message;}
   await appendFile(path.join(base,'search-log.local.jsonl'),JSON.stringify(log)+'\n');await drain();
  }
 }
