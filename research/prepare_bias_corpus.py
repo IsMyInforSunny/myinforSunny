@@ -142,13 +142,22 @@ def prepare(articles, reviews, manifest):
             host = urlparse(url).hostname
             if canonical_publisher_host(host) != publisher_key:
                 issues.append('publisher_url_mismatch')
+        # A licensed dataset receipt is a real acquisition event, but is not a
+        # publisher fetch. Keep the two timestamps distinct instead of forcing
+        # importers to invent fetchedAt before they can prepare a corpus.
+        imported = article.get('intakeMethod') == 'licensed_dataset_import'
+        acquired_field = 'importedAt' if imported else 'fetchedAt'
+        dataset = article.get('dataset') if imported else None
+        if imported and (not isinstance(dataset, dict) or not nonempty(dataset.get('id'))
+                         or not public_url(dataset.get('sourceUrl'))):
+            issues.append('licensed_dataset_source_missing_or_invalid')
         dates = {}
-        for field in ('publishedAt', 'fetchedAt'):
+        for field in ('publishedAt', acquired_field):
             try:
                 when = timestamp(article.get(field))
                 dates[field] = when
-                if field == 'fetchedAt' and when > datetime.now(timezone.utc):
-                    issues.append('fetched_at_in_future')
+                if field == acquired_field and when > datetime.now(timezone.utc):
+                    issues.append('imported_at_in_future' if imported else 'fetched_at_in_future')
                 if field == 'publishedAt' and when > datetime.now(timezone.utc):
                     issues.append('published_at_in_future')
                 if field == 'publishedAt':
@@ -162,11 +171,11 @@ def prepare(articles, reviews, manifest):
                         issues.append('outside_comparison_publication_window')
             except (ValueError, TypeError):
                 issues.append(field + '_missing_or_invalid')
-        # A date-only fetch record covers its whole Korean calendar day; compare against the day's end.
-        if 'fetchedAt' in dates and DATE_ONLY.fullmatch(article['fetchedAt']):
-            dates['fetchedAt'] += timedelta(days=1) - timedelta(microseconds=1)
-        if len(dates) == 2 and dates['publishedAt'] > dates['fetchedAt']:
-            issues.append('publication_after_fetch_time')
+        # A date-only acquisition record covers its Korean calendar day.
+        if acquired_field in dates and DATE_ONLY.fullmatch(article[acquired_field]):
+            dates[acquired_field] += timedelta(days=1) - timedelta(microseconds=1)
+        if len(dates) == 2 and dates['publishedAt'] > dates[acquired_field]:
+            issues.append('publication_after_import_time' if imported else 'publication_after_fetch_time')
         if article.get('provenance') != 'public_article':
             issues.append('fetched_public_article_provenance_missing')
         if not nonempty(article.get('text')):
@@ -196,15 +205,22 @@ def prepare(articles, reviews, manifest):
                             'url': url,
                             'publisherId': publisher_key,
                             'publishedAt': article.get('publishedAt') if 'publishedAt' in dates else None,
+                            'acquisitionMethod': 'licensed_dataset_import' if imported else 'publisher_fetch',
+                            'acquiredAt': article.get(acquired_field) if acquired_field in dates else None,
                             'sourceGroupId': review.get('sourceGroupId') if nonempty(review.get('sourceGroupId')) else None,
                             'contentHash': content_hash(article['text']) if nonempty(article.get('text')) else None,
                             'issues': issues})
         if not issues:
             output_rows.append({k: article[k] for k in ('id', 'text', 'url', 'publishedAt', 'provenance')})
             output_rows[-1]['publisherId'] = publisher_key
+            acquisition = {'method': 'licensed_dataset_import' if imported else 'publisher_fetch',
+                           'acquiredAt': article[acquired_field],
+                           'sourceUrl': dataset['sourceUrl'] if imported else url}
+            if imported:
+                acquisition['datasetId'] = dataset['id']
             output_rows[-1].update({'comparisonGroup': comparison, 'sourceGroupId': review['sourceGroupId'],
-                                   'url': url,
-                                   'usage': usage, 'fetchedAt': article['fetchedAt'],
+                                   'url': url, 'usage': usage, acquired_field: article[acquired_field],
+                                   'acquisition': acquisition,
                                    'extractionVersion': article['extractionVersion'], 'topicReview': topic})
 
     extra_reviews = sorted(set(by_id) - article_ids)

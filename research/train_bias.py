@@ -51,7 +51,7 @@ def reviewed_axis(review, model_version):
             and type(agreement) in (int, float) and math.isfinite(agreement) and 0 <= agreement <= 1)
 
 
-def validate(rows, manifest, synthetic=False):
+def validate(rows, manifest, synthetic=False, cross_topic=False):
     if not rows or not isinstance(manifest.get('profiles'), list):
         raise ValueError('Need rows and orientation profiles')
     profiles = {p['publisherId']: p['orientation'] for p in manifest['profiles']}
@@ -67,6 +67,8 @@ def validate(rows, manifest, synthetic=False):
         for field in ('id', 'publisherId', 'text', 'sourceGroupId', 'comparisonGroup', 'url', 'publishedAt'):
             if not isinstance(row.get(field), str) or not row[field].strip():
                 raise ValueError(f'Missing {field}')
+        if len(row['comparisonGroup']) > 160:
+            raise ValueError('Comparison topic must be at most 160 characters')
         if row['id'] in ids or row['url'] in urls:
             raise ValueError('Duplicate article ID or URL')
         ids.add(row['id']); urls.add(row['url'])
@@ -93,7 +95,9 @@ def validate(rows, manifest, synthetic=False):
               or not usage.get('reviewedBy') or not usage.get('reviewedAt')):
             raise ValueError('Document training and model-distribution permissions for every article')
         comparison.add(row['comparisonGroup'])
-    if len(comparison) != 1:
+    if cross_topic and len(comparison) < 5:
+        raise ValueError('Cross-topic training needs at least five reviewed topics')
+    if not cross_topic and len(comparison) != 1:
         raise ValueError('Train one comparable proposition/topic per artifact')
     counts = Counter(r['publisherId'] for r in rows)
     if len(counts) < 2 or min(counts.values()) < 2 * MIN_SAMPLES:
@@ -113,12 +117,63 @@ def grouped_split(rows, seed=42):
     raise ValueError('Cannot form group-disjoint train/evaluation sets with three samples per publisher each')
 
 
-def train_model(rows, manifest, synthetic=False, seed=42):
-    profiles = validate(rows, manifest, synthetic)
+def grouped_topic_split(rows, seed=42):
+    """Hold out complete topics and any originals linking several topics.
+
+    A topic is the reviewed comparisonGroup, never a model-generated label.
+    Connected topics move together when a shared original spans topics, so
+    neither original-source groups nor topics can leak across the split.
+    """
+    from sklearn.model_selection import GroupShuffleSplit
+    topics = {r['comparisonGroup'] for r in rows}
+    parents = {topic: topic for topic in topics}
+
+    def root(topic):
+        while parents[topic] != topic:
+            parents[topic] = parents[parents[topic]]
+            topic = parents[topic]
+        return topic
+
+    first_topic = {}
+    for row in rows:
+        topic = row['comparisonGroup']
+        previous = first_topic.setdefault(row['sourceGroupId'], topic)
+        a, b = root(previous), root(topic)
+        if a != b:
+            parents[max(a, b)] = min(a, b)
+    components = [root(row['comparisonGroup']) for row in rows]
+    if len(set(components)) < 2:
+        raise ValueError('Shared originals prevent a topic-disjoint evaluation split')
+    labels = [r['publisherId'] for r in rows]
+    publishers = set(labels)
+    for train, test in GroupShuffleSplit(n_splits=512, test_size=EVALUATION_FRACTION,
+                                         random_state=seed).split(rows, labels, components):
+        training_topics = {rows[i]['comparisonGroup'] for i in train}
+        evaluation_topics = {rows[i]['comparisonGroup'] for i in test}
+        if len(training_topics) < 3 or len(evaluation_topics) < 2:
+            continue
+        if not all(Counter(labels[i] for i in part)[publisher] >= MIN_SAMPLES
+                   and len({rows[i]['comparisonGroup'] for i in part
+                            if labels[i] == publisher}) >= 2
+                   for part in (train, test) for publisher in publishers):
+            continue
+        if ({rows[i]['sourceGroupId'] for i in train}
+                & {rows[i]['sourceGroupId'] for i in test}):
+            raise ValueError('Original-source group leaked across topic split')
+        return train, test
+    raise ValueError('Cannot form a topic-disjoint split with three training topics, two evaluation topics, '
+                     'two topics per publisher in each split, and three samples per publisher each')
+
+
+def train_model(rows, manifest, synthetic=False, seed=42, cross_topic=False):
+    profiles = validate(rows, manifest, synthetic, cross_topic)
     import numpy as np
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.svm import LinearSVC
-    train, test = grouped_split(rows, seed)
+    train, test = grouped_topic_split(rows, seed) if cross_topic else grouped_split(rows, seed)
+    scope = {'mode': 'cross_topic',
+             'trainingTopics': sorted({rows[i]['comparisonGroup'] for i in train}),
+             'evaluationTopics': sorted({rows[i]['comparisonGroup'] for i in test})} if cross_topic else None
     texts = [normalize(r['text']) for r in rows]
     vectorizer = TfidfVectorizer(analyzer='char', ngram_range=(2, 4), lowercase=False,
                                  sublinear_tf=True, norm='l2', max_features=20000)
@@ -163,9 +218,15 @@ def train_model(rows, manifest, synthetic=False, seed=42):
                 'publishedAt': r['publishedAt'], 'sourceGroupId': r['sourceGroupId'],
                 'contentHash': content_hash(texts[i]), 'usage': r.get('usage'),
                 'split': 'training' if i in train else 'evaluation'} for i, r in enumerate(rows)]
-    model_version = digest({'lineage': lineage, 'seed': seed, 'version': VERSION,
-                            'axisId': manifest['axisId'], 'profiles': manifest['profiles'],
-                            'coefficients': coefficients.tolist(), 'offset': offset, 'scale': scale})[:20]
+    if cross_topic:
+        for source, entry in zip(rows, lineage):
+            entry['comparisonGroup'] = source['comparisonGroup']
+    version_input = {'lineage': lineage, 'seed': seed, 'version': VERSION,
+                     'axisId': manifest['axisId'], 'profiles': manifest['profiles'],
+                     'coefficients': coefficients.tolist(), 'offset': offset, 'scale': scale}
+    if scope:
+        version_input['topicScope'] = scope
+    model_version = digest(version_input)[:20]
     evidence = {'axisId': manifest['axisId'], 'coordinateSpace': f'{VERSION}:{model_version}',
                 'modelId': 'publisher-char-tfidf-linear-svm', 'modelVersion': model_version,
                 'task': 'publisher_identity_relative_coordinate',
@@ -184,9 +245,10 @@ def train_model(rows, manifest, synthetic=False, seed=42):
     references = [{'articleId': rows[i]['id'], 'publisherId': rows[i]['publisherId'],
                    'comparisonGroup': rows[i]['comparisonGroup'],
                    'classifier': {**evidence, 'coordinate': float(c)}} for i, c in zip(test, evaluation_coordinates)]
-    return {'schemaVersion': VERSION, 'synthetic': synthetic, 'dataKind': 'synthetic' if synthetic else 'real',
+    comparison_group = '여러 주제 매체 문체 모델' if cross_topic else rows[0]['comparisonGroup']
+    artifact = {'schemaVersion': VERSION, 'synthetic': synthetic, 'dataKind': 'synthetic' if synthetic else 'real',
             'status': 'validated' if human_reviewed and axis_separated and not synthetic else 'research_only',
-            'comparisonGroup': rows[0]['comparisonGroup'], 'classifierEvidence': evidence,
+            'comparisonGroup': comparison_group, 'classifierEvidence': evidence,
             'vectorizer': {'analyzer': 'char', 'ngramRange': [2, 4], 'lowercase': False,
                            'whitespace': 'collapse', 'norm': 'l2', 'sublinearTf': True,
                            'vocabulary': {k: int(v) for k, v in vectorizer.vocabulary_.items()},
@@ -198,21 +260,28 @@ def train_model(rows, manifest, synthetic=False, seed=42):
             'corpus': {'articleCount': len(rows), 'publisherCounts': dict(sorted(Counter(labels).items())),
                        'publishedDates': sorted({r['publishedAt'] for r in rows}),
                        'contentHashAlgorithm': 'sha256-normalized-utf8',
-                       'comparisonGroup': rows[0]['comparisonGroup']},
+                       'comparisonGroup': comparison_group},
             'references': references, 'lineage': lineage}
+    if scope:
+        artifact['topicScope'] = scope
+    return artifact
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--input', type=Path, required=True)
+    parser.add_argument('--input', type=Path, required=True, action='append',
+                        help='Prepared local article JSONL; repeat to combine reviewed topic corpora')
     parser.add_argument('--manifest', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--synthetic', action='store_true')
+    parser.add_argument('--cross-topic', action='store_true',
+                        help='Hold out complete topics as well as original groups; requires at least five reviewed topics')
     parser.add_argument('--seed', type=int, default=42)
     args = parser.parse_args()
-    rows = [json.loads(line) for line in args.input.read_text(encoding='utf-8-sig').splitlines() if line.strip()]
+    rows = [json.loads(line) for source in args.input
+            for line in source.read_text(encoding='utf-8-sig').splitlines() if line.strip()]
     manifest = json.loads(args.manifest.read_text(encoding='utf-8-sig'))
-    artifact = train_model(rows, manifest, args.synthetic, args.seed)
+    artifact = train_model(rows, manifest, args.synthetic, args.seed, args.cross_topic)
     args.output.write_text(json.dumps(artifact, ensure_ascii=False, indent=2, allow_nan=False), encoding='utf-8')
     print(json.dumps({'status': artifact['status'], 'modelVersion': artifact['classifierEvidence']['modelVersion'],
                       'referenceCount': len(artifact['references'])}))

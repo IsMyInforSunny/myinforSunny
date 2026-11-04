@@ -13,6 +13,11 @@ const signal=()=>new AbortController().signal;
 const input=():ResearchInput=>{const a=demoAnalysis('supported');return {sources:a.sources,claims:a.claims.filter(c=>c.kind==='factual').slice(0,1),transmissionConsent:true,researchConsent:true};};
 
 describe('원사이트 본문 추출 복구 — 합성 HTML만 사용',()=>{
+ it('여러 article 중 짧은 카드 대신 가장 긴 본문 한 개만 취득한다',()=>{
+  const body='공개 가상 본문의 근거와 조사 방법을 설명하는 문장입니다. '.repeat(5).trim();
+  const found=extractArticle(`<article>짧은 요약 카드</article><article><p>${body}</p></article>`,'https://news.example/a');
+  expect(found?.text).toBe(body);expect(found?.text).not.toContain('짧은 요약 카드');
+ });
  it('일반 div 기사에서 메뉴를 빼고 본문을 복원한다',()=>{
   const paragraph='공개 도서관이 운영 시간을 안내했다. 자료에는 운영 대상과 기간을 설명하고 시민의 이용 방법을 구체적으로 알렸다. ';
   const result=extractArticle(`<html><head><title>공개 도서관 안내</title></head><body><nav>제외할 메뉴</nav><div id="content">${Array.from({length:5},()=>`<p>${paragraph}</p>`).join('')}</div><footer>제외할 꼬리말</footer></body></html>`,'https://news.example/a');
@@ -53,7 +58,13 @@ describe('원사이트의 선택형 한국어 검색 복구 — 모의 Tavily',(
  it('기본 검색 1회만 보내고 키·전체 본문·자동 업그레이드를 요청 본문에 넣지 않는다',async()=>{
   const fetch=vi.fn().mockResolvedValue(Response.json({results:[{title:'공개 기사',url:'https://news.example/a'}],usage:{credits:1}}));vi.stubGlobal('fetch',fetch);
   const found=await searchTavily('도서관 운영',config(),signal());expect(found.provider).toBe('tavily');expect(fetch).toHaveBeenCalledTimes(1);
+  expect(fetch.mock.calls[0][1].redirect).toBe('manual');
   const body=JSON.parse(fetch.mock.calls[0][1].body);expect(body).toMatchObject({language:'ko',filter_by_language:true,search_depth:'basic',auto_parameters:false,include_raw_content:false});expect(JSON.stringify(body)).not.toContain('synthetic-only');
+ });
+ it('인증 정보를 가진 검색 요청의 이동을 따라가지 않는다',async()=>{
+  const fetch=vi.fn().mockResolvedValue(new Response(null,{status:302,headers:{Location:'https://other.example/'}}));vi.stubGlobal('fetch',fetch);
+  await expect(searchTavily('도서관 운영',config(),signal())).rejects.toMatchObject({code:'SEARCH_UNEXPECTED_REDIRECT'});
+  expect(fetch).toHaveBeenCalledTimes(1);expect(fetch.mock.calls[0][1].redirect).toBe('manual');
  });
  it('무료 월간 예약이 실패하면 외부 호출이나 다른 제공자 전환을 하지 않는다',async()=>{
   const fetch=vi.fn();vi.stubGlobal('fetch',fetch);

@@ -18,6 +18,7 @@ function reviewData(v: Verification) {
     versions: v.versions, scope: v.scope, references: v.references,
     checks: v.checks, attempts: v.attempts, warnings: v.warnings, createdAt: v.createdAt,
     ...('perspectiveChecks' in v ? {perspectiveChecks: (v as ResearchVerification).perspectiveChecks} : {}),
+    ...('researchPlanId' in v ? {researchPlanId: (v as ResearchVerification).researchPlanId} : {}),
   };
 }
 

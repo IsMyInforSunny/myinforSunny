@@ -33,6 +33,25 @@ function result(a:Analysis):ResearchVerification{
 const rows=(a:Analysis,results:ResearchVerification[])=>biasCoordinatesFromResearch(a,results,model,orientations).filter(r=>r.articleId!==a.analysisId);
 
 describe('current research bias coordinate adapter',()=>{
+  it('collects six distinct articles for one claim within the latest signed sampling plan',()=>{
+    const a=analysis();
+    const bundles=Array.from({length:3},(_,index)=>{
+      const v=result(a);v.researchPlanId='synthetic-plan-1';v.createdAt=`2026-02-01T00:00:0${index}Z`;
+      v.references=['left.test','right.test'].map((host,side)=>{
+        const ref=structuredClone(v.references[0]);ref.id=`ref_${index}_${side}`;ref.url=`https://${host}/sample-${index}`;
+        ref.contentDigest=`synthetic-original-${index}-${side}`;ref.biasPrediction=compactBiasPrediction(model,side===0?-0.5:0.5)!;
+        return ref;
+      });
+      v.checks[0].relations=v.references.map(ref=>({referenceId:ref.id,quote:ref.text,start:0,end:ref.text.length,relation:'supports',explanation:'synthetic quote'}));
+      return v;
+    });
+    const coordinates=biasCoordinatesFromResearch(a,bundles,model,orientations);
+    expect(coordinates.filter(row=>row.articleId!==a.analysisId)).toHaveLength(6);
+    expect(analyzeBiasCoordinate(coordinates,orientations,a.analysisId)).toMatchObject({status:'ready',eligiblePublisherCount:2});
+    const rerun=result(a);rerun.researchPlanId='synthetic-plan-2';rerun.createdAt='2026-02-01T00:00:04Z';
+    rerun.references=[];rerun.checks[0].execution='failed';
+    expect(rows(a,[...bundles,rerun])).toEqual([]);
+  });
   it('accumulates current same-proposition claim bundles but removes an older bundle after its failed recheck',()=>{
     const a=analysis(),template=structuredClone(a.claims[0]);
     a.claims=Array.from({length:3},(_,i)=>({...structuredClone(template),id:`claim_${i}`,text:`별도 사실 주장 ${i}`}));

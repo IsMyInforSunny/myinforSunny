@@ -17,6 +17,11 @@ const articleText='학교 도서관의 운영 시간에 관해 학생과 교사�
 const article=(extra:Record<string,unknown>={})=>({success:true,data:{markdown:articleText,metadata:{sourceURL:'https://news.example/a',url:'https://news.example/a',statusCode:200,title:'가상 기사'},...extra}});
 
 describe('Firecrawl opt-in guards and provenance',()=>{
+ it('uses a Workers-compatible manual redirect and refuses to forward credentials',async()=>{
+  const call=vi.fn().mockResolvedValue(new Response(null,{status:302,headers:{Location:'https://other.example/'}}));vi.stubGlobal('fetch',call);
+  await expect(searchFirecrawl('school library',config(),signal())).rejects.toMatchObject({code:'SEARCH_UNEXPECTED_REDIRECT'});
+  expect(call).toHaveBeenCalledTimes(1);expect(call.mock.calls[0][1].redirect).toBe('manual');
+ });
  it('limits discovery to explicitly approved domains while preserving Korean query text',async()=>{
   const f=vi.fn().mockResolvedValue(Response.json({success:true,data:{web:[]}}));vi.stubGlobal('fetch',f);
   await searchFirecrawl('학교 도서관 운영 시간',{...config(),ALLOWED_RETRIEVAL_HOSTS:'news.example, www.news.example,news.example,https://bad.example,localhost'},signal());

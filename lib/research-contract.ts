@@ -7,11 +7,14 @@ export const researchInputSchema=z.object({sources:z.array(sourceSchema).min(1).
 export type ResearchInput=z.infer<typeof researchInputSchema>;
 export const researchQuerySchema=z.object({claimId:z.string().min(1).max(64),label:z.string().min(1).max(100),query:searchQuerySchema,purpose:z.enum(['fact_check','perspective'])}).strict();
 export type ResearchQuery=z.infer<typeof researchQuerySchema>;
+export const researchExcludedUrlsSchema=z.array(z.string().url().max(2048).refine(value=>{
+ try{const url=new URL(value);return url.protocol==='https:'&&!url.username&&!url.password;}catch{return false;}
+},'공개 HTTPS 기사 주소만 제외 목록에 넣을 수 있습니다.')).max(24);
 export type ResearchPlan={schemaVersion:'research-1.0';planId:string;token:string;queries:ResearchQuery[];claimCount:number;expiresAt:string;nextModelCallAt:string};
 export type RetrievedEvidence=Reference&{provenance:'web_fetched';url:string;title:string;fetchedAt:string;publisherDomain:string;contentDigest:string;retrievedTextLength:number;retrievedTruncated:boolean;excerptStart:number;excerptEnd:number;fullTextLength:number;extractionVersion:string};
 export type ResearchAttempt={url?:string;query?:string;stage:'search'|'fetch';status:'completed'|'empty'|'failed'|'disallowed'|'inaccessible';reason?:string};
 export type EvidenceBundle={schemaVersion:'evidence-1.0';planId:string;claimId:string;token:string;references:RetrievedEvidence[];attempts:ResearchAttempt[];expiresAt:string};
 export type SourcePerspective={referenceId:string;positionText:string;stance:'supports_position'|'opposes_position'|'adds_context'|'not_expressed'|'undetermined';quote:string;start:number;end:number;explanation:string};
-export type ResearchVerification=Verification&{perspectiveChecks?:SourcePerspective[]};
+export type ResearchVerification=Verification&{perspectiveChecks?:SourcePerspective[];researchPlanId?:string};
 export type Recommendation={referenceId:string;title:string;url:string;publisherDomain:string;kind:'different_evidence'|'opposing_view'|'supporting_view'|'context';reason:string;quote:string;start:number;end:number;provenance:'web_fetched'};
 export type ReliabilityReview={status:'not_started'|'investigating'|'no_factual_claims'|'partially_reviewed'|'supported_in_reviewed_scope'|'contradiction_found'|'needs_more_evidence'|'research_unavailable';label:string;totalClaims:number;completedClaims:number;supported:number;contradicted:number;conflicting:number;insufficient:number;remaining:number;sourceCount:number;publisherDomainCount:number;scopeNote:string;checks:Check[]};

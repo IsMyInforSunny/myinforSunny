@@ -74,9 +74,9 @@ export function extractArticle(html:string,url:string):ArticleText|null{
   if(marked||semanticArticle||semanticMain){
    // Do not repair a rejected/unclosed marked region by falling back to cards.
    if(!original.text)return null;
-   const semanticNode=document.querySelector(BODY_SELECTOR)??document.querySelector('article')??main;
-   if(!semanticNode)return null;
-   const text=plainText(semanticNode);
+   const semanticNodes=marked?Array.from(document.querySelectorAll(BODY_SELECTOR))
+     :semanticArticle?Array.from(document.querySelectorAll('article')):main?[main]:[];
+   const text=semanticNodes.map(node=>plainText(node)).sort((a,b)=>b.length-a.length)[0]??'';
    return text?{text,title:original.title,publishedAt,language,extractionVersion:ARTICLE_EXTRACTION_VERSION}:null;
   }
   Object.defineProperty(document,'documentURI',{value:url,configurable:true});

@@ -57,6 +57,49 @@ class CorpusPreparationTests(unittest.TestCase):
         self.assertIn('article_usage_review_incomplete', report['articles'][0]['issues'])
         self.assertIsNone(report['articles'][0]['sourceGroupId'])
 
+    def test_licensed_dataset_receipt_does_not_require_an_invented_publisher_fetch(self):
+        articles, reviews, manifest = fixture()
+        for article in articles:
+            article.update(intakeMethod='licensed_dataset_import', fetchedAt=None,
+                           importedAt='2026-05-29T12:00:00Z',
+                           dataset={'id': 'synthetic-dataset-metadata',
+                                    'sourceUrl': 'https://dataset.example/source'})
+        report, rows = prepare(articles, reviews, manifest)
+        self.assertEqual(report['status'], 'train_input_ready')
+        self.assertNotIn('fetchedAt', rows[0])
+        self.assertEqual(rows[0]['acquisition'], {
+            'method': 'licensed_dataset_import', 'acquiredAt': articles[0]['importedAt'],
+            'sourceUrl': 'https://dataset.example/source', 'datasetId': 'synthetic-dataset-metadata'})
+        self.assertEqual(report['articles'][0]['acquisitionMethod'], 'licensed_dataset_import')
+        self.assertFalse(report['releaseReady'])
+        self.assertNotIn(articles[0]['text'], json.dumps(report, ensure_ascii=False))
+
+    def test_dataset_import_still_requires_real_receipt_metadata_and_usage_review(self):
+        for field, bad, issue in [
+                ('importedAt', None, 'importedAt_missing_or_invalid'),
+                ('importedAt', '2999-01-01T00:00:00Z', 'imported_at_in_future'),
+                ('importedAt', '2026-05-27T00:00:00Z', 'publication_after_import_time'),
+                ('dataset', None, 'licensed_dataset_source_missing_or_invalid'),
+                ('dataset', {'id': 'synthetic', 'sourceUrl': 'https://localhost/source'},
+                 'licensed_dataset_source_missing_or_invalid')]:
+            with self.subTest(field=field, bad=bad):
+                articles, reviews, manifest = fixture()
+                for article in articles:
+                    article.update(intakeMethod='licensed_dataset_import', fetchedAt=None,
+                                   importedAt='2026-05-29T12:00:00Z',
+                                   dataset={'id': 'synthetic', 'sourceUrl': 'https://dataset.example/source'})
+                articles[0][field] = bad
+                report, _ = prepare(articles, reviews, manifest)
+                self.assertEqual(report['status'], 'pending_review')
+                self.assertIn(issue, report['articles'][0]['issues'])
+        articles, reviews, manifest = fixture()
+        articles[0].update(intakeMethod='licensed_dataset_import', fetchedAt=None,
+                           importedAt='2026-05-29T12:00:00Z',
+                           dataset={'id': 'synthetic', 'sourceUrl': 'https://dataset.example/source'})
+        reviews['articles'][0]['usage']['trainingAllowed'] = False
+        report, _ = prepare(articles, reviews, manifest)
+        self.assertIn('article_usage_review_incomplete', report['articles'][0]['issues'])
+
     def test_false_or_truthy_rights_and_missing_dates_are_not_approvals(self):
         for field in ('textStorageAllowed', 'trainingAllowed', 'evaluationAllowed', 'modelDistributionAllowed'):
             for bad in (False, 'true', 1):

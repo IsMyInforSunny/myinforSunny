@@ -13,6 +13,8 @@ const evidenceSchema=z.object({
 const artifactSchema=z.object({
   schemaVersion:z.literal('publisher-coordinate-svm-1'),synthetic:z.literal(false),dataKind:z.literal('real'),status:z.literal('validated'),
   comparisonGroup:z.string().min(1).max(160),classifierEvidence:evidenceSchema,
+  topicScope:z.object({mode:z.literal('cross_topic'),trainingTopics:z.array(z.string().trim().min(1).max(160)).min(3),
+    evaluationTopics:z.array(z.string().trim().min(1).max(160)).min(2)}).strict().optional(),
   vectorizer:z.object({analyzer:z.literal('char'),ngramRange:z.tuple([z.literal(2),z.literal(4)]),lowercase:z.literal(false),
     whitespace:z.literal('collapse'),norm:z.literal('l2'),sublinearTf:z.literal(true),vocabulary:z.record(z.string(),z.number().int().nonnegative()),idf:z.array(finite.positive()).min(1).max(100000)}),
   projection:z.object({coefficients:z.array(finite).min(1).max(100000),offset:finite,scale:finite.positive()}),
@@ -20,7 +22,7 @@ const artifactSchema=z.object({
     reviewedBy:z.string().min(1),evidence:z.string().min(1),reviewedModelVersion:z.string().min(1),
     reviewers:z.array(z.string().min(1)).min(2),sampleCount:z.number().int().min(40),interReviewerAgreement:finite.min(0).max(1)})}),
   lineage:z.array(z.object({articleId:z.string().min(1),publisherId:z.string().min(1),url:z.string().url(),
-    publishedAt:z.string().min(1),sourceGroupId:z.string().min(1),contentHash:z.string().regex(/^[a-f0-9]{64}$/),
+    publishedAt:z.string().min(1),sourceGroupId:z.string().min(1),comparisonGroup:z.string().trim().min(1).max(160).optional(),contentHash:z.string().regex(/^[a-f0-9]{64}$/),
     split:z.enum(['training','evaluation']),usage:z.object({trainingAllowed:z.literal(true),modelDistributionAllowed:z.literal(true),
       basisUrl:z.string().trim().min(1),reviewedBy:z.string().trim().min(1),reviewedAt:z.string().trim().min(1)})})).min(12),
 });
@@ -37,9 +39,10 @@ const compactClassifierSchema=z.object({
 const compactPredictionSchema=z.object({comparisonGroup:z.string().min(1).max(160),classifier:compactClassifierSchema}).strict();
 export type CompactBiasPrediction=z.infer<typeof compactPredictionSchema>;
 
-export function compactBiasPrediction(model:PortableBiasModel,coordinate:number):CompactBiasPrediction|null{
+export function compactBiasPrediction(model:PortableBiasModel,coordinate:number,comparisonGroup=model.comparisonGroup):CompactBiasPrediction|null{
   const evidence=model.classifierEvidence;
-  const parsed=compactPredictionSchema.safeParse({comparisonGroup:model.comparisonGroup,classifier:{coordinate,
+  if(!modelAcceptsComparison(model,comparisonGroup))return null;
+  const parsed=compactPredictionSchema.safeParse({comparisonGroup,classifier:{coordinate,
     axisId:evidence.axisId,coordinateSpace:evidence.coordinateSpace,modelId:evidence.modelId,modelVersion:evidence.modelVersion,
     task:evidence.task,trainingDataId:evidence.trainingDataId,evaluationDataId:evidence.evaluationDataId,
     evaluation:{groupSplitId:evidence.evaluation.groupSplitId}}});
@@ -64,6 +67,15 @@ export function parseBiasModel(value:unknown):PortableBiasModel|null{
   const publishers=e.metrics.map(m=>m.publisherId);
   const train=model.lineage.filter(row=>row.split==='training'),heldout=model.lineage.filter(row=>row.split==='evaluation');
   const trainingHashes=new Set(train.map(row=>row.contentHash));
+  const scope=model.topicScope;
+  if(scope){
+    const topics=(rows:typeof train)=>[...new Set(rows.map(row=>row.comparisonGroup).filter((v):v is string=>!!v))];
+    if(model.lineage.some(row=>!row.comparisonGroup)
+      ||!sameSet(scope.trainingTopics,topics(train))||!sameSet(scope.evaluationTopics,topics(heldout))
+      ||scope.trainingTopics.some(topic=>scope.evaluationTopics.includes(topic))
+      ||publishers.some(p=>topics(train.filter(row=>row.publisherId===p)).length<2
+        ||topics(heldout.filter(row=>row.publisherId===p)).length<2))return null;
+  }else if(model.lineage.some(row=>row.comparisonGroup!==undefined&&row.comparisonGroup!==model.comparisonGroup))return null;
   if(ids.length!==n||new Set(ids).size!==n||ids.some(i=>i>=n)||model.projection.coefficients.length!==n
     ||!model.projection.coefficients.some(v=>v!==0)
     ||Object.keys(model.vectorizer.vocabulary).some(term=>Array.from(term).length<2||Array.from(term).length>4)
@@ -89,6 +101,21 @@ export function parseBiasModel(value:unknown):PortableBiasModel|null{
       ||!Number.isFinite(Date.parse(row.publishedAt));})
     ||e.metrics.some(m=>!e.trainingPublisherIds.includes(m.publisherId)||!e.evaluationPublisherIds.includes(m.publisherId)))return null;
   return model;
+}
+
+/** A general publisher model must first pass held-out-topic validation. Runtime
+ * article comparisons still use the user's current topic, never a pooled mix. */
+export function modelAcceptsComparison(model:PortableBiasModel,group:string):boolean{
+  return !!group.trim()&&group.length<=160&&(model.topicScope?.mode==='cross_topic'||model.comparisonGroup===group);
+}
+
+export function biasComparisonGroup(model:PortableBiasModel,analysis:{proposition?:string;claims:readonly {kind:string;text:string}[]}):string|null{
+  if(!model.topicScope){
+    return (analysis.proposition?analysis.proposition===model.comparisonGroup:analysis.claims.some(c=>c.text===model.comparisonGroup))?model.comparisonGroup:null;
+  }
+  const group=analysis.proposition??analysis.claims.find(c=>c.kind==='opinion')?.text
+    ??analysis.claims.find(c=>c.kind==='factual'&&modelAcceptsComparison(model,c.text))?.text;
+  return group&&modelAcceptsComparison(model,group)?group:null;
 }
 
 export function normalizeBiasText(text:string){

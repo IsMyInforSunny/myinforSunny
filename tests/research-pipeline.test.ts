@@ -27,15 +27,22 @@ describe('자동 조사 단계 연결 (모의 검색·모의 LLM, 실서비스 �
  });
  it('한국어 기관명·핵심어를 계획 토큰부터 실제 검색 호출까지 보존한다',async()=>{
   const i=input(),query='통계청 도서관 운영 2025'.normalize('NFD');
+  const koreanConfig={...config,NEWS_PROVIDER:'publisher_feeds'};
   const llm=vi.spyOn(language,'structured').mockResolvedValue({queries:[{claimId:i.claims[0].id,label:'운영 시간',query,purpose:'fact_check'}]});
-  const plan=await planResearch(request(),i,config,AbortSignal.timeout(1000));
+  const plan=await planResearch(request(),i,koreanConfig,AbortSignal.timeout(1000));
   expect(plan.queries[0].query).toBe(query.normalize('NFC'));
   expect(llm.mock.calls[0][2]).toContain('한국어 기관명');
   expect(llm.mock.calls[0][2]).not.toContain('검색어 하나를 영문으로');
   vi.spyOn(searchBudget,'reserveSearch').mockResolvedValue(undefined);
   const search=vi.spyOn(news,'searchNews').mockResolvedValue({provider:'gdelt',query,status:'empty',articles:[],searchedAt:new Date().toISOString(),scopeNote:'모의'});
-  await discoverEvidence(request(),i,plan.token,0,config,AbortSignal.timeout(1000));
+  await discoverEvidence(request(),i,plan.token,0,koreanConfig,AbortSignal.timeout(1000));
   expect(search.mock.calls[0][0]).toBe(query.normalize('NFC'));
+ });
+ it('GDELT의 영문 번역 색인에는 같은 계획 호출에서 영문 핵심어를 만든다',async()=>{
+  const i=input(),llm=planner(i);
+  await planResearch(request(),i,config,AbortSignal.timeout(1000));
+  expect(llm.mock.calls[0][2]).toContain('영문 번역 색인');
+  expect(llm.mock.calls[0][2]).not.toContain('억지로 영문으로 번역하지 않는다');
  });
  it('기사에 명시된 1차 출처를 같은 계획 호출의 미검증 힌트로 연결한다',async()=>{
   const body='통계청에 따르면 2025년 조사에서 인구가 10% 증가했다.';

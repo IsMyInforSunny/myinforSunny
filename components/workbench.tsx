@@ -124,7 +124,7 @@ export default function Workbench(){
     <div aria-live="polite" aria-atomic="true">{error&&<div className="notice error" role="alert"><Info size={16}/>{error}</div>}{cancelled&&<div className="notice">요청을 취소했습니다.</div>}</div>
     <div ref={reportRef} tabIndex={-1} aria-label="기사 분석 작업 공간" className="canva-screen-focus">
       <CanvaDashboard analysis={analysis} researchResults={researchResults} researchStage={researchStage}
-        availability={cap?{biasModelReady:!!releasedBiasModel,articleResearchReady:!!cap.webSearch&&!!cap.webFetch,biasComparisonGroup:releasedBiasModel?.comparisonGroup??null}:null}
+        availability={cap?{biasModelReady:!!releasedBiasModel,articleResearchReady:!!cap.webSearch&&!!cap.webFetch,biasComparisonGroup:releasedBiasModel?.topicScope?null:releasedBiasModel?.comparisonGroup??null}:null}
         reliabilityObservations={evidenceObservations}
         sourceWeightSet={SOUTH_KOREA_PUBLIC_TRUST_PRIOR_2025} biasArticleCoordinates={biasCoordinates} biasOrientationSet={CLAUDE_MEDIA_ORIENTATION_SET} selectedBiasArticleId={analysis?.analysisId}
         stale={stale} onInput={()=>setView('input')} onCoordinates={()=>setView('coordinates')} onEvidence={()=>showDetails('evidence')} onArticles={()=>showDetails('articles')}/>

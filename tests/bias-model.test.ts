@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {inferBiasCoordinate,parseBiasModel,isBiasTrainingArticle,compactBiasPrediction,sameBiasModel,type PortableBiasModel} from '../lib/bias-model';
+import {biasComparisonGroup,modelAcceptsComparison,inferBiasCoordinate,parseBiasModel,isBiasTrainingArticle,compactBiasPrediction,sameBiasModel,type PortableBiasModel} from '../lib/bias-model';
 import {analyzeBiasCoordinate,type BiasArticleCoordinate,type BiasOrientationSet} from '../lib/bias-analysis';
 import {biasCoordinatesFromResearch} from '../lib/bias-model-adapter';
 import {demoAnalysis} from '../lib/fixtures';
@@ -24,6 +24,28 @@ const fixture={schemaVersion:'publisher-coordinate-svm-1',synthetic:false,dataKi
 const set:BiasOrientationSet={axisId:'test',version:'test',source:'synthetic',note:'synthetic',profiles:[{publisherId:'left.test',orientation:'left'},{publisherId:'right.test',orientation:'right'}]};
 
 describe('portable bias inference',()=>{
+  it('requires held-out topics before applying one model to a new comparison topic',()=>{
+    const topicScope={mode:'cross_topic',trainingTopics:['training-a','training-b','training-c'],evaluationTopics:['evaluation-a','evaluation-b']};
+    const cross={...structuredClone(fixture),topicScope,lineage:fixture.lineage.map((row,i)=>({...structuredClone(row),
+      comparisonGroup:row.split==='training'?topicScope.trainingTopics[i%3]:topicScope.evaluationTopics[i%2]}))};
+    const model=parseBiasModel(cross);expect(model).not.toBeNull();
+    const analysis={proposition:'새로운 비교 명제',claims:[]};
+    expect(biasComparisonGroup(model!,analysis)).toBe(analysis.proposition);
+    expect(compactBiasPrediction(model!,0.2,analysis.proposition)?.comparisonGroup).toBe(analysis.proposition);
+    expect(sameBiasModel(compactBiasPrediction(model!,0.2,analysis.proposition)!.classifier,model!)).toBe(true);
+    const legacy=parseBiasModel(fixture)!;
+    expect(modelAcceptsComparison(legacy,analysis.proposition)).toBe(false);
+    expect(compactBiasPrediction(legacy,0.2,analysis.proposition)).toBeNull();
+    expect(biasComparisonGroup(legacy,analysis)).toBeNull();
+    expect(biasComparisonGroup(model!,{claims:[{kind:'factual',text:'현재 사실 주장'}]})).toBe('현재 사실 주장');
+    const leaked=structuredClone(cross);leaked.topicScope.evaluationTopics[0]='training-a';
+    expect(parseBiasModel(leaked)).toBeNull();
+    const missing=structuredClone(cross);missing.lineage[0].comparisonGroup='unreported-topic';
+    expect(parseBiasModel(missing)).toBeNull();
+    const confounded=structuredClone(cross);
+    for(const row of confounded.lineage)if(row.publisherId==='left.test'&&row.split==='evaluation')row.comparisonGroup='evaluation-a';
+    expect(parseBiasModel(confounded)).toBeNull();
+  });
   it('signs bounded predictions for a large corpus without embedding evaluation group arrays per article',async()=>{
     const large=structuredClone(fixture);
     for(let i=0;i<800;i++){

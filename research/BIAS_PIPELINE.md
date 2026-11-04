@@ -12,7 +12,7 @@ py research/train_bias.py --input articles.local.jsonl --manifest orientation.lo
 
 - `id`, `publisherId`: 고유 기사 ID와 정규화한 매체 도메인. 예를 들어 MBC는 `imbc.com`이고 URL은 그 하위 도메인일 수 있다.
 - `text`, `sourceGroupId`: 본문과 동일 원본·전재 그룹 ID. 원문은 로컬 입력에서만 사용하고 출력하지 않는다.
-- `comparisonGroup`: 동일한 주제·명제·기간·기사 형식을 검토해 붙인 공통 비교 그룹. 한 번의 학습에는 한 그룹만 허용한다.
+- `comparisonGroup`: 동일한 주제·명제·기간·기사 형식을 검토해 붙인 공통 비교 그룹. 기본 모드는 한 그룹만 허용한다. 아래의 명시적 여러 주제 모드는 서로 다른 검토 그룹을 보존해 평가한다.
 - `url`, `publishedAt`: 해당 매체의 HTTPS 공개 URL과 실제 발행일. 날짜만 있으면 한국 시간 날짜로, 시각이 있으면 `YYYY-MM-DDTHH:MM[:SS[.ffffff]]Z` 또는 `±HH:MM`을 명시한 확장 ISO 형식으로 기록한다.
 - `provenance: "public_article"`, `usage: {trainingAllowed: true, modelDistributionAllowed: true, basisUrl: "이용 근거 URL", reviewedBy: "검토자", reviewedAt: "검토일"}`. 필드는 사용 조건 검토 기록이며 프로그램이 법적 허가를 확인하는 것은 아니다.
 
@@ -33,13 +33,29 @@ py research/plan_bias_collection.py --manifest research/bias-orientation.example
 
 현재 분리기는 원본 그룹의 40%를 올림해 평가에 배정한다. 서로 다른 평가 원본 40개를 얻으려면 산술적으로 전체 독립 원본 그룹이 적어도 98개여야 한다(`ceil(98×0.4)=40`, 97개에서는 39개). 기본 기준 매체 7곳에 균등하게 배정한 수집 계획은 각 14개, 총 98개다. **98개는 평가 표본 수를 확보하기 위한 계획 하한이며 충분한 학습량·정확도·축 분리·배포 가능성을 보장하지 않는다.** 학습/평가 양쪽에서 매체별 3개 이상이 나오는 실제 그룹 분리가 실패하거나 사람이 판단 유보한 평가 표본이 생기면 더 필요하다. 두 평가자가 같은 원본 40개를 각각 검토하므로 최소 80개의 판정 기록이 필요하다.
 
-한 모델은 동일 비교 명제·기간·기사 형식으로 검토한 한 `comparisonGroup`만 받는다. 여러 주제의 기사 수를 합산해서 조건을 충족했다고 처리하지 않는다. 단순 기사 수나 대략적인 작업 일수로 완성을 약속하지 않으며 실제 취득·원본 중복·매체 분포·사람 검토·축 품질로 판단한다. 이 도구의 `releaseReady`는 항상 `false`이고 실제 분리·모델 평가는 별도 단계다.
+기본 모델은 동일 비교 명제·기간·기사 형식으로 검토한 한 `comparisonGroup`만 받는다. 여러 주제의 기사 수를 합산해서 한 주제의 조건을 충족했다고 처리하지 않는다. 단순 기사 수나 대략적인 작업 일수로 완성을 약속하지 않으며 실제 취득·원본 중복·매체 분포·사람 검토·축 품질로 판단한다. 수집 계획 도구의 `releaseReady`는 항상 `false`이고 실제 분리·모델 평가는 별도 단계다.
+
+## 여러 주제의 매체 문체 모델
+
+임의 주제 입력을 한 개 명제 전용 모델에 연결하지 않도록 `train_bias.py --cross-topic`을 별도로 제공한다. 각 주제의 기사·기간·원본 그룹·사용 조건을 먼저 기존 준비 단계로 검토한 후, 실제 준비된 JSONL 경로를 반복해서 지정한다.
+
+```powershell
+py research/train_bias.py --cross-topic --input topic-one.local.jsonl --input topic-two.local.jsonl --input topic-three.local.jsonl --input topic-four.local.jsonl --input topic-five.local.jsonl --manifest orientation.local.json --output cross-topic-model.local.json
+```
+
+각 행의 실제 `comparisonGroup`을 보존하며 적어도 다섯 주제를 요구한다. 한 번의 학습·평가 분리는 학습에 최소 세 주제, 평가에 최소 두 주제를 배정한다. 같은 주제를 양쪽에 나누지 않는다. 원본 그룹이 여러 주제에 걸치면 해당 주제 전체를 연결해 같은 쪽에 배정하므로, 주제가 달라도 같은 원본이 학습과 평가에 섞이지 않는다. 각 매체는 학습·평가 각각 최소 두 주제와 세 고유 기사 표본을 갖춰야 한다. 기본 평가 비율 40%와 결정적 시드로 후보 분리를 찾고, 이 조건을 만족하지 못하면 학습을 중단한다. 단일 주제 수집 계획의 약 98개 하한만으로 이 주제·매체별 분포가 확보됐다고 볼 수 없다.
+
+출력에는 `topicScope: {mode: "cross_topic", trainingTopics: [...], evaluationTopics: [...]}`를 기록하고 각 `lineage` 행에 실제 `comparisonGroup`을 남긴다. 주제 목록과 분리가 모델 버전 해시에 포함되므로 주제 구성이 달라지면 기존 축 승인 기록을 재사용할 수 없다. 모델 최상위 `comparisonGroup`은 범위를 설명하는 `여러 주제 매체 문체 모델`이며 특정 사용자의 비교 명제를 뜻하지 않는다. 기본 단일 주제 모드의 출력에는 `topicScope`를 추가하지 않는다.
+
+교차 주제 매체 식별 성능은 새로운 주제에서 매체 문체를 구별한 측정치다. 정치 편향 정답 정확도나 모든 주제에 대한 일반화 보장이 아니다. 실제 여러 주제 기사 자료·원본 그룹 분리·모든 기준 매체의 평가·평가 좌표 방향 분리와 최소 두 사람의 40개 독립 평가 원본 축 검토를 모두 통과해야 `validated`가 될 수 있다. 데이터나 검토가 없으면 이 모드를 추가해도 모델은 생성되거나 승인되지 않는다.
 
 ## 실제 취득 기사와 사람 검토를 결합하는 준비 단계
 
 `prepare_bias_corpus.py`는 수집 도구의 출력과 실제 검토 기록 사이의 누락을 확인하는 오프라인 준비 도구다. 네트워크 요청·기사 취득·정치 라벨 생성·사용권 승인·학습·모델 활성화를 하지 않는다. 원문 저장 자체의 이용 조건은 취득 전에 확인해야 하며, 이 도구의 통과가 그 확인을 대신하지 않는다.
 
 입력 `fetched.local.jsonl`은 실제 수집기가 취득한 기사당 한 줄이며 `id`, `publisherId`, `url`, `publishedAt`, `fetchedAt`, `text`, `extractionVersion`, `provenance: "public_article"`를 담는다. `publisherId`는 위 학습 계약의 루트 매체 도메인이다. `publishedAt`과 `fetchedAt`은 실제 발행·취득 시점이고, 본문은 제호·광고·기자 반복 푸터의 처리 버전을 `extractionVersion`으로 남긴다. 이 필드는 처리 절차를 수행했다는 사실을 자동 증명하지 않는다. 후보 제목·URL만으로 본문이나 날짜를 만들지 않는다.
+
+공식 파일로 받은 기사 자료는 `intakeMethod: "licensed_dataset_import"`, 실제 파일 처리 시각 `importedAt`, `dataset: {id, sourceUrl}`을 사용한다. 이 경우 `fetchedAt`은 요구하거나 생성하지 않으며 공개 HTTPS 데이터 출처와 처리 시각의 형식·시간 순서를 확인한다. 직접 취득과 파일 가져오기 모두 준비 출력의 `acquisition: {method, acquiredAt, sourceUrl, datasetId?}`에 경로를 기록한다. 파일 가져오기도 동일한 기사 사용 조건·원본 그룹·주제 검토가 필요하며, 데이터셋 이름이나 파일 처리 시각이 학습·배포 승인으로 바뀌지 않는다. `acquisition`은 로컬 학습 입력의 계보이며 현재 모델 JSON의 공개 lineage에는 URL·발행일·해시·그룹·사용 조건이 기록된다.
 
 사람 검토 JSON의 최상위 항목은 `comparisonGroup`(실제 비교할 명제), `windowStart`, `windowEnd`(비교 기간의 ISO 시각), `articles`다. 날짜만 쓰면 한국 시간 자정으로 해석하고, 비교 기간의 끝 날짜는 한국 시간 하루 전체를 포함한다. 시각까지 쓰면 `Z` 또는 UTC 오프셋이 반드시 있어야 하며 시간대 없는 시각은 보류한다. 시간대가 포함된 경계를 쓸 때는 확장 ISO 형식만 허용한다. 하루 전체의 시각 경계를 쓰려면 한국 시간 `T00:00:00+09:00`부터 `T23:59:59.999999+09:00`까지 지정한다. 날짜만 입력하는 방식도 같은 한국 날짜 전체를 포함한다. 각 `articles` 항목은 다음과 같다.
 

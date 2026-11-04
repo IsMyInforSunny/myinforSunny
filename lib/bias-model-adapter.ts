@@ -2,7 +2,7 @@ import type {Analysis,Reference} from './contracts';
 import type {ResearchVerification} from './research-contract';
 import type {BiasArticleCoordinate,BiasOrientationSet} from './bias-analysis';
 import {currentResearch} from './current-research';
-import {inferBiasCoordinate,sameBiasModel,type PortableBiasModel} from './bias-model';
+import {biasComparisonGroup,inferBiasCoordinate,sameBiasModel,type PortableBiasModel} from './bias-model';
 import {normalizeSourceUrl} from './source-quality';
 
 function publisher(host:string,set:BiasOrientationSet):string|null{
@@ -17,15 +17,20 @@ function quoteMatches(ref:Reference,quote:{quote:string;start:number;end:number}
 /** Infer only the target locally; reference predictions originate in the signed fetch flow. */
 export function biasCoordinatesFromResearch(analysis:Analysis,results:readonly ResearchVerification[],model:PortableBiasModel|null,set:BiasOrientationSet):BiasArticleCoordinate[]{
   if(!model||analysis.mode!=='live'||model.classifierEvidence.axisId!==set.axisId)return [];
-  const group=model.comparisonGroup;
-  if(analysis.proposition?analysis.proposition!==group:!analysis.claims.some(c=>c.text===group))return [];
+  const group=biasComparisonGroup(model,analysis);if(!group)return [];
   const body=analysis.sources.find(s=>s.kind==='body');if(!body)return [];
   const prediction=inferBiasCoordinate(model,body.text);if(!prediction)return [];
   const rows=new Map<string,BiasArticleCoordinate>();
   const current=currentResearch(analysis,results).map((result,index)=>({result,index})).sort((a,b)=>
     (Date.parse(a.result.createdAt)||0)-(Date.parse(b.result.createdAt)||0)||a.index-b.index).map(x=>x.result);
-  const latestChecks=new Map<string,ResearchVerification['checks'][number]>();
-  for(const result of current)for(const check of result.checks)latestChecks.set(check.claimId,check);
+  const latestChecks=new Map<string,{check:ResearchVerification['checks'][number];result:ResearchVerification}>();
+  for(const result of current)for(const check of result.checks)latestChecks.set(check.claimId,{check,result});
+  // Multiple independently acquired bundles in one signed plan form one sampling
+  // run. A later plan still supersedes the old run, including failed reruns.
+  const currentCheck=(result:ResearchVerification,check:ResearchVerification['checks'][number])=>{
+    const latest=latestChecks.get(check.claimId);
+    return !!latest&&(latest.check===check||!!result.researchPlanId&&result.researchPlanId===latest.result.researchPlanId);
+  };
   const latestPerspective=current.filter(r=>r.perspectiveChecks?.some(p=>p.positionText===group)).at(-1);
   for(const result of current)for(const ref of result.references){
     if(ref.provenance!=='web_fetched'||!ref.publishedAt||!Number.isFinite(Date.parse(ref.publishedAt))||!ref.fetchedAt)continue;
@@ -35,11 +40,12 @@ export function biasCoordinatesFromResearch(analysis:Analysis,results:readonly R
     // Separate claim searches can all compare the same explicit proposition.
     // Retain each claim's current attempt, rather than throwing away every
     // bundle except the last (which would cap the entire baseline at two URLs).
-    const currentPerspective=result.checks.length?result.checks.some(c=>latestChecks.get(c.claimId)===c
-      &&analysis.claims.some(a=>a.id===c.claimId)&&c.execution==='completed'):result===latestPerspective;
+    const currentPerspective=result.checks.length?result.checks.some(c=>currentCheck(result,c)
+      &&analysis.claims.some(a=>a.id===c.claimId)&&c.execution==='completed'):result===latestPerspective
+        ||!!result.researchPlanId&&result.researchPlanId===latestPerspective?.researchPlanId;
     const perspective=currentPerspective&&result.perspectiveChecks?.some(p=>p.referenceId===ref.id&&p.positionText===group
       &&!['undetermined','not_expressed'].includes(p.stance)&&quoteMatches(ref,p));
-    const factual=result.checks.some(c=>latestChecks.get(c.claimId)===c&&analysis.claims.some(a=>a.id===c.claimId&&a.text===group)&&c.execution==='completed'
+    const factual=result.checks.some(c=>currentCheck(result,c)&&analysis.claims.some(a=>a.id===c.claimId&&a.text===group)&&c.execution==='completed'
       &&c.temporalFit==='matched'&&c.relations.some(r=>r.referenceId===ref.id&&quoteMatches(ref,r)));
     if(!perspective&&!factual)continue;
     // A full-text digest is only trusted when extraction was complete.

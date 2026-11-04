@@ -41,8 +41,9 @@ async function readBounded(response:Response,limit=512000){
 async function call(operation:'search'|'scrape',body:object,c:RuntimeConfig,signal:AbortSignal){
  const reserved=await reserveFirecrawlCredits(c,operation);
  let response:Response;
- try{response=await fetch(API+operation,{method:'POST',redirect:'error',headers:{Authorization:`Bearer ${c.FIRECRAWL_API_KEY}`,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(body),signal:AbortSignal.any([signal,AbortSignal.timeout(16000)])});}
+ try{response=await fetch(API+operation,{method:'POST',redirect:'manual',headers:{Authorization:`Bearer ${c.FIRECRAWL_API_KEY}`,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(body),signal:AbortSignal.any([signal,AbortSignal.timeout(16000)])});}
  catch{throw new AppError(503,'SEARCH_UNAVAILABLE','외부 자료 수집에 연결하지 못했습니다. 다른 유료 서비스로 전환하지 않습니다.',true);}
+ if(response.status>=300&&response.status<400){await response.body?.cancel();throw new AppError(502,'SEARCH_UNEXPECTED_REDIRECT','자료 수집 서비스가 다른 주소로 이동을 요청했습니다. 운영 설정을 확인해 주세요.');}
  if(!response.ok){await response.body?.cancel();throw new AppError(response.status===429?429:503,response.status===429?'SEARCH_RATE_LIMITED':'SEARCH_UNAVAILABLE','외부 자료 수집이 중단되었습니다. 서비스 한도·설정을 확인해 주세요.',response.status===429);}
  const value=await readBounded(response);
  // Never reduce the conservative reservation, including on partial/failed results.

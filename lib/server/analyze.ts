@@ -1,3 +1,4 @@
+import {searchLanguagePrompt} from './search-language';
 import { Analysis, BodyTopicAssignment, RawAnalysis, RUBRIC, TextRequest, analysisModelSchema, analysisResponseSchema, Expression, Span, searchQuerySchema } from '../contracts';
 import { assertAnalysis, indicators, locate, makeSources, naturalSentenceCount, SEGMENTER } from '../domain';
 import { RuntimeConfig, modelName } from './config';
@@ -74,7 +75,7 @@ export async function analyze(req:TextRequest,config:RuntimeConfig,requestId:str
   if(sentenceIds.length>24)throw new AppError(422,'INPUT_TOO_LARGE','정확한 문장별 분석을 위해 한 번에 최대 24문장씩 입력해 주세요.');
   const input={proposition:req.proposition??null,requiredExpressionSentenceIds:sentenceIds,requiredTopicAssignmentSourceIds:sources.filter(s=>s.kind==='comment').map(s=>s.id),sources:sources.map(s=>({id:s.id,kind:s.kind,sentences:s.sentences.map(t=>({sentenceId:t.id,text:s.text.slice(t.start,t.end)}))}))};
   const coverageInstructions=' 출력은 간결하게 작성한다. 자극적이지 않은 clear 문장은 ID만 clearSentenceIds에 넣고 expressions 객체는 만들지 않는다. flagged 또는 undetermined 문장만 expressions에 넣는다. 두 배열을 합쳐 requiredExpressionSentenceIds의 모든 ID가 정확히 한 번씩 있어야 한다. topicAssignments에는 requiredTopicAssignmentSourceIds의 댓글만 각 1개씩 반환하며 본문 body는 여기에 넣지 않는다. 댓글이 없어도 본문 body의 모든 문장 ID를 bodyAssigned({sentenceId,topicIds}: 해당 논점 있음)·bodyOtherIds(해당 논점 없음)·bodyUndeterminedIds(유보) 중 정확히 한 곳에 한 번씩 넣는다. topicIds는 topics의 id만 쓰며 여러 개 가능하다. topics 근거 인용은 예시일 뿐 분포에 쓰이지 않는다. stances는 proposition이 없으면 빈 배열이다.';
-  const raw=await structured(config,analysisResponseSchema(sources,!!req.proposition),ANALYZE_PROMPT+coverageInstructions,input,signal,{generationSchema:analysisModelSchema(sources,!!req.proposition)});
+  const raw=await structured(config,analysisResponseSchema(sources,!!req.proposition),searchLanguagePrompt(ANALYZE_PROMPT+coverageInstructions,config),input,signal,{generationSchema:analysisModelSchema(sources,!!req.proposition)});
   const {clearSentenceIds,...proposal}=raw;
   const explicitIds=new Set(proposal.expressions.map(e=>e.sentenceId));
   const overlaps=clearSentenceIds.filter(id=>explicitIds.has(id));

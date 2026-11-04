@@ -2,7 +2,7 @@
 import copy
 import unittest
 
-from train_bias import normalize, reviewed_axis, train_model, validate
+from train_bias import grouped_topic_split, normalize, reviewed_axis, train_model, validate
 
 
 def fixture():
@@ -21,7 +21,72 @@ def fixture():
     return rows, manifest
 
 
+def topic_fixture():
+    originals, manifest = fixture()
+    rows = []
+    for topic in range(5):
+        for publisher in ('left.example', 'right.example'):
+            base = next(row for row in originals if row['publisherId'] == publisher)
+            for index in range(10):
+                identity = f'{publisher}-topic-{topic}-{index}'
+                rows.append({**base, 'id': identity, 'url': f'https://{publisher}/{topic}/{index}',
+                             'sourceGroupId': identity, 'comparisonGroup': f'synthetic-topic-{topic}',
+                             'text': base['text'] + f' 별도 합성 주제 {topic} 사례 {index}'})
+    return rows, manifest
+
+
 class TrainingTests(unittest.TestCase):
+    def test_cross_topic_mode_holds_out_complete_topics_and_originals(self):
+        rows, manifest = topic_fixture()
+        artifact = train_model(rows, manifest, synthetic=True, cross_topic=True)
+        self.assertEqual(artifact['status'], 'research_only')
+        scope = artifact['topicScope']
+        self.assertEqual(scope['mode'], 'cross_topic')
+        self.assertGreaterEqual(len(scope['trainingTopics']), 3)
+        self.assertGreaterEqual(len(scope['evaluationTopics']), 2)
+        self.assertFalse(set(scope['trainingTopics']) & set(scope['evaluationTopics']))
+        for split, key in [('training', 'trainingTopics'), ('evaluation', 'evaluationTopics')]:
+            lineage = [row for row in artifact['lineage'] if row['split'] == split]
+            self.assertEqual(set(scope[key]), {row['comparisonGroup'] for row in lineage})
+            for publisher in ('left.example', 'right.example'):
+                publisher_rows = [row for row in lineage if row['publisherId'] == publisher]
+                self.assertGreaterEqual(len(publisher_rows), 3)
+                self.assertGreaterEqual(len({row['comparisonGroup'] for row in publisher_rows}), 2)
+        evaluation = artifact['classifierEvidence']['evaluation']
+        self.assertFalse(set(evaluation['trainingSourceGroupIds']) & set(evaluation['evaluationSourceGroupIds']))
+        self.assertNotEqual(artifact['comparisonGroup'], rows[0]['comparisonGroup'])
+
+    def test_cross_topic_originals_linking_topics_stay_in_one_split(self):
+        rows, _ = topic_fixture()
+        left = next(row for row in rows if row['publisherId'] == 'left.example' and row['comparisonGroup'] == 'synthetic-topic-0')
+        right = next(row for row in rows if row['publisherId'] == 'right.example' and row['comparisonGroup'] == 'synthetic-topic-1')
+        left['sourceGroupId'] = right['sourceGroupId'] = 'shared-original-between-topics'
+        training, evaluation = grouped_topic_split(rows)
+        self.assertEqual(any(rows[index]['comparisonGroup'] == 'synthetic-topic-0' for index in training),
+                         any(rows[index]['comparisonGroup'] == 'synthetic-topic-1' for index in training))
+        self.assertFalse({rows[i]['sourceGroupId'] for i in training} & {rows[i]['sourceGroupId'] for i in evaluation})
+
+    def test_cross_topic_mode_requires_five_topics_and_publisher_topic_coverage(self):
+        rows, manifest = topic_fixture()
+        with self.assertRaisesRegex(ValueError, 'one comparable'):
+            train_model(rows, manifest, synthetic=True)
+        fewer = [row for row in rows if row['comparisonGroup'] != 'synthetic-topic-4']
+        with self.assertRaisesRegex(ValueError, 'five reviewed topics'):
+            train_model(fewer, manifest, synthetic=True, cross_topic=True)
+        narrow = [row for row in rows if row['publisherId'] != 'right.example'
+                  or row['comparisonGroup'] in ('synthetic-topic-0', 'synthetic-topic-1', 'synthetic-topic-2')]
+        with self.assertRaisesRegex(ValueError, 'two topics per publisher'):
+            train_model(narrow, manifest, synthetic=True, cross_topic=True)
+
+    def test_cross_topic_model_identity_covers_topic_names(self):
+        rows, manifest = topic_fixture()
+        first = train_model(rows, manifest, synthetic=True, cross_topic=True)
+        renamed = copy.deepcopy(rows)
+        for row in renamed:
+            row['comparisonGroup'] += '-reviewed'
+        second = train_model(renamed, manifest, synthetic=True, cross_topic=True)
+        self.assertNotEqual(first['classifierEvidence']['modelVersion'], second['classifierEvidence']['modelVersion'])
+
     def test_provenance_and_duplicate_group_checks(self):
         rows, manifest = fixture()
         with self.assertRaisesRegex(ValueError, 'permissions'):
