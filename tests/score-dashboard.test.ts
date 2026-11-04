@@ -22,7 +22,7 @@ describe('score dashboard contract',()=>{
   it('explains unavailable model and article collection without suggesting that a score is processing',()=>{
     const html=render(article('공개 가상 기사다.'),{availability:{biasModelReady:false,articleResearchReady:false}});
     expect(html).toContain('산출 대기 이유');
-    expect(html).toContain('편향: 비교 모델과 검토 기사 자료를 준비 중이에요.');
+    expect(html).toContain('편향: 실제 기사로 학습·홀드아웃 평가·축 검토를 통과한 SVM 모델이 아직 공개되지 않아 계산을 기다려요.');
     expect(html).toContain('신뢰: 관련 기사 검색과 원문 수집을 연결 중이에요.');
     expect(html).not.toContain('신뢰: 외부 자료를 조사하고 있어요.');
   });

@@ -29,7 +29,12 @@ export default function DirectEvidence({analysis,cap,locked,onBusy,onProgress,on
   if(!selected.length||selected.length>2){setMessage('공개 기사 주소를 한 줄에 하나씩, 최대 2개 입력해 주세요.');return;}
   if(selected.some(value=>{try{const u=new URL(value);return u.protocol!=='https:'||!!u.username||!!u.password||!!u.port;}catch{return true;}})){setMessage('로그인 정보가 없는 공개 HTTPS 기사 주소를 입력해 주세요.');return;}
   const c=new AbortController();controller.current=c;setBusy(true);callbacks.current.onBusy(true);setConsent(false);
-  const input:ResearchInput={sources:analysis.sources,claims:factual,proposition,position,transmissionConsent:true,researchConsent:true};
+  // This request checks the selected target only. Other claims remain in the
+  // parent analysis denominator and cannot exceed this API's five-claim cap.
+  const selectedClaim=factual.find(claim=>claim.id===claimId);
+  const targetId=selectedClaim?.id??(proposition?'comparison_position':position?.id);
+  if(!targetId){controller.current=null;setBusy(false);callbacks.current.onBusy(false);return;}
+  const input:ResearchInput={sources:analysis.sources,claims:selectedClaim?[selectedClaim]:[],proposition,position,transmissionConsent:true,researchConsent:true};
   async function post<T>(body:unknown):Promise<T>{
    const response=await fetch('/api/research',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.any([c.signal,AbortSignal.timeout(60000)])});
    const data=await response.json() as {error?:{message?:string}};if(c.signal.aborted)throw new DOMException('취소됨','AbortError');
@@ -37,7 +42,7 @@ export default function DirectEvidence({analysis,cap,locked,onBusy,onProgress,on
   }
   try{
    setMessage('선택한 공개 기사 본문을 가져오고 있어요.');callbacks.current.onProgress('fetching');
-   const evidence=await post<EvidenceBundle>({operation:'import',input,claimId,urls:selected});
+   const evidence=await post<EvidenceBundle>({operation:'import',input,claimId:targetId,urls:selected});
    if(!evidence.references.length)throw new Error('허용된 공개 본문을 확보하지 못했어요. 접속 실패는 거짓 판정이 아닙니다.');
    const remaining=Math.max(0,Date.parse(analysis.createdAt)+61000-Date.now(),lastComparison.current+61000-Date.now());
    if(remaining){setMessage(`무료 AI 한도를 지키기 위해 약 ${Math.ceil(remaining/1000)}초 기다립니다.`);callbacks.current.onProgress('waiting');await researchWait(remaining,c.signal);}

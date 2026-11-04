@@ -13,3 +13,7 @@ export const researchSearchBudget=sqliteTable('research_search_budget',{
 export const firecrawlCreditBudget=sqliteTable('firecrawl_credit_budget',{
   id:text('id').primaryKey(),month:text('month').notNull(),operation:text('operation').notNull(),credits:integer('credits').notNull(),createdAt:integer('created_at').notNull(),
 });
+// Restored optional search provider: monthly counts only, never keys or content.
+export const searchMonthlyBudget=sqliteTable('search_monthly_budget',{
+  id:text('id').primaryKey(),reserved:integer('reserved').notNull(),
+});

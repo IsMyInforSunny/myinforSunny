@@ -16,14 +16,16 @@ import {inferBiasCoordinate,isBiasTrainingArticle,compactBiasPrediction} from '.
 import {reviewCitedSources} from '../cited-sources';
 import {canonicalPublisherHost} from '../source-reliability';
 import {actorHash} from './budget';
+import {assertResearchBatch,researchWaitReasons,waitReasonText} from './score-workflow';
 
 type PlanData={planId:string;inputDigest:string;queries:ResearchQuery[];expiresAt:string};
 type EvidenceData={planId:string;inputDigest:string;claimId:string;references:RetrievedEvidence[];attempts:ResearchAttempt[];expiresAt:string};
 export function researchReady(c:RuntimeConfig){return capabilities(c).live&&capabilities(c).webSearch&&!!c.ALLOWED_RETRIEVAL_HOSTS?.trim();}
-export function requireResearch(c:RuntimeConfig){if(!researchReady(c))throw new AppError(503,'RESEARCH_UNAVAILABLE','자동 신뢰성 조사와 기사 검색은 아직 연결 준비 중입니다. 본문 분석과 예시 체험은 이용할 수 있어요.');}
-export function requireEvidence(c:RuntimeConfig){const ready=capabilities(c);if(!ready.live||!ready.webFetch)throw new AppError(503,'RESEARCH_UNAVAILABLE','공개 기사 본문 연결은 아직 준비 중입니다. 붙여 넣은 참고자료는 수동 대조할 수 있어요.');}
+export function requireResearch(c:RuntimeConfig){if(!researchReady(c))throw new AppError(503,'RESEARCH_UNAVAILABLE',`자동 신뢰성 조사와 기사 검색은 아직 연결 준비 중입니다. ${waitReasonText(researchWaitReasons(c,'search'))} 본문 분석과 예시 체험은 이용할 수 있어요.`.replace(/\s+/g,' '));}
+export function requireEvidence(c:RuntimeConfig){const ready=capabilities(c);if(!ready.live||!ready.webFetch)throw new AppError(503,'RESEARCH_UNAVAILABLE',`공개 기사 본문 연결은 아직 준비 중입니다. ${waitReasonText(researchWaitReasons(c,'evidence'))} 붙여 넣은 참고자료는 수동 대조할 수 있어요.`.replace(/\s+/g,' '));}
 export function validateResearch(input:ResearchInput){
  if(input.transmissionConsent!==true||input.researchConsent!==true)throw new AppError(422,'VALIDATION_ERROR','분석과 자료 조사 전송에 동의해 주세요.');
+ assertResearchBatch(input);
  validateVerifyInput({kind:'text',sources:input.sources,claims:input.claims,references:[],useWebSearch:false});
  if(input.sources.reduce((n,s)=>n+s.sentences.length,0)>24)throw new AppError(422,'VALIDATION_ERROR','원문 처리 단위가 너무 많습니다.');
  if(input.claims.some(c=>c.kind!=='factual'))throw new AppError(422,'VALIDATION_ERROR','사실 주장만 신뢰성 조사 대상으로 선택해 주세요.');

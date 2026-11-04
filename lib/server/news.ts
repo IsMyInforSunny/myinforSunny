@@ -2,6 +2,8 @@ import type {NewsResult,RelatedArticle} from '../news-contract';
 import type {RuntimeConfig} from './config';
 import {AppError} from './errors';
 import {searchFirecrawl} from './firecrawl';
+import {searchTavily} from './tavily-search';
+import {searchPublisherFeeds} from './publisher-feeds';
 
 // No article URL is fetched here. Only this fixed search endpoint is a network destination.
 const ENDPOINT='https://api.gdeltproject.org/api/v2/doc/doc';
@@ -31,6 +33,8 @@ export function normalizeArticles(value:unknown):RelatedArticle[]{
 export async function searchNews(query:string,config:RuntimeConfig,signal:AbortSignal):Promise<NewsResult>{
  const searchTerm=query.normalize('NFC');
  if(config.NEWS_PROVIDER==='firecrawl')return searchFirecrawl(searchTerm,config,signal);
+ if(config.NEWS_PROVIDER==='tavily')return searchTavily(searchTerm,config,signal);
+ if(config.NEWS_PROVIDER==='publisher_feeds')return searchPublisherFeeds(searchTerm,config,signal);
  if(config.NEWS_PROVIDER&&config.NEWS_PROVIDER!=='gdelt')throw new AppError(503,'SEARCH_UNAVAILABLE','검색 제공자 설정을 확인해 주세요.');
  if(config.ENABLE_NEWS_SEARCH!=='true'||config.NEWS_TERMS_APPROVED!=='true'||!config.DB)throw new AppError(503,'SEARCH_UNAVAILABLE','관련 기사 검색을 준비 중입니다. 잠시 후 다시 확인해 주세요.');
  const now=Date.now();

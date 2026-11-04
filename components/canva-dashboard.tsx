@@ -7,7 +7,7 @@ import type {ResearchStage, ResearchVerification} from '@/lib/research-contract'
 import {expressionSummary} from '@/lib/domain';
 import {verifiedRecommendations} from '@/lib/reliability';
 import {currentResearch} from '@/lib/current-research';
-import {analyzeBiasCoordinate, type BiasArticleCoordinate, type BiasOrientationSet} from '@/lib/bias-analysis';
+import {analyzeBiasCoordinate, type BiasAnalysisResult, type BiasArticleCoordinate, type BiasOrientationSet} from '@/lib/bias-analysis';
 import {assessWeightedClaimEvidence, type EvidenceObservation, type PublisherWeightSet, type WeightedClaimEvidence} from '@/lib/source-reliability';
 import {MIN_N_FOR_PERCENT} from '@/lib/display';
 import {reviewCitedSources, type ClaimSourcingStatus, type CitedSourceType} from '@/lib/cited-sources';
@@ -21,7 +21,7 @@ type Props = {
   checks?: Check[];
   researchStage?: ResearchStage;
   /** Known service/model availability; null means it has not been checked yet. */
-  availability?: {biasModelReady:boolean;articleResearchReady:boolean} | null;
+  availability?: {biasModelReady:boolean;articleResearchReady:boolean;biasComparisonGroup?:string|null} | null;
   biasArticleCoordinates?: BiasArticleCoordinate[];
   biasOrientationSet?: BiasOrientationSet | null;
   selectedBiasArticleId?: string;
@@ -82,6 +82,27 @@ const weightedPendingLabels: Record<Exclude<WeightedClaimEvidence['status'], 'we
   no_eligible_evidence: '인용·시점이 확인된 근거 없음',
 };
 
+/* 편향 계산 대기 사유. bias-analysis의 실제 reason과 표본 수를 그대로 보여 주며, 기준을 낮추지 않는다. */
+function biasPendingText(bias: BiasAnalysisResult, availability: Props['availability']): string {
+  if (availability?.biasModelReady === false) return '편향: 실제 기사로 학습·홀드아웃 평가·축 검토를 통과한 SVM 모델이 아직 공개되지 않아 계산을 기다려요.';
+  switch (bias.reason) {
+    case 'no_selected_article':
+    case 'selected_article_missing':
+      return availability?.biasComparisonGroup
+        ? `편향: 이 기사의 명제가 공개 모델의 비교 주제(“${availability.biasComparisonGroup}”)와 같지 않거나 본문 좌표를 산출하지 못했어요.`
+        : '편향: 입력 기사의 모델 좌표가 아직 없어요.';
+    case 'selected_article_ambiguous': return '편향: 입력 기사 좌표가 중복되어 어느 값을 쓸지 정할 수 없어요.';
+    case 'no_orientation_profiles':
+    case 'invalid_orientation_profiles': return '편향: 좌익·우익 축 방향을 정할 매체 기준표가 없거나 유효하지 않아요.';
+    case 'model_coordinate_mismatch': return '편향: 비교 기사 좌표가 현재 공개 모델과 다른 모델·평가 버전에서 산출되어 함께 쓸 수 없어요.';
+    case 'insufficient_publisher_samples':
+      return `편향: 매체별 고유 기사 ${bias.minArticlesPerPublisher}개 이상인 적격 매체가 ${bias.eligiblePublisherCount}/${bias.minEligiblePublishers}곳이에요 (같은 명제 비교 기사 ${Math.max(0, bias.uniqueArticleCount - 1)}개 확보).`;
+    case 'model_not_validated': return '편향: 비교 매체 중 모델 홀드아웃 평가 지표가 없는 곳이 있거나 검증 정보가 부족해요.';
+    case 'axis_orientation_validation_failed': return '편향: 좌익·우익 기준 매체의 모델 좌표 순서가 검증되지 않아 방향과 기준선을 정할 수 없어요.';
+    default: return '편향: 같은 명제의 비교 기사나 모델 검증 조건이 부족해요. 매체 좌표에서 준비 상태를 확인해 주세요.';
+  }
+}
+
 const recommendationLabels = {
   opposing_view: '다른 입장',
   supporting_view: '같은 입장',
@@ -140,9 +161,7 @@ export default function CanvaDashboard({analysis, researchResults, biasArticleCo
   const partial = analysis?.status === 'partial';
   const pendingReasons:string[]=[];
   if(analysis?.mode==='live'&&!stale){
-    if(scores.bias.status==='pending')pendingReasons.push(availability?.biasModelReady===false
-      ?'편향: 비교 모델과 검토 기사 자료를 준비 중이에요.'
-      :'편향: 같은 명제의 비교 기사나 모델 검증 조건이 부족해요. 매체 좌표에서 준비 상태를 확인해 주세요.');
+    if(scores.bias.status==='pending')pendingReasons.push(biasPendingText(bias,availability));
     if(scores.stimulation.status==='pending')pendingReasons.push('자극: 표현을 판단할 수 있는 분석 결과가 부족해요. 분석근거에서 미판정 문장을 확인해 주세요.');
     if(scores.reliability.status==='pending'){
       const reasons=[...new Set(weightedObserved.flatMap(claim=>claim.status==='weighted_evidence_available'?[]:[weightedPendingLabels[claim.status]]))];
@@ -234,7 +253,10 @@ export default function CanvaDashboard({analysis, researchResults, biasArticleCo
                     <MapPinned size={18} aria-hidden="true" /> 좌표 보기
                   </button>
                 ) : null}
-                <small className="cv3-axis-caption">{measured ? `${bias.directionLabel ?? '방향 유보'} · ${bias.eligiblePublisherCount}개 매체 기준` : `상대 매체 좌표 · 기사 모델 대기`}</small>
+                <small className="cv3-axis-caption">{measured ? `${bias.directionLabel ?? (bias.reason === 'within_uncertainty' ? '평가 오차 이내 · 방향 유보' : '방향 유보')} · ${bias.eligiblePublisherCount}개 매체 기준`
+                  : availability?.biasModelReady === false ? '검증 모델 미공개 · 계산 대기'
+                  : bias.reason === 'insufficient_publisher_samples' ? `적격 매체 ${bias.eligiblePublisherCount}/${bias.minEligiblePublishers}곳 · 계산 대기`
+                  : '상대 매체 좌표 · 기사 모델 대기'}</small>
               </li>
               <li className="cv3-axis cv3-axis-expression">
                 <span className="cv3-axis-label">자극</span>
