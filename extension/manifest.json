@@ -1,7 +1,7 @@
 {
   "manifest_version":3,
   "name":"내 정보 맑음? — 기사 선택 분석",
-  "version":"0.2.0",
+  "version":"0.2.1",
   "description":"선택 글을 확인한 뒤 공개 사이트의 작은 창 또는 웹 화면에서 분석합니다.",
   "permissions":["activeTab","scripting"],
   "action":{"default_popup":"popup.html"}

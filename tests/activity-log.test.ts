@@ -49,7 +49,7 @@ describe('extension handoff', () => {
   });
   it('sends only the explicit selection in a fragment to the fixed public site',async()=>{
     const {nodes,createTab,createWindow}=await extension('선택한 공개 글');
-    await nodes.popup.callbacks.click();expect(createWindow).toHaveBeenCalledWith({url:'https://naeinfo-clear-code2026.civilsquid9.chatgpt.site/popup#selection='+encodeURIComponent('선택한 공개 글'),type:'popup',width:580,height:840});
+    await nodes.popup.callbacks.click();expect(createWindow).toHaveBeenCalledWith({url:'https://naeinfo-clear-code2026.mseohyeon190.chatgpt.site/popup#selection='+encodeURIComponent('선택한 공개 글'),type:'popup',width:580,height:840});
     expect(createTab).not.toHaveBeenCalled();await nodes.open.callbacks.click();expect(createTab.mock.calls[0][0].url).toContain('/analyze#selection=');
   });
 });

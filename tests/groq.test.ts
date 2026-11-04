@@ -10,6 +10,11 @@ const schema=z.object({message:z.string()}).strict();
 const response=(content:unknown,finish_reason='stop')=>Response.json({choices:[{finish_reason,message:{content:typeof content==='string'?content:JSON.stringify(content)}}],usage:{total_tokens:123}});
 afterEach(()=>vi.unstubAllGlobals());
 describe('Groq 단일 요청 경로와 무료 경계',()=>{
+ it.each([401,429,503])('오류 응답 스트림을 닫고 재시도하지 않는다 (%s)',async status=>{
+  const cancel=vi.fn(),stream=new ReadableStream({cancel}),fetch=vi.fn().mockResolvedValue(new Response(stream,{status}));vi.stubGlobal('fetch',fetch);
+  await expect(structured({...config,onRateLimit:async()=>{}},schema,'분석',{},new AbortController().signal)).rejects.toMatchObject({status:status===401?503:status});
+  expect(cancel).toHaveBeenCalledTimes(1);expect(fetch).toHaveBeenCalledTimes(1);
+ });
  it('키·계정 조건·무료 요금제·허용 모델이 모두 필요하다',()=>{
   expect(providerReady(config)).toBe(true);
   for(const c of [{...config,GROQ_API_KEY:undefined},{...config,GROQ_ELIGIBILITY_CONFIRMED:'false'},{...config,GROQ_FREE_PLAN_CONFIRMED:'false'},{...config,GROQ_MODEL:'paid-or-unknown'}])expect(providerReady(c)).toBe(false);

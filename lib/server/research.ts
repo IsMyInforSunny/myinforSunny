@@ -8,7 +8,7 @@ import {structured} from './language';
 import {validateVerifyInput,verify} from './verify';
 import {searchNews} from './news';
 import {allowedUrl,retrieve} from './retrieval';
-import {reserveSearch} from './search-budget';
+import {isSearchLockBusy,releaseSearch,reserveSearch} from './search-budget';
 import {digest,readResearchToken,signResearchToken} from './research-token';
 import {normalizeSourceUrl,selectDiverseSources} from '../source-quality';
 import {releasedBiasModel} from '../bias-model-release';
@@ -134,8 +134,12 @@ export async function discoverEvidence(request:Request,input:ResearchInput,planT
  const position=comparisonTarget(input);const claim=[...input.claims,...(position?[position]:[])].find(c=>c.id===query.claimId);
  if(!claim)throw new AppError(422,'VALIDATION_ERROR','조사할 주장이나 비교 명제를 찾을 수 없습니다.');
  const attempts:ResearchAttempt[]=[];const references:RetrievedEvidence[]=[];
- await reserveSearch(request,config,await digest({planId:plan.planId,queryIndex}));
- const result=await searchNews(query.query,config,signal);
+ const reservationId=await digest({planId:plan.planId,queryIndex});
+ await reserveSearch(request,config,reservationId);
+ let result:Awaited<ReturnType<typeof searchNews>>;
+ // Only the pre-dispatch lock failure frees the reservation; no automatic retry.
+ try{result=await searchNews(query.query,config,signal);}
+ catch(e){if(isSearchLockBusy(e))await releaseSearch(request,config,reservationId);throw e;}
  attempts.push({stage:'search',query:query.query,status:result.articles.length?'completed':'empty'});
  const hosts=config.ALLOWED_RETRIEVAL_HOSTS!.split(',').map(h=>h.trim()).filter(Boolean);
  // Prefer a different publisher while retaining exact allowlist checks and a two-fetch ceiling.

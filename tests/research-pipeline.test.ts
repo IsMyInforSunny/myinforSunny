@@ -9,12 +9,22 @@ import {planResearch,discoverEvidence,compareEvidence,researchExcerpt} from '../
 import type {RuntimeConfig} from '../lib/server/config';
 import {verifiedRecommendations,reliabilityReview} from '../lib/reliability';
 import {makeSources} from '../lib/domain';
+import {AppError} from '../lib/server/errors';
 const request=()=>new Request('https://site.test/api/research',{headers:{'cf-connecting-ip':'192.0.2.1'}});
 const config:RuntimeConfig={AI_PROVIDER:'groq',ENABLE_LIVE_ANALYSIS:'true',GROQ_API_KEY:'synthetic-only-not-real',GROQ_MODEL:'openai/gpt-oss-120b',GROQ_ELIGIBILITY_CONFIRMED:'true',GROQ_FREE_PLAN_CONFIRMED:'true',GROQ_CONSOLE_LIMITS_CONFIRMED:'true',GROQ_CONSOLE_RPD:'1000',GROQ_CONSOLE_TPD:'200000',ENABLE_NEWS_SEARCH:'true',NEWS_TERMS_APPROVED:'true',ALLOWED_RETRIEVAL_HOSTS:'news.example',DB:{} as D1Database};
 const input=():ResearchInput=>{const a=demoAnalysis('conflict');return {sources:a.sources,claims:a.claims.filter(c=>c.kind==='factual').slice(0,1),transmissionConsent:true,researchConsent:true};};
 afterEach(()=>vi.restoreAllMocks());
 function planner(i:ResearchInput){return vi.spyOn(language,'structured').mockResolvedValue({queries:[{claimId:i.claims[0].id,label:'운영 시간',query:'school library closing time',purpose:'fact_check'}]});}
 describe('자동 조사 단계 연결 (모의 검색·모의 LLM, 실서비스 검증 아님)',()=>{
+ it.each(['SEARCH_LOCK_BUSY','SEARCH_RATE_LIMITED','SEARCH_UNAVAILABLE'])('예약 복원은 실제 전송 전 잠금 실패에만 적용한다 (%s)',async code=>{
+  const i=input();planner(i);const plan=await planResearch(request(),i,config,AbortSignal.timeout(1000));
+  const reserve=vi.spyOn(searchBudget,'reserveSearch').mockResolvedValue(undefined),release=vi.spyOn(searchBudget,'releaseSearch').mockResolvedValue(undefined);
+  const search=vi.spyOn(news,'searchNews').mockRejectedValue(new AppError(429,code,'공개 합성 오류'));
+  await expect(discoverEvidence(request(),i,plan.token,0,config,AbortSignal.timeout(1000))).rejects.toMatchObject({code});
+  expect(search).toHaveBeenCalledTimes(1);
+  if(code==='SEARCH_LOCK_BUSY')expect(release).toHaveBeenCalledWith(expect.any(Request),config,reserve.mock.calls[0][2]);
+  else expect(release).not.toHaveBeenCalled();
+ });
  it('한국어 기관명·핵심어를 계획 토큰부터 실제 검색 호출까지 보존한다',async()=>{
   const i=input(),query='통계청 도서관 운영 2025'.normalize('NFD');
   const llm=vi.spyOn(language,'structured').mockResolvedValue({queries:[{claimId:i.claims[0].id,label:'운영 시간',query,purpose:'fact_check'}]});

@@ -1,4 +1,4 @@
-const SITE_ORIGIN = 'https://naeinfo-clear-code2026.civilsquid9.chatgpt.site';
+const SITE_ORIGIN = 'https://naeinfo-clear-code2026.mseohyeon190.chatgpt.site';
 const MAX_SELECTION = 2000;
 const preview = document.getElementById('preview'), status = document.getElementById('status'), count = document.getElementById('count');
 function updateCount() { count.textContent = `${preview.value.length.toLocaleString()} / ${MAX_SELECTION.toLocaleString()}자`; }

@@ -3,7 +3,7 @@ async page => {
  const check=(ok,message)=>{if(!ok)throw new Error(message);};
  const sample=await (await page.request.post(origin+'/api/analyze',{data:{kind:'demo',fixtureId:'supported'}})).json();
  const fixture=await (await page.request.post(origin+'/api/verify',{data:{kind:'demo',fixtureId:'supported'}})).json();
- const analysis={...sample,mode:'live',analysisId:'direct-browser-mock',requestId:'direct-browser-mock',createdAt:new Date(Date.now()-120000).toISOString()};
+ const analysis={...sample,mode:'live',analysisId:'direct-browser-mock',requestId:'direct-browser-mock',proposition:'학교 도서관 운영 시간을 늘려야 한다.',createdAt:new Date(Date.now()-120000).toISOString()};
  const review={...fixture,mode:'live',createdAt:new Date().toISOString(),references:fixture.references.map((r,i)=>({...r,provenance:'web_fetched',url:`https://news.example/public-${i}`,fetchedAt:new Date().toISOString()}))};
  const log=[],operations=[];let hold=false,release;
  const capability={live:true,webSearch:false,webFetch:true,directFetch:true,rubricVersion:'browser-mock',limits:{body:2000,comments:5,comment:200,claimsPerCheck:1}};
@@ -13,6 +13,7 @@ async page => {
   const data=route.request().postDataJSON();operations.push(data.operation);
   if(data.operation==='import'){
    check(data.input.researchConsent===true&&data.input.transmissionConsent===true,'missing consent');
+   check(data.input.proposition===analysis.proposition,'Direct URL intake lost the comparison proposition');
    if(hold)await new Promise(resolve=>{release=resolve;});
    try{await route.fulfill({json:{schemaVersion:'evidence-1.0',token:'synthetic-evidence',references:review.references,attempts:[]}});}catch{}return;
   }
@@ -47,6 +48,17 @@ async page => {
   check(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),'375px overflow');
   await direct.screenshot({path:'output/playwright/direct-evidence-375.png'});
   log.push('375px layout has no horizontal page overflow');
+  await urls.fill('https://news.example/fourth');await consent.check();await direct.getByRole('button',{name:'기사 본문 가져와 대조하기'}).click();
+  await direct.getByRole('button',{name:'주소 자료 대조 취소'}).waitFor();
+  await page.keyboard.press('Escape');await page.getByRole('button',{name:/^기사 (입력하기|다시 입력)$/}).click();
+  const body=page.getByRole('textbox',{name:'본문 필수'});const original=await body.inputValue();
+  await body.fill(original+' 추가 가상 문장.');await page.keyboard.press('Escape');
+  await page.getByRole('button',{name:'분석근거 표시',exact:true}).click();
+  await direct.getByText('기사 주소의 본문 취득은 연결 준비 중입니다.',{exact:false}).waitFor();
+  release?.();
+  check(JSON.parse(await page.locator('.export-preview pre').textContent()).research.stage==='cancelled','Changed input left direct research running');
+  check(operations.filter(op=>op==='compare').length===1,'Changed input triggered late model comparison');
+  log.push('input edits cancel direct intake and leave no active investigation or late comparison');
   return {scope:'intercepted browser responses only; zero external inference/search calls',operations,passed:log};
  }finally{
   release?.();await page.unroute('**/api/capabilities');await page.unroute('**/api/analyze');await page.unroute('**/api/research');await page.goto(origin);

@@ -1,0 +1,21 @@
+
+ RUN  v5.0.5 C:/Users/pp/Desktop/대회/디지털 새싹/디지털새싹_cmd/.sites-runtime/github-sync/.sites-runtime/publish-2230
+
+node : (node:30584) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` inste
+ad.
+위치 줄:2 문자:261
++ ... TEXITCODE}; node node_modules/vitest/vitest.mjs run --exclude tests/c ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ((node:30584) [D...oks()` instead.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+ Test Files  54 passed | 1 skipped (55)
+      Tests  669 passed | 13 skipped (682)
+   Start at  12:37:12
+   Duration  13.09s (import 47%, tests 46%, transform 4%, worker 2%)
+
+    Isolate  55 workers spawned · ~482ms startup each (spawn + environment, per file)
+             at least ~3.31s faster with isolate: false — reuses workers across files instead of one per file
+

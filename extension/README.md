@@ -7,7 +7,7 @@ Chromium 개발자 모드에서 이 폴더를 ‘압축해제된 확장’으로
 3. ‘작은 분석 창’ 또는 ‘전체 웹 화면’을 선택합니다.
 4. 공개 사이트의 같은 Workbench가 열립니다. 실시간 AI 분석은 사이트에서 전송 동의를 확인하고 분석 버튼을 눌러야 시작합니다.
 
-대상은 고정된 `https://naeinfo-clear-code2026.civilsquid9.chatgpt.site`의 `/popup` 및 `/analyze`입니다. localhost 서버는 필요하지 않습니다. 웹에서도 `/popup`을 직접 열 수 있습니다.
+대상은 현재 공개 사이트 `https://naeinfo-clear-code2026.mseohyeon190.chatgpt.site`의 `/popup` 및 `/analyze`입니다. localhost 서버는 필요하지 않습니다. 웹에서도 `/popup`을 직접 열 수 있습니다.
 
 선택 글만 주소 조각(`#selection`)으로 전달하며 쿼리에 넣지 않습니다. 사이트에서 주소 조각을 즉시 지우지만, 브라우저 이동 기록에 잠시 포함될 수 있으므로 민감한 자료에는 사용하지 마세요. 사이트 제목·주소·열람 이력·계정 쿠키는 수집하지 않습니다.
 

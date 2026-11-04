@@ -31,6 +31,7 @@ export const groqProvider:StructuredProvider={id:'groq',async generate(request,c
     });
   }catch{throw new AppError(callSignal.aborted?504:503,callSignal.aborted?'TIMEOUT':'PROVIDER_UNAVAILABLE',callSignal.aborted?'분석 시간이 초과되었거나 취소되었습니다.':'무료 AI 서비스에 연결하지 못했습니다.',true);}
   if(!response.ok){
+   try{
     if(response.status===429){await config.onRateLimit?.(retrySeconds(response.headers));throw new AppError(429,'RATE_LIMITED','무료 AI 요청·토큰 한도에 도달했습니다. 안내된 시간이 지난 뒤 다시 이용해 주세요.',true);}
     if(response.status===400){
       const error=await response.json().catch(()=>null) as {error?:{code?:unknown}}|null;
@@ -38,6 +39,7 @@ export const groqProvider:StructuredProvider={id:'groq',async generate(request,c
     }
     // No raw provider message is exposed or logged.
     throw providerFailure(response.status);
+   }finally{await response.body?.cancel().catch(()=>{});}
   }
   const data=await response.json().catch(()=>null) as {usage?:{total_tokens?:number};choices?:{finish_reason?:string;message?:{content?:unknown;refusal?:unknown}}[]}|null;
   const usage=data?.usage?.total_tokens;

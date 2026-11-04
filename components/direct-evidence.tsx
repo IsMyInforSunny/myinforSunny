@@ -6,7 +6,11 @@ import {researchWait} from '@/lib/research-runner';
 
 export default function DirectEvidence({analysis,cap,locked,onBusy,onProgress,onResult}:{analysis:Analysis;cap:Capabilities|null;locked:boolean;onBusy:(busy:boolean)=>void;onProgress:(stage:ResearchStage)=>void;onResult:(result:ResearchVerification)=>void}){
  const factual=analysis.claims.filter(c=>c.kind==='factual');
- const [claimId,setClaimId]=useState(factual[0]?.id??''),[urls,setUrls]=useState(''),[consent,setConsent]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState('');
+ const proposition=analysis.proposition?.trim()||undefined,position=proposition?undefined:analysis.claims.find(claim=>claim.kind==='opinion');
+ let comparisonId=position?.id??'comparison_position';
+ if(proposition){const ids=new Set(factual.map(claim=>claim.id));while(ids.has(comparisonId))comparisonId+='_';}
+ const targets=[...factual.map(claim=>({id:claim.id,text:`사실 주장: ${claim.text}`})),...(proposition||position?[{id:comparisonId,text:`비교 명제: ${proposition??position!.text}`}]:[])];
+ const [claimId,setClaimId]=useState(targets[0]?.id??''),[urls,setUrls]=useState(''),[consent,setConsent]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState('');
  const controller=useRef<AbortController|null>(null);
  const lastComparison=useRef(0);
  const callbacks=useRef({onBusy,onProgress,onResult});
@@ -20,12 +24,12 @@ export default function DirectEvidence({analysis,cap,locked,onBusy,onProgress,on
   return()=>clearTimeout(timer);
  },[ready]);
  async function start(){
-  if(busy||locked||!ready||!consent||!factual.some(c=>c.id===claimId))return;
+  if(busy||locked||!ready||!consent||!targets.some(target=>target.id===claimId))return;
   const selected=urls.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
   if(!selected.length||selected.length>2){setMessage('공개 기사 주소를 한 줄에 하나씩, 최대 2개 입력해 주세요.');return;}
   if(selected.some(value=>{try{const u=new URL(value);return u.protocol!=='https:'||!!u.username||!!u.password||!!u.port;}catch{return true;}})){setMessage('로그인 정보가 없는 공개 HTTPS 기사 주소를 입력해 주세요.');return;}
   const c=new AbortController();controller.current=c;setBusy(true);callbacks.current.onBusy(true);setConsent(false);
-  const input:ResearchInput={sources:analysis.sources,claims:factual,transmissionConsent:true,researchConsent:true};
+  const input:ResearchInput={sources:analysis.sources,claims:factual,proposition,position,transmissionConsent:true,researchConsent:true};
   async function post<T>(body:unknown):Promise<T>{
    const response=await fetch('/api/research',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.any([c.signal,AbortSignal.timeout(60000)])});
    const data=await response.json() as {error?:{message?:string}};if(c.signal.aborted)throw new DOMException('취소됨','AbortError');
@@ -46,13 +50,13 @@ export default function DirectEvidence({analysis,cap,locked,onBusy,onProgress,on
   finally{if(controller.current===c){controller.current=null;setBusy(false);callbacks.current.onBusy(false);}}
  }
  function cancel(){controller.current?.abort();controller.current=null;setBusy(false);setConsent(false);setMessage('자료 대조를 취소했어요.');callbacks.current.onBusy(false);callbacks.current.onProgress('cancelled');}
- if(analysis.mode==='demo'||!factual.length)return null;
+ if(analysis.mode==='demo'||!targets.length)return null;
  return <div className="check-form" aria-label="기사 주소로 근거 대조">
   <h4>기사 주소로 근거 대조</h4>
   {!ready?<p className="topic-note">기사 주소의 본문 취득은 연결 준비 중입니다. 참고자료 수동 대조에서 본문을 붙여 넣을 수 있어요.</p>:<>
-   <label className="field-label" style={{display:'block'}}>대조할 사실 주장<select aria-label="주소 자료와 대조할 주장" style={{display:'block',width:'100%',maxWidth:'100%',minWidth:0,marginTop:8,padding:8,border:'1px solid var(--line)',borderRadius:6,background:'white'}} value={claimId} disabled={busy||locked} onChange={e=>{setClaimId(e.target.value);setConsent(false);setMessage('');}}>{factual.map(claim=><option key={claim.id} value={claim.id}>{claim.text}</option>)}</select></label>
+   <label className="field-label" style={{display:'block'}}>대조할 사실 주장·비교 명제<select aria-label="주소 자료와 대조할 주장" style={{display:'block',width:'100%',maxWidth:'100%',minWidth:0,marginTop:8,padding:8,border:'1px solid var(--line)',borderRadius:6,background:'white'}} value={claimId} disabled={busy||locked} onChange={e=>{setClaimId(e.target.value);setConsent(false);setMessage('');}}>{targets.map(target=><option key={target.id} value={target.id}>{target.text}</option>)}</select></label>
    <label className="field-label" style={{display:'block'}}>공개 기사 주소 · 최대 2개<textarea aria-label="근거 기사 주소" value={urls} maxLength={4098} disabled={busy||locked} placeholder={'https://…\nhttps://…'} onChange={e=>{setUrls(e.target.value);setConsent(false);setMessage('');}}/></label>
-   <p className="topic-note">운영자가 허용한 매체의 공개 HTTPS 주소만 가져옵니다. 로그인·유료 본문·다른 주소로 이동하는 페이지는 처리하지 않습니다. 선택한 주장에는 이번에 가져온 자료를 기준으로 최신 대조 결과를 반영합니다.</p>
+   <p className="topic-note">운영자가 허용한 매체의 공개 HTTPS 주소만 가져옵니다. 로그인·유료 본문·다른 주소로 이동하는 페이지는 처리하지 않습니다. 사실 주장은 근거를 대조하고, 비교 명제는 참·거짓 대신 기사에 드러난 입장을 살펴봅니다. 선택한 대상에는 이번 자료의 최신 대조 결과를 반영합니다.</p>
    <label className="transmission-consent"><input type="checkbox" checked={consent} disabled={busy||locked} onChange={e=>setConsent(e.target.checked)}/><span>입력한 주소의 기사 본문을 가져오고, 선택한 주장과 기사 발췌를 Groq에 전송하는 데 동의합니다.</span></label>
    <button className="button secondary" type="button" disabled={busy||locked||!consent||!urls.trim()} onClick={()=>void start()}>기사 본문 가져와 대조하기</button>
    {busy&&<button className="small-button" type="button" onClick={cancel}>주소 자료 대조 취소</button>}

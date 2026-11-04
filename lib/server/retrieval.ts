@@ -5,8 +5,9 @@ import {ARTICLE_EXTRACTION_VERSION,articleTextPrefix,decodeArticleDocument,extra
 
 // The initial web adapter deliberately supports exact, operator-approved hosts only.
 // Arbitrary user URLs never become network destinations. Redirects are never followed.
+// HTTPS only: plain HTTP is rejected and never silently upgraded to HTTPS.
 export function allowedUrl(input:string,hosts:string[]):URL|null{
-  try{const url=new URL(input);if(!['https:','http:'].includes(url.protocol)||url.username||url.password||url.port||url.hostname.endsWith('.')||/^(localhost|.*\.localhost)$/i.test(url.hostname))return null;
+  try{const url=new URL(input);if(url.protocol!=='https:'||url.username||url.password||url.port||url.hostname.endsWith('.')||/^(localhost|.*\.localhost)$/i.test(url.hostname))return null;
     if(!hosts.some(h=>h.toLowerCase()===url.hostname.toLowerCase())||/^[\d.:[\]]+$/.test(url.hostname))return null;return url;
   }catch{return null;}
 }

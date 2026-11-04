@@ -36,7 +36,9 @@ export async function searchNews(query:string,config:RuntimeConfig,signal:AbortS
  const now=Date.now();
  // Atomic across Worker instances. No query text, original article, or identity is stored.
  const lock=await config.DB.prepare(`INSERT INTO provider_backoff (id,until_at) VALUES ('gdelt',?) ON CONFLICT(id) DO UPDATE SET until_at=excluded.until_at WHERE provider_backoff.until_at<=?`).bind(now+6000,now).run();
- if(!lock.meta.changes)throw new AppError(429,'SEARCH_RATE_LIMITED','기사 검색 요청이 많습니다. 잠시 기다린 후 다시 검색해 주세요.',true);
+ // Lock contention happens before any network dispatch, so callers may release the
+ // site reservation for this code only. External 429/network failures keep it.
+ if(!lock.meta.changes)throw new AppError(429,'SEARCH_LOCK_BUSY','다른 기사 검색이 진행 중입니다. 잠시 기다린 후 직접 다시 검색해 주세요.',true);
  const url=new URL(ENDPOINT);Object.entries({query:`${searchTerm} sourcelang:korean`,mode:'artlist',format:'json',maxrecords:'20',timespan:'30d',sort:'hybridrel'}).forEach(([k,v])=>url.searchParams.set(k,v));
  let response:Response;
  try{response=await fetch(url,{headers:{Accept:'application/json'},redirect:'error',signal:AbortSignal.any([signal,AbortSignal.timeout(12000)])});}

@@ -15,3 +15,11 @@ export async function reserveSearch(request:Request,config:RuntimeConfig,id:stri
  .bind(id,actor,day,now,actor,now-60000,actor,now-3600000,day).run();
  if(!result.meta.changes)throw new AppError(429,'SEARCH_RATE_LIMITED','기사 검색 요청 한도에 도달했거나 이미 처리한 조사입니다. 잠시 후 다시 시작해 주세요.',true);
 }
+/** Undo one reservation only when no provider request was dispatched (SEARCH_LOCK_BUSY).
+ * Both id and actor must match so one actor cannot free another actor's row. Never retries. */
+export async function releaseSearch(request:Request,config:RuntimeConfig,id:string){
+ if(!config.DB)return;
+ const actor=await actorHash(request,config);
+ await config.DB.prepare('DELETE FROM research_search_budget WHERE id=? AND actor=?').bind(id,actor).run();
+}
+export function isSearchLockBusy(error:unknown){return error instanceof AppError&&error.code==='SEARCH_LOCK_BUSY';}

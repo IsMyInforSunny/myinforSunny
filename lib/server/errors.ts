@@ -1,7 +1,11 @@
 export class AppError extends Error {
   constructor(public status:number,public code:string,message:string,public retryable=false,public fields?:{path:string;message:string}[]){super(message);}
 }
-export function json(data:unknown,status=200,headers:Record<string,string>={}){return Response.json(data,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...headers}});}
+export function json(data:unknown,status=200,headers:Record<string,string>={}){
+ const id=data&&typeof data==='object'&&'requestId' in data?data.requestId:undefined;
+ const requestHeader:Record<string,string>=typeof id==='string'&&/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(id)?{'X-Request-Id':id}:{};
+ return Response.json(data,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...requestHeader,...headers}});
+}
 export function errorResponse(error:unknown,requestId:string){
   if(error instanceof AppError)return json({requestId,error:{code:error.code,message:error.message,retryable:error.retryable,fields:error.fields}},error.status,error.status===429?{'Retry-After':'60'}:{});
   return json({requestId,error:{code:'INTERNAL_ERROR',message:'처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.',retryable:true}},500);
