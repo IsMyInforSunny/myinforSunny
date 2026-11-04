@@ -40,11 +40,38 @@ describe('허용 출처의 문서 해독과 본문 추출 — 모의 응답만 �
   expect(extractArticleDocument('<nav>menu</nav><main><p>학교의 공개 공지다.</p></main><footer>footer</footer>',true).text).toBe('학교의 공개 공지다.');
   expect(extractArticleDocument('<article>짧은 카드</article><article><p>첫째 문장이다.</p><article>둘째 문장이다.</article><p>셋째 문장이다.</p></article>',true).text).toBe('첫째 문장이다. 둘째 문장이다. 셋째 문장이다.');
  });
+ it('ASP.NET 문서용 form 안의 명시적 기사 본문을 보존하되 댓글 form은 제외한다',()=>{
+  const html='<form name="aspnetForm" id="aspnetForm" method="post"><nav>메뉴</nav><main><header>제목</header><article class="article_body at_contents article_view" itemprop="articleBody"><p>공개 합성 기사 첫 문장.</p><form id="comments"><label>댓글 개인정보</label><input value="private"></form><p>공개 합성 기사 마지막 문장.</p></article><aside>추천 목록</aside></main></form>';
+  expect(extractArticleDocument(html,true).text).toBe('공개 합성 기사 첫 문장. 공개 합성 기사 마지막 문장.');
+  expect(extractArticleDocument('<form name="aspnetForm" id="aspnetForm"><label>입력 양식</label></form><main>공개 본문.</main>',true).text).toBe('공개 본문.');
+  expect(extractArticleDocument('<form><article itemprop="articleBody">댓글 양식의 가짜 기사.</article></form><main>실제 본문.</main>',true).text).toBe('실제 본문.');
+ });
+ it('명시적 news_view 본문을 다른 article 카드보다 우선하고 중첩 section을 보존한다',()=>{
+  const html='<main><article>다른 기사 카드.</article><section class="news_view"><p>공개 보도 본문이다.</p><section>본문의 추가 설명이다.</section><aside>광고</aside><p>보도 마지막 문장이다.</p></section><article>추천 기사 카드.</article></main>';
+  expect(extractArticleDocument(html,true).text).toBe('공개 보도 본문이다. 본문의 추가 설명이다. 보도 마지막 문장이다.');
+  expect(extractArticleDocument('<div class="news_viewer">메뉴</div><main>실제 본문.</main>',true).text).toBe('실제 본문.');
+  expect(extractArticleDocument('<article-view class="news_view">커스텀 카드</article-view><main>실제 본문.</main>',true).text).toBe('실제 본문.');
+ });
+ it('스크립트 속 본문 표시자나 제거된 광고의 표시자를 기사로 복구하지 않는다',()=>{
+  const html='<script>const fake=`<article itemprop="articleBody">가짜</article>`;</script><form name="aspnetForm" id="aspnetForm">입력 양식</form><aside><section class="news_view">광고 문구</section></aside><main>공개 본문.</main>';
+  expect(extractArticleDocument(html,true).text).toBe('공개 본문.');
+  expect(extractArticleDocument('<section class="news_view">닫히지 않은 본문<div>다른 글</div>',true).text).toBe('');
+ });
  it('본문 속 날짜를 발행일로 추정하거나 수정일을 발행일로 바꾸지 않는다',()=>{
   expect(extractArticleDocument('<meta property="article:modified_time" content="2026-11-02"><article>2024년 운영 안내다.</article>',true).publishedAt).toBeUndefined();
   expect(extractArticleDocument('<meta property="article:published_time" content="2026-02-30"><main>공개 자료</main>',true).publishedAt).toBeUndefined();
   expect(extractArticleDocument('<meta property="article:published_time" content="2026-02-30T09:00:00+09:00"><main>공개 자료</main>',true).publishedAt).toBeUndefined();
   expect(extractArticleDocument('<meta name="date" content="2026-11-02"><main>공개 자료</main>',true).publishedAt).toBe('2026-11-02');
+ });
+ it('스크립트로만 본문을 제공하는 빈 HTML 껍데기를 취득 근거로 인정하지 않는다',async()=>{
+  const html='<!DOCTYPE html><html><head><title>공개 기사</title></head><body><script>window.article={text:"실행하면 안 되는 본문"}</script></body></html>';
+  expect(extractArticleDocument(html,true).text).toBe('');
+  vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(html,{headers:{'content-type':'text/html'}})));
+  expect(await retrieve('https://news.example/a','r1',{ALLOWED_RETRIEVAL_HOSTS:'news.example'},new AbortController().signal)).toBeNull();
+ });
+ it('중첩된 동명 ASP.NET form을 댓글 제외 규칙의 우회로로 쓰지 않는다',()=>{
+  const html='<form name="aspnetForm" id="aspnetForm"><article itemprop="articleBody">공개 본문.<form name="aspnetForm" id="aspnetForm">제외할 댓글.</form>끝 문장.</article></form>';
+  expect(extractArticleDocument(html,true).text).toBe('공개 본문. 끝 문장.');
  });
  it('일반 텍스트는 HTML이나 문자 엔티티로 재해석하지 않는다',()=>{
   expect(extractArticleDocument('  공개 문구 <예시> &amp;\n둘째 줄  ',false)).toEqual({text:'공개 문구 <예시> &amp;\n둘째 줄',title:undefined,publishedAt:undefined});

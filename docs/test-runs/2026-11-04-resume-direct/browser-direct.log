@@ -1,0 +1,60 @@
+### Result
+{"scope":"intercepted browser responses only; zero external inference/search calls","operations":["import","compare","import"],"passed":["search disabled; explicit consent; URL changes revoke consent; imported evidence reaches shared review and export","cancelled direct fetch ignores late response and makes no model comparison","375px layout has no horizontal page overflow"]}
+### Ran Playwright code
+```js
+await (async page => {
+ const origin='http://127.0.0.1:5173';
+ const check=(ok,message)=>{if(!ok)throw new Error(message);};
+ const sample=await (await page.request.post(origin+'/api/analyze',{data:{kind:'demo',fixtureId:'supported'}})).json();
+ const fixture=await (await page.request.post(origin+'/api/verify',{data:{kind:'demo',fixtureId:'supported'}})).json();
+ const analysis={...sample,mode:'live',analysisId:'direct-browser-mock',requestId:'direct-browser-mock',createdAt:new Date(Date.now()-120000).toISOString()};
+ const review={...fixture,mode:'live',createdAt:new Date().toISOString(),references:fixture.references.map((r,i)=>({...r,provenance:'web_fetched',url:`https://news.example/public-${i}`,fetchedAt:new Date().toISOString()}))};
+ const log=[],operations=[];let hold=false,release;
+ const capability={live:true,webSearch:false,webFetch:true,directFetch:true,rubricVersion:'browser-mock',limits:{body:2000,comments:5,comment:200,claimsPerCheck:1}};
+ await page.route('**/api/capabilities',route=>route.fulfill({json:capability}));
+ await page.route('**/api/analyze',route=>route.request().postDataJSON().kind==='demo'?route.continue():route.fulfill({json:analysis}));
+ await page.route('**/api/research',async route=>{
+  const data=route.request().postDataJSON();operations.push(data.operation);
+  if(data.operation==='import'){
+   check(data.input.researchConsent===true&&data.input.transmissionConsent===true,'missing consent');
+   if(hold)await new Promise(resolve=>{release=resolve;});
+   try{await route.fulfill({json:{schemaVersion:'evidence-1.0',token:'synthetic-evidence',references:review.references,attempts:[]}});}catch{}return;
+  }
+  check(data.operation==='compare','Unexpected automatic search/planning request');
+  await route.fulfill({json:review});
+ });
+ try{
+  await page.goto(origin);await page.getByRole('button',{name:/^기사 (입력하기|다시 입력)$/}).click();
+  await page.getByRole('textbox',{name:'본문 필수'}).fill(sample.sources.find(s=>s.kind==='body').text);
+  await page.getByRole('checkbox',{name:/가상 또는 사용 가능한 공개 자료/}).check();
+  await page.getByRole('button',{name:'정보 성분표 만들기',exact:true}).click();
+  await page.getByRole('button',{name:'분석근거 표시',exact:true}).click();
+  const direct=page.locator('[aria-label="기사 주소로 근거 대조"]');
+  const urls=direct.getByRole('textbox',{name:'근거 기사 주소'}),consent=direct.getByRole('checkbox');
+  await urls.fill('https://news.example/first');await consent.check();
+  await urls.fill('https://news.example/second');check(!await consent.isChecked(),'URL edit retained consent');
+  check(await direct.getByRole('button',{name:'기사 본문 가져와 대조하기'}).isDisabled(),'Missing consent allowed fetch');
+  await consent.check();await direct.getByRole('button',{name:'기사 본문 가져와 대조하기'}).click();
+  await direct.getByRole('status').filter({hasText:'선택한 자료의 대조를 마쳤어요.'}).waitFor();
+  check(JSON.stringify(operations)===JSON.stringify(['import','compare']),'Wrong operation sequence');
+  const exported=JSON.parse(await page.locator('.export-preview pre').textContent());
+  check(exported.research.completedClaims===1,'Fetched review not connected to shared results');
+  check(exported.scores.bias.status==='pending','Direct fetch created a fake bias score');
+  log.push('search disabled; explicit consent; URL changes revoke consent; imported evidence reaches shared review and export');
+  hold=true;await urls.fill('https://news.example/third');await consent.check();await direct.getByRole('button',{name:'기사 본문 가져와 대조하기'}).click();
+  await direct.getByRole('button',{name:'주소 자료 대조 취소'}).waitFor();
+  await direct.getByRole('button',{name:'주소 자료 대조 취소'}).click();release?.();
+  await direct.getByRole('status').filter({hasText:'자료 대조를 취소했어요.'}).waitFor();
+  check(operations.filter(op=>op==='compare').length===1,'Late import triggered compare');
+  log.push('cancelled direct fetch ignores late response and makes no model comparison');
+  await page.setViewportSize({width:375,height:812});
+  check(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),'375px overflow');
+  await direct.screenshot({path:'output/playwright/direct-evidence-375.png'});
+  log.push('375px layout has no horizontal page overflow');
+  return {scope:'intercepted browser responses only; zero external inference/search calls',operations,passed:log};
+ }finally{
+  release?.();await page.unroute('**/api/capabilities');await page.unroute('**/api/analyze');await page.unroute('**/api/research');await page.goto(origin);
+ }
+}
+)(page);
+```

@@ -15,12 +15,15 @@ import {releasedBiasModel} from '../bias-model-release';
 import {inferBiasCoordinate,isBiasTrainingArticle,compactBiasPrediction} from '../bias-model';
 import {reviewCitedSources} from '../cited-sources';
 import {canonicalPublisherHost} from '../source-reliability';
+import {actorHash} from './budget';
 
 type PlanData={planId:string;inputDigest:string;queries:ResearchQuery[];expiresAt:string};
 type EvidenceData={planId:string;inputDigest:string;claimId:string;references:RetrievedEvidence[];attempts:ResearchAttempt[];expiresAt:string};
 export function researchReady(c:RuntimeConfig){return capabilities(c).live&&capabilities(c).webSearch&&!!c.ALLOWED_RETRIEVAL_HOSTS?.trim();}
 export function requireResearch(c:RuntimeConfig){if(!researchReady(c))throw new AppError(503,'RESEARCH_UNAVAILABLE','자동 신뢰성 조사와 기사 검색은 아직 연결 준비 중입니다. 본문 분석과 예시 체험은 이용할 수 있어요.');}
+export function requireEvidence(c:RuntimeConfig){const ready=capabilities(c);if(!ready.live||!ready.webFetch)throw new AppError(503,'RESEARCH_UNAVAILABLE','공개 기사 본문 연결은 아직 준비 중입니다. 붙여 넣은 참고자료는 수동 대조할 수 있어요.');}
 export function validateResearch(input:ResearchInput){
+ if(input.transmissionConsent!==true||input.researchConsent!==true)throw new AppError(422,'VALIDATION_ERROR','분석과 자료 조사 전송에 동의해 주세요.');
  validateVerifyInput({kind:'text',sources:input.sources,claims:input.claims,references:[],useWebSearch:false});
  if(input.sources.reduce((n,s)=>n+s.sentences.length,0)>24)throw new AppError(422,'VALIDATION_ERROR','원문 처리 단위가 너무 많습니다.');
  if(input.claims.some(c=>c.kind!=='factual'))throw new AppError(422,'VALIDATION_ERROR','사실 주장만 신뢰성 조사 대상으로 선택해 주세요.');
@@ -73,6 +76,55 @@ export function researchExcerpt(text:string,claim:string,limit=1500){
  let end=Math.min(text.length,best+limit);if(end<text.length&&/[\uD800-\uDBFF]/.test(text[end-1]))end--;
  return {text:text.slice(best,end),start:best,end};
 }
+/** Keep complete-document model checks identical for search and direct URL intake. */
+async function evidenceSource(fetched:NonNullable<Awaited<ReturnType<typeof retrieve>>>,url:string,title:string,publisherDomain:string,input:ResearchInput,claimText:string,fallbackVersion:string):Promise<RetrievedEvidence>{
+ const biasModel=releasedBiasModel;
+ if(biasModel&&!fetched.truncated&&(input.proposition?input.proposition===biasModel.comparisonGroup:claimText===biasModel.comparisonGroup)
+   &&!await isBiasTrainingArticle(biasModel,url,fetched.text)){
+  const classifier=inferBiasCoordinate(biasModel,fetched.text);
+  const compact=classifier?compactBiasPrediction(biasModel,classifier.coordinate):null;
+  if(compact)fetched.biasPrediction=compact;
+ }
+ return {...fetched,provenance:'web_fetched',url,title:fetched.title||title,fetchedAt:fetched.fetchedAt!,publisherDomain,contentDigest:await digest(fetched.text),retrievedTextLength:fetched.text.length,retrievedTruncated:fetched.truncated,excerptStart:0,excerptEnd:fetched.text.length,fullTextLength:fetched.fullTextLength??fetched.text.length,extractionVersion:fetched.extractionVersion??fallbackVersion};
+}
+/** User-selected URLs use the same signed evidence path without a search/model call. */
+export async function importEvidence(request:Request,input:ResearchInput,claimId:string,urls:string[],config:RuntimeConfig,signal:AbortSignal):Promise<EvidenceBundle>{
+ requireEvidence(config);validateResearch(input);
+ if(config.ENABLE_DIRECT_FETCH!=='true'||config.NEWS_TERMS_APPROVED!=='true')throw new AppError(503,'RESEARCH_UNAVAILABLE','직접 기사 연결은 아직 준비 중입니다.');
+ const position=comparisonTarget(input);const claim=[...input.claims,...(position?[position]:[])].find(c=>c.id===claimId);
+ if(!claim||!Array.isArray(urls)||urls.length<1||urls.length>2)throw new AppError(422,'VALIDATION_ERROR','조사할 주장과 최대 두 개의 기사 주소를 확인해 주세요.');
+ const hosts=config.ALLOWED_RETRIEVAL_HOSTS!.split(',').map(h=>h.trim()).filter(Boolean);
+ const targets:{url:string;identity:string;host:string}[]=[];
+ for(const url of urls){
+  let decoded:string;try{decoded=decodeURIComponent(url);}catch{throw new AppError(422,'VALIDATION_ERROR','기사 주소 형식을 확인해 주세요.');}
+  if(containsContactInfo(decoded))throw new AppError(422,'PRIVACY_INPUT_REJECTED','기사 주소에서 개인 연락처를 지워 주세요.');
+  const permitted=allowedUrl(url,hosts);
+  if(!permitted||permitted.protocol!=='https:')throw new AppError(422,'VALIDATION_ERROR','본문 취득이 허용된 공개 HTTPS 기사 주소만 연결할 수 있습니다.');
+  const normalized=normalizeSourceUrl(permitted.href),host=canonicalPublisherHost(normalized.host??permitted.hostname);
+  const identity=new URL(normalized.url??permitted.href);identity.hostname=host;
+  targets.push({url:permitted.href,identity:identity.href,host});
+ }
+ const inputDigest=await inputHash(input);
+ const identities=[...new Set(targets.map(t=>t.identity))].sort();
+ await reserveSearch(request,config,await digest({purpose:'direct_evidence',actor:await actorHash(request,config),inputDigest,claimId,urls:identities}),Date.now(),'fetch');
+ const attempts:ResearchAttempt[]=[],fullSources:RetrievedEvidence[]=[],seen=new Set<string>();
+ for(const target of targets){
+  if(seen.has(target.identity)){attempts.push({stage:'fetch',url:target.url,status:'disallowed',reason:'같은 기사 주소의 중복 후보라 다시 취득하지 않았습니다.'});continue;}
+  seen.add(target.identity);
+  try{
+   const fetched=await retrieve(target.url,`direct_${fullSources.length}_${seen.size}`,config,signal);
+   if(!fetched){attempts.push({stage:'fetch',url:target.url,status:'inaccessible',reason:'공개 본문을 취득하지 못했습니다.'});continue;}
+   fullSources.push(await evidenceSource(fetched,target.url,'공개 기사',target.host,input,claim.text,'allowlisted-text-1.0'));
+   attempts.push({stage:'fetch',url:target.url,status:'completed'});
+  }catch{if(signal.aborted)throw new AppError(408,'REQUEST_ABORTED','조사를 취소했거나 제한 시간이 지났습니다.');attempts.push({stage:'fetch',url:target.url,status:'failed',reason:'자료 본문에 연결하지 못했습니다.'});}
+ }
+ const selection=selectDiverseSources(fullSources,2);
+ const references=selection.selected.map(source=>{const excerpt=researchExcerpt(source.text,claim.text);return {...source,text:excerpt.text,excerptStart:excerpt.start,excerptEnd:excerpt.end,truncated:source.truncated||excerpt.text.length<source.text.length};});
+ for(const skipped of selection.skipped)if(skipped.reason==='duplicate_of_selected')attempts.push({stage:'fetch',url:fullSources.find(s=>s.id===skipped.id)?.url,status:'disallowed',reason:'동일·유사 본문은 추가 독립 근거로 세지 않았습니다.'});
+ const planId=crypto.randomUUID(),expiresAt=new Date(Date.now()+30*60000).toISOString();
+ const data:EvidenceData={planId,inputDigest,claimId,references,attempts,expiresAt};
+ return {schemaVersion:'evidence-1.0',planId,claimId,references,attempts,expiresAt,token:await signResearchToken(request,config,'evidence',data)};
+}
 /** Only signed plan queries can reach the fixed search endpoint. Publisher fetches remain allowlisted. */
 export async function discoverEvidence(request:Request,input:ResearchInput,planToken:string,queryIndex:number,config:RuntimeConfig,signal:AbortSignal):Promise<EvidenceBundle>{
  requireResearch(config);validateResearch(input);
@@ -107,15 +159,7 @@ export async function discoverEvidence(request:Request,input:ResearchInput,planT
   try{
    const fetched=await retrieve(article.url,`web_${queryIndex}_${fetches++}`,config,signal);
    if(!fetched){attempts.push({stage:'fetch',url:article.url,status:'inaccessible',reason:'공개 본문을 취득하지 못했습니다.'});continue;}
-   // Predict before excerpting, only in the reviewed model's exact subject scope.
-   const biasModel=releasedBiasModel;
-   if(biasModel&&!fetched.truncated&&(input.proposition?input.proposition===biasModel.comparisonGroup:claim.text===biasModel.comparisonGroup)
-     &&!await isBiasTrainingArticle(biasModel,article.url,fetched.text)){
-    const classifier=inferBiasCoordinate(biasModel,fetched.text);
-    const compact=classifier?compactBiasPrediction(biasModel,classifier.coordinate):null;
-    if(compact)fetched.biasPrediction=compact;
-   }
-   fullSources.push({...fetched,provenance:'web_fetched',url:article.url,title:fetched.title||article.title,fetchedAt:fetched.fetchedAt!,publisherDomain:article.publisherDomain,contentDigest:await digest(fetched.text),retrievedTextLength:fetched.text.length,retrievedTruncated:fetched.truncated,excerptStart:0,excerptEnd:fetched.text.length,fullTextLength:fetched.fullTextLength??fetched.text.length,extractionVersion:fetched.extractionVersion??(result.provider==='firecrawl'?'firecrawl-markdown-1.0':'allowlisted-text-1.0')});
+   fullSources.push(await evidenceSource(fetched,article.url,article.title,article.publisherDomain,input,claim.text,result.provider==='firecrawl'?'firecrawl-markdown-1.0':'allowlisted-text-1.0'));
    attempts.push({stage:'fetch',url:article.url,status:'completed'});
   }catch{if(signal.aborted)throw new AppError(408,'REQUEST_ABORTED','조사를 취소했거나 제한 시간이 지났습니다.');attempts.push({stage:'fetch',url:article.url,status:'failed',reason:'자료 본문에 연결하지 못했습니다.'});}
  }
@@ -128,12 +172,12 @@ export async function discoverEvidence(request:Request,input:ResearchInput,planT
 }
 /** Provenance comes from the signature, never from browser-supplied reference fields. */
 export async function compareEvidence(request:Request,input:ResearchInput,evidenceToken:string,config:RuntimeConfig,requestId:string,signal:AbortSignal){
- requireResearch(config);validateResearch(input);
+ requireEvidence(config);validateResearch(input);
  const bundle=await readResearchToken<EvidenceData>(request,config,evidenceToken,'evidence');
  if(bundle.inputDigest!==await inputHash(input))throw new AppError(422,'RESEARCH_INPUT_CHANGED','입력이 바뀌었습니다. 다시 조사를 시작해 주세요.');
  const position=comparisonTarget(input);const claim=input.claims.find(c=>c.id===bundle.claimId)??(position?.id===bundle.claimId?position.claim:undefined);
  if(!claim&&position?.id!==bundle.claimId)throw new AppError(422,'VALIDATION_ERROR','조사한 주장이나 비교 명제를 찾을 수 없습니다.');
  if(!bundle.references.length)throw new AppError(422,'RESEARCH_NO_EVIDENCE','대조할 공개 기사 본문을 확보하지 못했습니다. 자료가 없다는 뜻이 거짓이라는 뜻은 아닙니다.');
  const result=await verify({kind:'text',sources:input.sources,claims:claim?[claim]:[],references:[],useWebSearch:false},config,requestId,signal,bundle.references,position?.text);
- return {...result,attempts:bundle.attempts,versions:{...result.versions,retriever:'signed-research-1.0'},warnings:[...result.warnings,{code:'RESEARCH_SCOPE',message:'검색·본문 취득이 가능한 출처의 짧은 발췌만 대조했습니다. 기사 전체나 모든 관점을 검증한 결과가 아닙니다.'}]};
+ return {...result,attempts:bundle.attempts,versions:{...result.versions,retriever:'signed-research-1.0'},warnings:[...result.warnings,{code:'RESEARCH_SCOPE',message:bundle.attempts.some(a=>a.stage==='search')?'검색·본문 취득이 가능한 출처의 짧은 발췌만 대조했습니다. 기사 전체나 모든 관점을 검증한 결과가 아닙니다.':'직접 연결한 공개 기사의 짧은 발췌만 대조했습니다. 자동 검색이나 기사 전체·모든 관점의 검증 결과가 아닙니다.'}]};
 }

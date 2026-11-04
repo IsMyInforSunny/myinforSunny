@@ -63,7 +63,7 @@ export type Outcome = z.infer<typeof outcomeSchema>;
 export type EvidenceRelation = { referenceId:string;quote:string;start:number;end:number;relation:'supports'|'contradicts'|'context';explanation:string };
 export type Check = { claimId:string;outcome:Outcome;execution:'completed'|'failed'|'skipped';relations:EvidenceRelation[];explanation:string;temporalFit:'matched'|'mismatched'|'unclear';limitations:string[] };
 export type Verification = {schemaVersion:'2.1';requestId:string;parentAnalysisId?:string;mode:'demo'|'live';status:'success'|'partial';versions:{rubric:string;prompt:string;model:string;retriever:string};scope:'provided_text'|'retrieved_documents'|'mixed';references:Reference[];checks:Check[];attempts:{url?:string;query?:string;status:string;reason?:string}[];warnings:{code:string;message:string}[];createdAt:string};
-export type Capabilities = {searchProvider?:'gdelt'|'firecrawl';live:boolean;webSearch:boolean;webFetch:boolean;rubricVersion:string;limits:{body:number;comments:number;comment:number;claimsPerCheck:number};reason?:string};
+export type Capabilities = {searchProvider?:'gdelt'|'firecrawl';live:boolean;webSearch:boolean;webFetch:boolean;directFetch?:boolean;rubricVersion:string;limits:{body:number;comments:number;comment:number;claimsPerCheck:number};reason?:string};
 
 // Model output is a proposal: offsets and final indicators are always server-owned.
 const quoteCandidate=z.object({sentenceId:id,quote:text(8000)}).strict();

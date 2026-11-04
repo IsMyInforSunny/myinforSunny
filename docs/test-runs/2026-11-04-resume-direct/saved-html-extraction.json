@@ -1,0 +1,32 @@
+{
+  "scope": "offline saved public HTML; no network, no full text exported",
+  "results": [
+    {
+      "name": "ohmy",
+      "length": 2035,
+      "title": "국민연금, 올해 국내주식 목표 비중 14.9%→20.8% 대폭 확대",
+      "date": "2026-05-28T11:13:00.000Z",
+      "hasTopic": true,
+      "hasTarget": true,
+      "empty": false
+    },
+    {
+      "name": "donga",
+      "length": 1255,
+      "title": "국민연금 ‘코스피 매도 폭탄’ 피했다…국내주식 목표 비중 상향",
+      "date": "2026-05-28T09:26:00.000Z",
+      "hasTopic": true,
+      "hasTarget": true,
+      "empty": false
+    },
+    {
+      "name": "chosun",
+      "length": 0,
+      "title": "국민연금, 국내 주식 투자 비율 14.9%에서 20.8%로 상향",
+      "date": "2026-05-28T09:04:59.189Z",
+      "hasTopic": false,
+      "hasTarget": false,
+      "empty": true
+    }
+  ]
+}

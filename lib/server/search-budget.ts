@@ -3,8 +3,8 @@ import {actorHash} from './budget';
 import {AppError} from './errors';
 // Site safety caps, not a claim about the search provider's published allowance.
 export const SEARCH_REQUESTS_PER_MINUTE=3,SEARCH_REQUESTS_PER_HOUR=20,SEARCH_REQUESTS_PER_DAY=200;
-export async function reserveSearch(request:Request,config:RuntimeConfig,id:string,now=Date.now()){
- if(!config.DB||config.ENABLE_NEWS_SEARCH!=='true'||config.NEWS_TERMS_APPROVED!=='true')throw new AppError(503,'SEARCH_UNAVAILABLE','관련 기사 검색은 연결 준비 중입니다.');
+export async function reserveSearch(request:Request,config:RuntimeConfig,id:string,now=Date.now(),purpose:'search'|'fetch'='search'){
+ if(!config.DB||(purpose==='fetch'?config.ENABLE_DIRECT_FETCH:config.ENABLE_NEWS_SEARCH)!=='true'||config.NEWS_TERMS_APPROVED!=='true')throw new AppError(503,'SEARCH_UNAVAILABLE','관련 기사 검색은 연결 준비 중입니다.');
  const db=config.DB,actor=await actorHash(request,config),day=new Date(now).toISOString().slice(0,10);
  await db.prepare('DELETE FROM research_search_budget WHERE created_at<?').bind(now-2*86400000).run();
  const result=await db.prepare(`INSERT OR IGNORE INTO research_search_budget (id,actor,day,created_at)

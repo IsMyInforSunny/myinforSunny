@@ -1,7 +1,7 @@
 /** Bounded, offline document decoding/extraction for explicitly allowlisted publishers.
  * This does not establish that a page is an article or that its contents are accurate.
  */
-export const ARTICLE_EXTRACTION_VERSION = 'semantic-text-1.2';
+export const ARTICLE_EXTRACTION_VERSION = 'semantic-text-1.3';
 
 /** Keep the UTF-16 size ceiling without returning half of an astral character. */
 export function articleTextPrefix(text:string,limit:number){
@@ -21,7 +21,7 @@ function unescapeHtml(value:string){
   return code>0&&code<=0x10ffff&&!(code>=0xd800&&code<=0xdfff)?String.fromCodePoint(code):'�';
  });
 }
-function plainText(html:string){return unescapeHtml(html.replace(TAG_PATTERN,' ')).replace(/\s+/g,' ').trim();}
+function plainText(html:string){return unescapeHtml(html.replace(/<!doctype\b[^>]*>/gi,' ').replace(TAG_PATTERN,' ')).replace(/\s+/g,' ').trim();}
 function attributes(tag:string){
  const out=new Map<string,string>();
  for(const match of tag.matchAll(/([^\s=/>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g))out.set(match[1].toLowerCase(),unescapeHtml(match[2]??match[3]??match[4]??''));
@@ -40,9 +40,18 @@ function removeExcludedRegions(html:string){
  // Consume every complete tag, including quoted attributes, so a literal
  // "<body>" inside metadata cannot implicitly close the real head.
  const excluded=new Set(['head','nav','footer','header','aside','form','button']);
+ // Some ASP.NET news pages place their whole document inside this framework
+ // form. Only retain that exact wrapper when a real article-body marker exists;
+ // ordinary search/comment forms remain excluded, including nested forms.
+ const hasDocumentArticle=[...htmlTags(html)].some(match=>!match[1]&&match[2].toLowerCase()==='article'&&isArticleBodyMarker(match[0]));
+ const formWrappers:boolean[]=[];
  const stack:string[]=[],parts:string[]=[];let cursor=0;
  for(const match of htmlTags(html)){
   const tag=match[2].toLowerCase(),closing=!!match[1],start=match.index!;
+  if(tag==='form'){
+   if(!closing){const a=attributes(match[0]);const wrapper=hasDocumentArticle&&!formWrappers.length&&!stack.length&&a.get('id')==='aspnetForm'&&a.get('name')==='aspnetForm';formWrappers.push(wrapper);if(wrapper)continue;}
+   else if(formWrappers.pop()===true)continue;
+  }
   // HTML permits omitting </head> before the body. Do not apply this to
   // unclosed advertising/menu regions, whose contents remain withheld.
   if(!closing&&['body','article','main'].includes(tag)&&stack.length===1&&stack[0]==='head'){
@@ -87,6 +96,27 @@ function semanticBodies(html:string,tag:'article'|'main'|'title'){
  }
  return bodies;
 }
+function isArticleBodyMarker(tag:string){
+ const a=attributes(tag);
+ return (a.get('itemprop')??'').split(/\s+/).includes('articleBody')
+  ||(a.get('class')??'').split(/\s+/).some(value=>value==='article_body'||value==='news_view');
+}
+/** Prefer explicit body regions over unrelated semantic article cards. */
+function markedArticleBodies(html:string){
+ const bodies:string[]=[];let found=false,activeTag:string|undefined,depth=0,start=0;
+ for(const match of htmlTags(html)){
+  const tag=match[2].toLowerCase(),closing=!!match[1];
+  if(activeTag){
+   if(tag!==activeTag)continue;
+   if(!closing&&!/\/\s*>$/.test(match[0]))depth++;
+   else if(closing&&--depth===0){bodies.push(html.slice(start,match.index));activeTag=undefined;}
+  }else if(!closing&&['article','section','div'].includes(tag)&&isArticleBodyMarker(match[0])){
+   found=true;
+   if(!/\/\s*>$/.test(match[0])){activeTag=tag;depth=1;start=match.index!+match[0].length;}
+  }
+ }
+ return {bodies,found};
+}
 export function publicationDate(value:string|undefined){
  // A date alone stays a calendar date: do not invent a timezone or time of day.
  if(!value)return undefined;
@@ -105,9 +135,10 @@ export function extractArticleDocument(document:string,isHtml:boolean){
  const title=metadata.get('og:title')??plainText(semanticBodies(visible,'title')[0]??'');
  const publishedAt=publicationDate(metadata.get('article:published_time')??metadata.get('datepublished')??metadata.get('date'));
  const cleaned=removeExcludedRegions(visible);
- const candidates=semanticBodies(cleaned,'article');
- if(!candidates.length)candidates.push(...semanticBodies(cleaned,'main'));
+ const marked=markedArticleBodies(cleaned);
+ const candidates=marked.found?marked.bodies:semanticBodies(cleaned,'article');
+ if(!marked.found&&!candidates.length)candidates.push(...semanticBodies(cleaned,'main'));
  // Prefer one substantive semantic body; never join unrelated article cards.
- const text=(candidates.length?candidates:[cleaned]).map(plainText).sort((a,b)=>b.length-a.length)[0]??'';
+ const text=(marked.found||candidates.length?candidates:[cleaned]).map(plainText).sort((a,b)=>b.length-a.length)[0]??'';
  return {text,title:title?articleTextPrefix(title.trim(),250)||undefined:undefined,publishedAt};
 }

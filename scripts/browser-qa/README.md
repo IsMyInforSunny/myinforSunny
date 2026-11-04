@@ -26,6 +26,7 @@ npx --yes --package @playwright/cli playwright-cli -s=site-qa close
 | `pending-readiness.js` | 현재 열린 사이트의 origin에서 모의 분석으로 산출 대기 이유, 기사 연결 준비/사용 가능 상태, 자극 점수 보존과 375px 화면을 확인. 실제 text 분석 요청은 가로챔 |
 | `example-navigation.js` | 예시 요청 취소·초기화 후 좌표창 재개방 방지, 정상 완료 시 이동, 수동 대조 본문 안내 |
 | `research.js` | 분석·조사 취소, 늦은 응답 무시, 재시작 동의, 입력 변경·복원, 메인·내보내기 집계 일치, 한도 소진 안내 |
+| `direct-evidence.js` | 검색 없이 직접 URL 근거 대조, 주소 수정 후 재동의, 공통 검토·내보내기 연결, 취소 뒤 늦은 응답 무시, 375px 화면. 모든 text 분석·조사는 모의 API |
 | `coordinates.js` | 직접 지정한 명제, 사실 건수와 의견 구분, 현재 조사에서 추천·매체 좌표 연결, 매체별 3개·2곳 기준, 모바일 |
 | `popup.js` | 실제 팝업, 원문 강조, 방향키·Home·End 탭 조작, 모바일 제목·닫기 버튼과 가로 넘침 |
 | `exports.js` | 실제 기본·상세 JSON 다운로드 성공, 미리보기와 파일 일치, 원문·자료 포함 선택 구분 |

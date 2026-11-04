@@ -82,5 +82,12 @@ describe('기사 검색 안전 상한 · 실제 D1',()=>{
  it('동시 요청에서도 IP별 분당 3개만 예약한다',async()=>{const now=Date.now();const out=await Promise.allSettled(Array.from({length:4},(_,i)=>reserveSearch(req('search-rate'),searchConfig(),`s-${i}`,now)));expect(out.filter(r=>r.status==='fulfilled')).toHaveLength(3);expect(out.filter(r=>r.status==='rejected')).toHaveLength(1);});
  it('같은 조사 재전송과 승인 전 검색을 차단한다',async()=>{await reserveSearch(req('search-replay'),searchConfig(),'one');await expect(reserveSearch(req('search-replay'),searchConfig(),'one')).rejects.toMatchObject({code:'SEARCH_RATE_LIMITED'});await expect(reserveSearch(req('search-off'),{...searchConfig(),NEWS_TERMS_APPROVED:'false'},'off')).rejects.toMatchObject({code:'SEARCH_UNAVAILABLE'});});
  it('분당 한도 아래여도 IP별 시간당 20개를 넘길 수 없다',async()=>{const start=Date.now();for(let i=0;i<20;i++)await reserveSearch(req('hour'),searchConfig(),`hour-${i}`,start+i*80000);await expect(reserveSearch(req('hour'),searchConfig(),'hour-over',start+20*80000)).rejects.toMatchObject({code:'SEARCH_RATE_LIMITED'});});
+ it('직접 취득도 DB 한도와 중복 차단을 공유하되 검색 활성화를 요구하지 않는다',async()=>{
+  const c={...searchConfig(),ENABLE_NEWS_SEARCH:'false',ENABLE_DIRECT_FETCH:'true'};
+  await reserveSearch(req('direct-fetch'),c,'direct-one',Date.now(),'fetch');
+  await expect(reserveSearch(req('direct-fetch'),c,'direct-one',Date.now(),'fetch')).rejects.toMatchObject({code:'SEARCH_RATE_LIMITED'});
+  await expect(reserveSearch(req('direct-off'),{...c,ENABLE_DIRECT_FETCH:'false'},'direct-off',Date.now(),'fetch')).rejects.toMatchObject({code:'SEARCH_UNAVAILABLE'});
+  await expect(reserveSearch(req('search-off'),c,'search-off')).rejects.toMatchObject({code:'SEARCH_UNAVAILABLE'});
+ });
  it('저장소에는 질의·본문·원 IP 필드가 없다',async()=>{const cols=await db.prepare('PRAGMA table_info(research_search_budget)').all<{name:string}>();expect(cols.results.map(c=>c.name)).toEqual(['id','actor','day','created_at']);});
 });
