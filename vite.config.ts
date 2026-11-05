@@ -5,6 +5,7 @@ import { readExecutionProfile } from "./scripts/execution-profile.mjs";
 import { configureToolEnvironment } from "./scripts/tool-environment.mjs";
 import { sites } from "./scripts/vite/sites-vite-plugin";
 import { connectorPreview } from "./scripts/vite/connector-preview-plugin.mjs";
+import {localNvidiaRuntime} from './scripts/local-nvidia-runtime.mjs';
 import { localGroqRuntime } from "./scripts/local-groq-runtime.mjs";
 import path from "node:path";
 
@@ -41,7 +42,7 @@ const localBindingConfig = {
 
 export default defineConfig(async ({ command }) => {
   configureToolEnvironment(process.cwd());
-  const localGroq = localGroqRuntime({ command, root: process.cwd() });
+  const localGroq = localNvidiaRuntime({command,root:process.cwd()}) ?? localGroqRuntime({ command, root: process.cwd() });
 
   // Wrangler snapshots its log path while the Cloudflare plugin is imported.
   const { cloudflare } = await import("@cloudflare/vite-plugin");

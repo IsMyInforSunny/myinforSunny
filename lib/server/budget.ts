@@ -1,21 +1,24 @@
-import { RuntimeConfig, providerReady } from './config';
+import { RuntimeConfig, providerReady, provider } from './config';
 import {dailyLimits,minuteLimits,MODEL_REQUEST_RESERVATION,IP_REQUESTS_PER_MINUTE,IP_REQUESTS_PER_HOUR} from './limits';
 import {DAILY_LIMIT_MESSAGE} from '../display';
 import { AppError } from './errors';
+import {withNvidiaBudget} from './nvidia-budget';
+import {NVIDIA_TIMEOUT_MS} from './providers/nvidia';
 
 export const RESERVATION=MODEL_REQUEST_RESERVATION;
 const hex=(buffer:ArrayBuffer)=>Array.from(new Uint8Array(buffer)).map(v=>v.toString(16).padStart(2,'0')).join('');
 const hmac=async(key:ArrayBuffer|Uint8Array,message:string)=>crypto.subtle.sign('HMAC',await crypto.subtle.importKey('raw',key as BufferSource,{name:'HMAC',hash:'SHA-256'},false,['sign']),new TextEncoder().encode(message));
 /** Server-keyed actor id. Only the trusted Cloudflare header is used; a missing one shares one conservative bucket. */
-export async function actorHash(request:Request,config:Pick<RuntimeConfig,'IP_HASH_SECRET'|'GROQ_API_KEY'>):Promise<string>{
+export async function actorHash(request:Request,config:Pick<RuntimeConfig,'IP_HASH_SECRET'|'GROQ_API_KEY'|'NVIDIA_API_KEY'>):Promise<string>{
   const encoder=new TextEncoder();let key:ArrayBuffer|Uint8Array;
   if(config.IP_HASH_SECRET)key=encoder.encode(config.IP_HASH_SECRET);
   // Domain-separated derivation so the provider key itself is never used directly as the HMAC key.
-  else if(config.GROQ_API_KEY)key=await hmac(encoder.encode(config.GROQ_API_KEY),'naeinfo:actor-hash:v1');
+  else if(config.NVIDIA_API_KEY||config.GROQ_API_KEY)key=await hmac(encoder.encode(config.NVIDIA_API_KEY??config.GROQ_API_KEY!),'naeinfo:actor-hash:v1');
   else throw new AppError(503,'FEATURE_UNAVAILABLE','실시간 분석은 준비 중입니다. 예시 체험을 이용해 주세요.');
   return hex(await hmac(key,`ip:${request.headers.get('cf-connecting-ip')??'local'}`));
 }
 export async function withBudget<T>(request:Request,config:RuntimeConfig,requestId:string,timeout:number,action:(config:RuntimeConfig,signal:AbortSignal)=>Promise<T>):Promise<T>{
+  if(provider(config)==='nvidia')return withNvidiaBudget(request,config,requestId,Math.max(timeout,NVIDIA_TIMEOUT_MS),action);
   if(config.ENABLE_LIVE_ANALYSIS!=='true'||!providerReady(config)||!dailyLimits(config).verified||!config.DB)throw new AppError(503,'FEATURE_UNAVAILABLE','실시간 분석은 준비 중입니다. 예시 체험을 이용해 주세요.');
   const minute=minuteLimits(config);
   if(!minute.compatible)throw new AppError(503,'PROJECT_MINUTE_LIMIT_UNSUPPORTED','확인된 프로젝트의 분당 한도가 요청 예약을 충족하지 못하거나 설정이 올바르지 않습니다.');

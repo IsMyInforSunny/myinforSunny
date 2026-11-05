@@ -62,7 +62,7 @@ export default function DirectEvidence({analysis,cap,locked,onBusy,onProgress,on
    <label className="field-label" style={{display:'block'}}>대조할 사실 주장·비교 명제<select aria-label="주소 자료와 대조할 주장" style={{display:'block',width:'100%',maxWidth:'100%',minWidth:0,marginTop:8,padding:8,border:'1px solid var(--line)',borderRadius:6,background:'white'}} value={claimId} disabled={busy||locked} onChange={e=>{setClaimId(e.target.value);setConsent(false);setMessage('');}}>{targets.map(target=><option key={target.id} value={target.id}>{target.text}</option>)}</select></label>
    <label className="field-label" style={{display:'block'}}>공개 기사 주소 · 최대 2개<textarea aria-label="근거 기사 주소" value={urls} maxLength={4098} disabled={busy||locked} placeholder={'https://…\nhttps://…'} onChange={e=>{setUrls(e.target.value);setConsent(false);setMessage('');}}/></label>
    <p className="topic-note">운영자가 허용한 매체의 공개 HTTPS 주소만 가져옵니다. 로그인·유료 본문·다른 주소로 이동하는 페이지는 처리하지 않습니다. 사실 주장은 근거를 대조하고, 비교 명제는 참·거짓 대신 기사에 드러난 입장을 살펴봅니다. 선택한 대상에는 이번 자료의 최신 대조 결과를 반영합니다.</p>
-   <label className="transmission-consent"><input type="checkbox" checked={consent} disabled={busy||locked} onChange={e=>setConsent(e.target.checked)}/><span>입력한 주소의 기사 본문을 가져오고, 선택한 주장과 기사 발췌를 Groq에 전송하는 데 동의합니다.</span></label>
+   <label className="transmission-consent"><input type="checkbox" checked={consent} disabled={busy||locked} onChange={e=>setConsent(e.target.checked)}/><span>입력한 주소의 기사 본문을 가져오고, 선택한 주장과 기사 발췌를 선택한 AI 제공자에 전송하는 데 동의합니다.</span></label>
    <button className="button secondary" type="button" disabled={busy||locked||!consent||!urls.trim()} onClick={()=>void start()}>기사 본문 가져와 대조하기</button>
    {busy&&<button className="small-button" type="button" onClick={cancel}>주소 자료 대조 취소</button>}
   </>}
