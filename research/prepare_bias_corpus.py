@@ -72,6 +72,8 @@ PUBLISHER_HOST_ALIASES = {
     'news.kbs.co.kr': 'kbs.co.kr',
     'news.sbs.co.kr': 'sbs.co.kr',
     'm.khan.co.kr': 'khan.co.kr',
+    'm.pressian.com': 'pressian.com',
+    'm.ohmynews.com': 'ohmynews.com',
     'news.donga.com': 'donga.com',
 }
 

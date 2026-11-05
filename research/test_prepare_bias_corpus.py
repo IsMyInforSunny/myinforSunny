@@ -163,6 +163,16 @@ class CorpusPreparationTests(unittest.TestCase):
         self.assertIn('publication_precision_insufficient_for_window', report['articles'][0]['issues'])
 
     def test_known_publisher_alias_is_allowed_but_unrelated_subdomain_is_not(self):
+        for mobile, publisher in [('m.pressian.com', 'pressian.com'), ('m.ohmynews.com', 'ohmynews.com')]:
+            articles, reviews, manifest = fixture()
+            for article in articles:
+                if article['publisherId'] == 'one.example':
+                    article['publisherId'] = publisher
+                    article['url'] = article['url'].replace('https://one.example', 'https://' + mobile)
+            manifest['profiles'][0]['publisherId'] = publisher
+            report, _ = prepare(articles, reviews, manifest)
+            self.assertEqual(report['status'], 'train_input_ready')
+
         articles, reviews, manifest = fixture()
         for article in articles:
             if article['publisherId'] == 'one.example':

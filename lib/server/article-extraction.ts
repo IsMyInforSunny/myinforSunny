@@ -4,8 +4,7 @@ import {ARTICLE_EXTRACTION_VERSION,articleTextPrefix,extractArticleDocument,publ
 
 export const EXTRACTION_VERSION='readability-text-1.1';
 export type ArticleText={text:string;title?:string;publishedAt?:string;language?:string;extractionVersion:string};
-const BODY_SELECTOR='article[itemprop~="articleBody"],section[itemprop~="articleBody"],div[itemprop~="articleBody"],article.article_body,section.article_body,div.article_body,article.news_view,section.news_view,div.news_view';
-const ARTICLE_BODY_SELECTOR='article[itemprop~="articleBody"],article.article_body,article.news_view';
+const BODY_SELECTOR='article[itemprop~="articleBody"],section[itemprop~="articleBody"],div[itemprop~="articleBody"],article.article_body,section.article_body,div.article_body,article.news_view,section.news_view,div.news_view,div.at_contents';
 const BLOCKS=new Set(['P','DIV','SECTION','ARTICLE','H1','H2','H3','H4','LI','BR','BLOCKQUOTE','TR']);
 
 /** Access metadata is inspected before either text extractor; a fallback never
@@ -59,7 +58,7 @@ export function extractArticle(html:string,url:string):ArticleText|null{
   // ASP.NET can wrap the whole article in a form. Keep only the exact outer
   // framework wrapper with an explicit article body, never nested comment forms.
   for(const form of Array.from(document.querySelectorAll('form'))){
-   const wrapper=form.id==='aspnetForm'&&form.getAttribute('name')==='aspnetForm'&&!form.parentElement?.closest('form')&&!!form.querySelector(ARTICLE_BODY_SELECTOR);
+   const wrapper=form.id==='aspnetForm'&&form.getAttribute('name')==='aspnetForm'&&!form.parentElement?.closest('form')&&!!form.querySelector(BODY_SELECTOR);
    if(!wrapper)form.replaceWith(document.createTextNode(' '));
   }
   const marked=!!document.querySelector(BODY_SELECTOR);

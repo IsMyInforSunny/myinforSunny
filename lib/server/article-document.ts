@@ -43,7 +43,7 @@ function removeExcludedRegions(html:string){
  // Some ASP.NET news pages place their whole document inside this framework
  // form. Only retain that exact wrapper when a real article-body marker exists;
  // ordinary search/comment forms remain excluded, including nested forms.
- const hasDocumentArticle=[...htmlTags(html)].some(match=>!match[1]&&match[2].toLowerCase()==='article'&&isArticleBodyMarker(match[0]));
+ const hasDocumentArticle=[...htmlTags(html)].some(match=>!match[1]&&['article','section','div'].includes(match[2].toLowerCase())&&isArticleBodyMarker(match[0]));
  const formWrappers:boolean[]=[];
  const stack:string[]=[],parts:string[]=[];let cursor=0;
  for(const match of htmlTags(html)){
@@ -99,7 +99,7 @@ function semanticBodies(html:string,tag:'article'|'main'|'title'){
 function isArticleBodyMarker(tag:string){
  const a=attributes(tag);
  return (a.get('itemprop')??'').split(/\s+/).includes('articleBody')
-  ||(a.get('class')??'').split(/\s+/).some(value=>value==='article_body'||value==='news_view');
+  ||(a.get('class')??'').split(/\s+/).some(value=>value==='article_body'||value==='news_view'||value==='at_contents');
 }
 /** Prefer explicit body regions over unrelated semantic article cards. */
 function markedArticleBodies(html:string){

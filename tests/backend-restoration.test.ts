@@ -13,6 +13,11 @@ const signal=()=>new AbortController().signal;
 const input=():ResearchInput=>{const a=demoAnalysis('supported');return {sources:a.sources,claims:a.claims.filter(c=>c.kind==='factual').slice(0,1),transmissionConsent:true,researchConsent:true};};
 
 describe('원사이트 본문 추출 복구 — 합성 HTML만 사용',()=>{
+ it('공개 ASP.NET 기사에서 명시된 div 본문만 보존하고 주변 기자·후원 UI를 제외한다',()=>{
+  const body='가상 본문의 공개 정책 설명입니다. '.repeat(6).trim();
+  const found=extractArticle(`<form id="aspnetForm" name="aspnetForm"><main><article class="newswrap"><header>제목과 공유</header><div class="at_contents"><p>${body}</p></div><section>후원하기 기자 소개</section></article></main></form>`,'https://www.ohmynews.com/NWS_Web/View/at_pg.aspx?CNTN_CD=A0000000000');
+  expect(found?.text).toBe(body);expect(found?.text).not.toContain('후원하기');
+ });
  it('여러 article 중 짧은 카드 대신 가장 긴 본문 한 개만 취득한다',()=>{
   const body='공개 가상 본문의 근거와 조사 방법을 설명하는 문장입니다. '.repeat(5).trim();
   const found=extractArticle(`<article>짧은 요약 카드</article><article><p>${body}</p></article>`,'https://news.example/a');
