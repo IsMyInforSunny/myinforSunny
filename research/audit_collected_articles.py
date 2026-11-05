@@ -5,9 +5,11 @@ import hashlib
 import json
 import re
 from collections import Counter
-from datetime import date, datetime
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+
+from corpus_dates import COLLECTION_END, COLLECTION_START, publication_calendar
 
 TOPICS = {
     'medical_school_quota': r'의대|의과대|의사\s*정원',
@@ -18,10 +20,21 @@ TOPICS = {
     'nuclear_energy': r'원전|원자력|핵폐기',
 }
 NAMES = {'dailian': 'dailian.co.kr', 'newdaily': 'newdaily.co.kr'}
+PROMOTIONAL_TITLE = re.compile(
+    r'(?:견본주택|모델하우스).*(?:개관|개장|오픈)'
+    r'|주택행정.*(?:우수상|수상|우수.*선정|우수기관|우수\s*시군)'
+    r'|(?:우수상|최우수상).*주택행정')
 
 
 def content_hash(text):
     return hashlib.sha256(re.sub(r'\s+', ' ', text).strip().encode()).hexdigest()
+
+
+def publication_year(value):
+    try:
+        return str(publication_calendar(value)[0].year)
+    except (TypeError, ValueError):
+        return 'unknown'
 
 
 def article_identity(row):
@@ -69,15 +82,20 @@ def audit(paths, excluded_ids=()):
             row['contentHash'] = content_hash(text)
             row.setdefault('id', 'article_' + hashlib.sha256(identity.encode()).hexdigest()[:20])
             flags = []
+            if PROMOTIONAL_TITLE.search(str(row.get('title', ''))):
+                flags.append('promotional_genre_review')
             if row.get('publishedAtNote'):
                 flags.append('publication_timezone_needs_review')
             if parsed.hostname.startswith('biz.'):
                 flags.append('publisher_edition_scope_needs_review')
             publication = row.get('publishedAt')
+            calendar_basis = 'invalid_or_missing'
             try:
-                day = date.fromisoformat(publication[:10])
-                if not date(2024, 1, 1) <= day <= date(2026, 11, 4):
+                day, calendar_basis = publication_calendar(publication)
+                if not COLLECTION_START <= day <= COLLECTION_END:
                     flags.append('outside_collection_period')
+                if calendar_basis == 'naive_timestamp_calendar_unverified' and 'publication_timezone_needs_review' not in flags:
+                    flags.append('publication_timezone_needs_review')
             except (TypeError, ValueError):
                 flags.append('missing_or_invalid_publication_date')
             try:
@@ -95,6 +113,7 @@ def audit(paths, excluded_ids=()):
             if re.search(r'무단전재|무단 전재|저작권자|구독신청|로그인하세요', text):
                 flags.append('possible_boilerplate')
             row['collectionAudit'] = {'topicKeywordHits': hits, 'flags': flags,
+                                      'publicationCalendarBasis': calendar_basis,
                                       'sourceFile': str(path), 'reviewStatus': 'candidate_only'}
             # A URL or different hash does not establish independent reporting.
             row['sourceGroupId'] = None
@@ -120,7 +139,8 @@ def audit(paths, excluded_ids=()):
               'byPublisher': dict(Counter(r['publisherId'] for r in articles)),
               'byPublisherTopic': dict(Counter(r['publisherId'] + ':' + str(r.get('topicId')) for r in articles)),
               'byEditionHost': dict(Counter(r['sourceEditionHost'] for r in articles)),
-              'byPublisherYear': dict(Counter(r['publisherId'] + ':' + str(r.get('publishedAt', ''))[:4] for r in articles)),
+              'byPublisherYear': dict(Counter(r['publisherId'] + ':' + publication_year(r.get('publishedAt')) for r in articles)),
+              'publicationYearBasis': 'KST for aware timestamps; publisher calendar for date-only or naive timestamps',
               'flagCounts': dict(Counter(flag for r in articles for flag in r['collectionAudit']['flags'])),
               'trainingApprovedRows': sum(r.get('usage', {}).get('trainingAllowed') is True for r in articles),
               'humanAxisReviewCompleted': False, 'releaseReady': False,

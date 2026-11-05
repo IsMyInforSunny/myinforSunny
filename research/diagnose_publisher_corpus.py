@@ -69,7 +69,7 @@ def diagnose(records, output, reference_left=None, reference_right=None):
     candidate = []
     for row in records:
         flags = row.get('collectionAudit', {}).get('flags', [])
-        if any(flag in flags for flag in ('outside_collection_period', 'missing_or_invalid_publication_date', 'topic_needs_review', 'short_body_needs_review')):
+        if any(flag in flags for flag in ('outside_collection_period', 'missing_or_invalid_publication_date', 'topic_needs_review', 'short_body_needs_review', 'promotional_genre_review')):
             continue
         host = row['sourceEditionHost'].removeprefix('www.').removeprefix('m.')
         # Economic editions remain distinct candidates; no political labels.

@@ -1,13 +1,13 @@
 {
   "checkpoint": 900,
-  "inputSignature": "fe6befeba5c79a0412ae0559dc8026871e7d892e903ef149e9a87e730462b302",
+  "inputSignature": "85ac9335a0c80027152d3cd931b3ed5b26f9c5dcf681913e9be91802461b9f64",
   "acceptedUniqueArticles": 900,
   "intakeExclusionsAcrossAvailableInput": {},
   "byPublisher": {
     "dailian.co.kr": 250,
-    "newdaily.co.kr": 250,
+    "newdaily.co.kr": 249,
     "ohmynews.com": 163,
-    "pressian.com": 237
+    "pressian.com": 238
   },
   "byPublisherTopic": {
     "dailian.co.kr:electricity_prices": 39,
@@ -17,7 +17,7 @@
     "dailian.co.kr:nuclear_energy": 40,
     "dailian.co.kr:pension_reform": 45,
     "newdaily.co.kr:electricity_prices": 34,
-    "newdaily.co.kr:housing_supply": 45,
+    "newdaily.co.kr:housing_supply": 44,
     "newdaily.co.kr:medical_school_quota": 45,
     "newdaily.co.kr:minimum_wage": 36,
     "newdaily.co.kr:nuclear_energy": 45,
@@ -28,7 +28,7 @@
     "ohmynews.com:minimum_wage": 29,
     "ohmynews.com:nuclear_energy": 31,
     "ohmynews.com:pension_reform": 21,
-    "pressian.com:electricity_prices": 21,
+    "pressian.com:electricity_prices": 22,
     "pressian.com:housing_supply": 44,
     "pressian.com:medical_school_quota": 44,
     "pressian.com:minimum_wage": 43,
@@ -36,8 +36,8 @@
     "pressian.com:pension_reform": 41
   },
   "qualityFlags": {
-    "publication_timezone_needs_review": 250,
-    "publisher_edition_scope_needs_review": 110,
+    "publication_timezone_needs_review": 249,
+    "publisher_edition_scope_needs_review": 109,
     "possible_boilerplate": 124,
     "topic_needs_review": 3
   },
@@ -49,12 +49,12 @@
     "evaluationRows": 412,
     "variants": {
       "raw": {
-        "publisherAccuracy": 0.7305825242718447,
-        "publisherMacroF1": 0.6635094832265941
+        "publisherAccuracy": 0.7330097087378641,
+        "publisherMacroF1": 0.6647600786951201
       },
       "publisher_markers_removed": {
-        "publisherAccuracy": 0.6941747572815534,
-        "publisherMacroF1": 0.635242598043333
+        "publisherAccuracy": 0.6966019417475728,
+        "publisherMacroF1": 0.6365413058913206
       }
     },
     "comparisonWarning": "Evaluation rows change across checkpoints; use fixedEvaluation for learning curve."

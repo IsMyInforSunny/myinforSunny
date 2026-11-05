@@ -1,11 +1,12 @@
 """Focused leakage, intake and frozen-holdout regression checks; synthetic data."""
 import json
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
 
-from checkpoint_bias_collection import (components, fixed_benchmark, freeze_holdout,
-                                        intake, unique_components)
+from checkpoint_bias_collection import (components, content_hash, fixed_benchmark, freeze_holdout,
+                                        intake, run, unique_components)
 
 
 def row(identifier, publisher='pressian.com', topic='medical_school_quota'):
@@ -24,6 +25,20 @@ def corpus():
 
 
 class CheckpointTests(unittest.TestCase):
+    def test_explicit_promotion_is_withheld_without_banning_policy_coverage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'input.jsonl'
+            articles = [
+                {**row('promotion'), 'title': '아파트 견본주택 개관'},
+                {**row('award'), 'title': '주택행정 평가 우수기관 선정'},
+                {**row('policy'), 'title': '주택공급 정책과 모델하우스 운영 기준 개선'},
+                {**row('politics'), 'title': '일본 수상 원전 재가동 정책 논의'},
+            ]
+            path.write_text('\n'.join(json.dumps(r) for r in articles), encoding='utf-8')
+            accepted, excluded = intake(path)
+            self.assertEqual([r['id'] for r in accepted], ['policy', 'politics'])
+            self.assertEqual(excluded, {'promotional_genre_review': 2})
+
     def test_intake_rejects_missing_date_restriction_and_duplicate_body(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'input.jsonl'
@@ -85,6 +100,28 @@ class CheckpointTests(unittest.TestCase):
             target['contentHash'] = 'changed'
             with self.assertRaisesRegex(ValueError, 'Frozen evaluation article changed'):
                 fixed_benchmark(rows, groups, frozen)
+
+    def test_single_checkpoint_run_preserves_matching_legacy_summaries(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            rows = [row(str(i)) for i in range(600)]
+            (base / 'articles.local.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in rows), encoding='utf-8')
+            # Real checkpoint artifacts are deliberately not rerun: emulate
+            # completed reports with signatures of the exact current prefixes.
+            (base / 'frozen-evaluation.local.json').write_text('{}', encoding='utf-8')
+            hashes = [content_hash(r['text']) for r in rows]
+            for size in (300, 600, 900):
+                output = base / f'checkpoint-{size}'
+                output.mkdir()
+                signature = hashlib.sha256('\n'.join(hashes[:size]).encode()).hexdigest()
+                summary = {'checkpoint': size, 'inputSignature': signature, 'fixedEvaluation': {}}
+                (output / 'summary.local.json').write_text(json.dumps(summary), encoding='utf-8')
+            original = (base / 'checkpoint-300/summary.local.json').read_bytes()
+            run(base, requested=600)
+            aggregate = json.loads((base / 'checkpoint-summary.local.json').read_text(encoding='utf-8'))
+            self.assertEqual(aggregate['completedCheckpoints'], [300, 600])
+            self.assertEqual(aggregate['staleCheckpointSummariesExcluded'], [900])
+            self.assertEqual((base / 'checkpoint-300/summary.local.json').read_bytes(), original)
 
 
 if __name__ == '__main__':

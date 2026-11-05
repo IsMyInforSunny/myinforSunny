@@ -1,4 +1,4 @@
-"""Offline, cumulative 300/600/900/1000 article quality and SVM checkpoints.
+"""Offline cumulative article quality and SVM checkpoints through 3,000 rows.
 
 All article bodies, holdout identities and experimental weights remain ignored
 local research artifacts. These measurements classify publisher identity, not
@@ -11,7 +11,6 @@ import io
 import json
 import re
 from collections import Counter
-from datetime import date
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -20,13 +19,14 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import accuracy_score, confusion_matrix, f1_score
 from sklearn.svm import LinearSVC
 
-from audit_collected_articles import TOPICS, article_identity, audit, content_hash
+from audit_collected_articles import TOPICS, PROMOTIONAL_TITLE, article_identity, audit, content_hash
+from corpus_dates import COLLECTION_END, COLLECTION_START, publication_day_kst
 from diagnose_publisher_corpus import diagnose, masked_text
 from train_bias import grouped_topic_split
 
-CHECKPOINTS = (300, 600, 900, 1000)
+CHECKPOINTS = (300, 600, 900, 1000, 1200, 1500, 1800, 2000, 2100, 2400, 2700, 3000)
 BAD_FLAGS = {'outside_collection_period', 'missing_or_invalid_publication_date',
-             'topic_needs_review', 'short_body_needs_review'}
+             'topic_needs_review', 'short_body_needs_review', 'promotional_genre_review'}
 
 
 def dump(path, value):
@@ -42,13 +42,16 @@ def intake(path):
         if not line.strip():
             continue
         row = json.loads(line)
+        if PROMOTIONAL_TITLE.search(str(row.get('title', ''))):
+            excluded['promotional_genre_review'] += 1
+            continue
         text = row.get('text', row.get('body'))
         if not isinstance(text, str) or len(text.strip()) < 300:
             excluded['missing_or_short_body'] += 1
             continue
         try:
-            day = date.fromisoformat(row.get('publishedAt', '')[:10])
-            if not date(2024, 1, 1) <= day <= date(2026, 11, 4):
+            day = publication_day_kst(row.get('publishedAt'))
+            if not COLLECTION_START <= day <= COLLECTION_END:
                 raise ValueError('outside date range')
         except (TypeError, ValueError):
             excluded['missing_or_outside_publication_date'] += 1
@@ -249,10 +252,20 @@ def run(base, requested=None):
               'publisherAccuracy': fixed['variants']['publisher_markers_removed']['publisherAccuracy'],
               'publisherMacroF1': fixed['variants']['publisher_markers_removed']['publisherMacroF1'],
               'majorityBaseline': fixed['majorityClassBaseline']['accuracy'], 'releaseReady': False}))
-    completed = [json.loads((base / f'checkpoint-{n}' / 'summary.local.json').read_text(encoding='utf-8'))
-                 for n in CHECKPOINTS if (base / f'checkpoint-{n}' / 'summary.local.json').exists()]
+    completed, stale = [], []
+    for size in CHECKPOINTS:
+        path = base / f'checkpoint-{size}' / 'summary.local.json'
+        if not path.exists():
+            continue
+        summary = json.loads(path.read_text(encoding='utf-8'))
+        signature = hashlib.sha256('\n'.join(r['contentHash'] for r in rows[:size]).encode()).hexdigest()
+        if len(rows) < size or summary.get('inputSignature') != signature:
+            stale.append(size)
+            continue
+        completed.append(summary)
     dump(base / 'checkpoint-summary.local.json', {'availableAcceptedUniqueArticles': len(rows),
          'intakeExclusions': excluded, 'completedCheckpoints': [s['checkpoint'] for s in completed],
+         'staleCheckpointSummariesExcluded': stale,
          'metrics': [{'checkpoint': s['checkpoint'], 'fixedEvaluation': s['fixedEvaluation']} for s in completed],
          'releaseReady': False})
     return summaries
