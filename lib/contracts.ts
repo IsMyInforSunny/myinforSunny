@@ -5,6 +5,7 @@ const id = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 const text = (max: number) => z.string().max(max).refine(v => v.trim().length > 0, '내용을 입력해 주세요.');
 export const analyzeRequestSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('demo'), fixtureId: id }).strict(),
+  z.object({ kind:z.literal('url'), url:z.string().trim().url().max(2048).refine(v=>v.startsWith('https://'),'HTTPS 기사 주소를 입력해 주세요.'), comments:z.array(z.object({id,text:text(200)}).strict()).max(5), proposition:text(160).optional(),transmissionConsent:z.literal(true) }).strict(),
   z.object({ kind: z.literal('text'), body: text(2000), comments: z.array(z.object({ id, text: text(200) }).strict()).max(5), proposition: text(160).optional(), transmissionConsent:z.literal(true) }).strict(),
 ]);
 export type TextRequest = Omit<Extract<z.infer<typeof analyzeRequestSchema>, {kind:'text'}>,'transmissionConsent'>;
@@ -38,6 +39,7 @@ export const searchQuerySchema=z.string()
  .refine(value=>!/(?:^| )(?:AND|OR|NOT)(?: |$)/.test(value),'검색 연산자 없이 핵심어만 입력해 주세요.');
 export type SearchSuggestion={label:string;query:string};
 export type Analysis = {
+  article?:{url:string;title?:string;fetchedAt:string;fullTextLength:number;analyzedCharacters:number;truncated:boolean};
   schemaVersion:'2.1'; analysisId:string; requestId:string; mode:'demo'|'live'; status:'success'|'partial';
   versions:{rubric:string;prompt:string;model:string;segmenter:string};
   sources:InputSource[]; proposition?:string; topics:Topic[]; topicAssignments:TopicAssignment[]; bodyTopicAssignments?:BodyTopicAssignment[]; stances?:Stance[];

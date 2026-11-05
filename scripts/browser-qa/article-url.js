@@ -1,0 +1,41 @@
+async page => {
+ const check=(value,message)=>{if(!value)throw Error(message);};
+ const origin='http://127.0.0.1:5184';
+ const result=await page.request.post(origin+'/api/analyze',{data:{kind:'demo',fixtureId:'supported'}});
+ check(result.ok(),'Local demo response unavailable');
+ const fixture=await result.json();let calls=0;
+ await page.route('**/api/capabilities',route=>route.fulfill({json:{live:true,webSearch:false,webFetch:true,directFetch:true,rubricVersion:'rubric-4.0',limits:{body:2000,comments:5,comment:200,claimsPerCheck:1}}}));
+ await page.route('**/api/analyze',async route=>{
+  const req=route.request().postDataJSON();
+  if(req.kind!=='url')return route.continue();
+  calls++;check(req.url==='https://news.example/article','Wrong URL sent');check(req.transmissionConsent===true,'Consent missing');check(!('body' in req),'Client sent body instead of URL');
+  await route.fulfill({json:{...fixture,mode:'live',article:{url:req.url,title:'합성 기사 링크 분석',fetchedAt:new Date().toISOString(),fullTextLength:5000,analyzedCharacters:fixture.sources[0].text.length,truncated:true}}});
+ });
+ await page.goto(origin);
+ await page.getByRole('button',{name:'기사 입력하기',exact:true}).click();
+ check(await page.getByLabel('기사 링크 필수').isVisible(),'URL input is not the default');
+ await page.getByLabel('기사 링크 필수').fill('https://news.example/article');
+ await page.getByRole('button',{name:'기사 링크 분석하기',exact:true}).click();
+ check(calls===0,'Request sent without consent');
+ const consent=page.getByRole('checkbox').filter({has:page.locator('never-matches')});
+ const transmission=page.locator('.transmission-consent input').first();
+ await transmission.check();
+ await page.getByRole('button',{name:'기사 링크 분석하기',exact:true}).click();
+ await page.getByRole('button',{name:'기사 다시 입력',exact:true}).waitFor();
+ check(calls===1,'URL analysis not requested once');
+ await page.getByRole('button',{name:'분석근거 표시',exact:true}).click();
+ await page.getByRole('link',{name:'합성 기사 링크 분석'}).waitFor();
+ check(await page.getByText('· 기사 일부만 분석',{exact:false}).count()>0,'Truncation disclosure missing');
+ await page.keyboard.press('Escape');
+ await page.getByRole('button',{name:'기사 다시 입력',exact:true}).click();
+ await page.getByLabel('기사 링크 필수').fill('https://news.example/changed');
+ check(!await transmission.isChecked(),'URL edit retained consent');
+ await page.keyboard.press('Escape');
+ check(await page.getByText('입력 내용이 바뀌어 이전 입력의 분석 결과를 표시합니다.',{exact:false}).count()>0,'Changed URL did not mark results stale');
+ await page.getByRole('button',{name:'기사 다시 입력',exact:true}).click();
+ await page.getByRole('button',{name:'입력과 결과 초기화',exact:true}).click();
+ check(await page.getByLabel('기사 링크 필수').inputValue()==='','Reset did not clear URL');
+ await page.setViewportSize({width:375,height:812});
+ check(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),'Mobile page overflow');
+ console.log(JSON.stringify({urlDefault:true,urlAnalysis:true,consent:true,sourceLink:true,truncation:true,stale:true,reset:true,mobile:true,externalCalls:0}));
+}
