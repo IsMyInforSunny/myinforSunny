@@ -115,6 +115,7 @@ describe('허용 출처의 문서 해독과 본문 추출 — 모의 응답만 �
   const ref=await retrieve('https://news.example/a','r1',{ALLOWED_RETRIEVAL_HOSTS:'news.example'},new AbortController().signal);
   expect(ref).toMatchObject({provenance:'web_fetched',truncated:true,fullTextLength:text.trim().length,extractionVersion:ARTICLE_EXTRACTION_VERSION});
   expect(ref!.text).toHaveLength(8000);expect(call).toHaveBeenCalledTimes(1);expect(call.mock.calls[0][1].redirect).toBe('manual');
+  expect(call.mock.calls[0][1].headers['User-Agent']).toBe('NaeinfoClear/0.1 (article analysis; user-requested fetch)');
  });
  it('취득 상한과 제목 상한의 이모지를 반으로 자르지 않고 원래 전체 길이를 기록한다',async()=>{
   const body='가'.repeat(7999)+'😀끝',title='나'.repeat(249)+'😀제목';

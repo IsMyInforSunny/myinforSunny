@@ -16,7 +16,7 @@ export async function retrieve(url:string,id:string,config:RuntimeConfig,signal:
   if(config.NEWS_PROVIDER==='firecrawl')return scrapeFirecrawl(url,id,config,signal);
   const hosts=(config.ALLOWED_RETRIEVAL_HOSTS??'').split(',').map(s=>s.trim()).filter(Boolean);const target=allowedUrl(url,hosts);if(!target)return null;
   // Use only trusted public publisher domains configured by the operator.
-  const response=await fetch(target,{redirect:'manual',headers:{Accept:'text/html,text/plain'},signal:AbortSignal.any([signal,AbortSignal.timeout(5000)])});
+  const response=await fetch(target,{redirect:'manual',headers:{Accept:'text/html,text/plain','User-Agent':'NaeinfoClear/0.1 (article analysis; user-requested fetch)'},signal:AbortSignal.any([signal,AbortSignal.timeout(5000)])});
   if(!response.ok||response.status>=300||/\b(noai|nosnippet)\b/i.test(response.headers.get('x-robots-tag')??'')){await response.body?.cancel();return null;}
   const type=response.headers.get('content-type')??'';if(!/^(text\/html|text\/plain)(;|$)/i.test(type)){await response.body?.cancel();return null;}
   const reader=response.body?.getReader();if(!reader)return null;

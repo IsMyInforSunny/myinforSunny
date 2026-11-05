@@ -2,7 +2,7 @@ import {afterEach,describe,expect,it,vi} from 'vitest';
 import {z} from 'zod/v4';
 import {structured} from '../lib/server/language';
 import {capabilities,NVIDIA_MODEL,providerReady} from '../lib/server/config';
-afterEach(()=>vi.unstubAllGlobals());
+afterEach(()=>{vi.unstubAllGlobals();vi.restoreAllMocks();});
 const config={AI_PROVIDER:'nvidia',NVIDIA_API_KEY:'synthetic',ENABLE_LIVE_ANALYSIS:'true',DB:{} as D1Database};
 describe('NVIDIA DeepSeek adapter',()=>{
  it('requires the selected model and secret, without inheriting Groq account limits',()=>{
@@ -26,5 +26,37 @@ describe('NVIDIA DeepSeek adapter',()=>{
  it('honors provider cooldown and hides raw errors',async()=>{
   const onRateLimit=vi.fn();const fetch=vi.fn().mockResolvedValue(new Response('private provider detail',{status:429,headers:{'retry-after':'90'}}));vi.stubGlobal('fetch',fetch);
   await expect(structured({...config,onRateLimit},z.object({ok:z.boolean()}),'JSON',{},new AbortController().signal)).rejects.toMatchObject({code:'RATE_LIMITED'});expect(onRateLimit).toHaveBeenCalledWith(90);expect(fetch).toHaveBeenCalledTimes(1);
+ });
+ it('joins split SSE frames and ignores private reasoning',async()=>{
+  const encoder=new TextEncoder();const wire='data: '+JSON.stringify({choices:[{delta:{reasoning_content:'private reasoning'}}]})+'\r\n\r\n'+'data: '+JSON.stringify({choices:[{delta:{content:'{"ok":'}}]})+'\n\n'+'data: '+JSON.stringify({choices:[{delta:{content:'true}'},finish_reason:'stop'}],usage:{total_tokens:123}})+'\n\n';
+  const bytes=encoder.encode(wire);const body=new ReadableStream({start(c){for(let i=0;i<bytes.length;i+=7)c.enqueue(bytes.slice(i,i+7));c.close();}});
+  const fetch=vi.fn().mockResolvedValue(new Response(body,{headers:{'Content-Type':'text/event-stream'}}));vi.stubGlobal('fetch',fetch);
+  const onUsage=vi.fn();expect(await structured({...config,onUsage},z.object({ok:z.boolean()}),'JSON',{},new AbortController().signal)).toEqual({ok:true});
+  expect(JSON.parse(fetch.mock.calls[0][1].body).stream).toBe(true);expect(onUsage).toHaveBeenCalledWith(123);
+ });
+ it('rejects unfinished streams without accepting partial JSON',async()=>{
+  vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response('data: {"choices":[{"delta":{"content":"{\\"ok\\":true}"}}]}\n\n',{headers:{'Content-Type':'text/event-stream'}})));
+  await expect(structured(config,z.object({ok:z.boolean()}),'JSON',{},new AbortController().signal)).rejects.toMatchObject({code:'INVALID_MODEL_OUTPUT'});
+ });
+ it('stops a DONE-only stream and cancels it instead of waiting for a socket close',async()=>{
+  const cancel=vi.fn();const encoder=new TextEncoder();
+  vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(new ReadableStream({start(c){c.enqueue(encoder.encode('data: [DONE]\n\n'));},cancel}),{headers:{'Content-Type':'text/event-stream'}})));
+  await expect(structured(config,z.object({ok:z.boolean()}),'JSON',{},new AbortController().signal)).rejects.toMatchObject({code:'INVALID_MODEL_OUTPUT'});
+  expect(cancel).toHaveBeenCalled();
+ });
+ it('logs only stage timing and never the request, response or private reasoning',async()=>{
+  const log=vi.spyOn(console,'info').mockImplementation(()=>{});
+  vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response('data: {"choices":[{"delta":{"reasoning_content":"private-reasoning"}}]}\n\ndata: {"choices":[{"delta":{"content":"{\\"ok\\":true}"},"finish_reason":"stop"}]}\n\n',{headers:{'Content-Type':'text/event-stream'}})));
+  await structured(config,z.object({ok:z.boolean()}),'private-prompt',{text:'private-article'},new AbortController().signal);
+  const entries=log.mock.calls.map(([line])=>JSON.parse(line));
+  expect(entries.map(e=>e.stage)).toEqual(['headers','first_delta','first_content','completed','stream_closed']);
+  for(const entry of entries)expect(Object.keys(entry).sort()).toEqual(['durationMs','provider','stage','type']);
+ });
+ it('cancels the upstream reader on aborted requests',async()=>{
+  const cancel=vi.fn();const controller=new AbortController();
+  vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(new ReadableStream({cancel}),{headers:{'Content-Type':'text/event-stream'}})));
+  const pending=structured(config,z.object({ok:z.boolean()}),'JSON',{},controller.signal);
+  await new Promise(resolve=>setTimeout(resolve,10));controller.abort();
+  await expect(pending).rejects.toMatchObject({code:'TIMEOUT'});expect(cancel).toHaveBeenCalled();
  });
 });

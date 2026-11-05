@@ -12,7 +12,9 @@ export async function analyzeUrl(req:Extract<import('zod/v4').infer<typeof analy
  if(!capabilities(config).directFetch)throw new AppError(503,'ARTICLE_IMPORT_UNAVAILABLE','기사 링크 분석은 현재 준비 중입니다. 잠시 후 다시 시도해 주세요.');
  const url=allowedUrl(req.url,hosts);
  if(!url)throw new AppError(422,'ARTICLE_URL_NOT_ALLOWED','현재 지원하는 언론사의 HTTPS 기사 링크를 입력해 주세요. 포털·단축 주소 대신 언론사 원문 링크를 사용해 주세요.');
+ const retrievalStarted=Date.now();
  const ref=await retrieve(url.href,'input_article',config,signal);
+ console.info(JSON.stringify({type:'article_timing',stage:'retrieved',durationMs:Date.now()-retrievalStarted,requestId}));
  if(!ref||ref.text.trim().length<100)throw new AppError(422,'ARTICLE_BODY_UNAVAILABLE','기사 본문을 가져오지 못했습니다. 언론사 원문 링크인지 확인해 주세요. 로그인·유료·접근 제한 기사는 분석할 수 없습니다.');
  const body=articleTextPrefix(ref.text,2000);
  if(containsContactInfo([body,req.proposition??'',...req.comments.map(c=>c.text)].join('\n')))throw new AppError(422,'PRIVACY_INPUT_REJECTED','기사나 댓글에서 전화번호·이메일 등 개인정보가 발견되어 분석을 중단했습니다.');
