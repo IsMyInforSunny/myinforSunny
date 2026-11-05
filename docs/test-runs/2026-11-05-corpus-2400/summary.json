@@ -1,0 +1,217 @@
+{
+  "checkpoint": 2400,
+  "inputSignature": "746cca62eb2c9d36b52a7f12b0ce691744a3ae85a987ebb7a23cc8b036281321",
+  "acceptedUniqueArticles": 2400,
+  "intakeExclusionsAcrossAvailableInput": {},
+  "byPublisher": {
+    "dailian.co.kr": 682,
+    "newdaily.co.kr": 505,
+    "ohmynews.com": 579,
+    "pressian.com": 634
+  },
+  "byPublisherTopic": {
+    "dailian.co.kr:electricity_prices": 67,
+    "dailian.co.kr:housing_supply": 122,
+    "dailian.co.kr:medical_school_quota": 125,
+    "dailian.co.kr:minimum_wage": 122,
+    "dailian.co.kr:nuclear_energy": 122,
+    "dailian.co.kr:pension_reform": 124,
+    "newdaily.co.kr:electricity_prices": 55,
+    "newdaily.co.kr:housing_supply": 66,
+    "newdaily.co.kr:medical_school_quota": 115,
+    "newdaily.co.kr:minimum_wage": 68,
+    "newdaily.co.kr:nuclear_energy": 108,
+    "newdaily.co.kr:pension_reform": 93,
+    "ohmynews.com:electricity_prices": 21,
+    "ohmynews.com:housing_supply": 150,
+    "ohmynews.com:medical_school_quota": 131,
+    "ohmynews.com:minimum_wage": 97,
+    "ohmynews.com:nuclear_energy": 99,
+    "ohmynews.com:pension_reform": 81,
+    "pressian.com:electricity_prices": 30,
+    "pressian.com:housing_supply": 165,
+    "pressian.com:medical_school_quota": 165,
+    "pressian.com:minimum_wage": 84,
+    "pressian.com:nuclear_energy": 94,
+    "pressian.com:pension_reform": 96
+  },
+  "qualityFlags": {
+    "publication_timezone_needs_review": 505,
+    "publisher_edition_scope_needs_review": 344,
+    "possible_boilerplate": 821,
+    "topic_needs_review": 13
+  },
+  "nearDuplicatePairs": 5,
+  "nearDuplicateRowsWithheldFromTopicDiagnostic": 4,
+  "topicHeldoutDiagnostic": {
+    "status": "measured",
+    "trainingRows": 1319,
+    "evaluationRows": 1064,
+    "variants": {
+      "raw": {
+        "publisherAccuracy": 0.9041353383458647,
+        "publisherMacroF1": 0.8432621721447608
+      },
+      "publisher_markers_removed": {
+        "publisherAccuracy": 0.8618421052631579,
+        "publisherMacroF1": 0.7953663962915567
+      }
+    },
+    "comparisonWarning": "Evaluation rows change across checkpoints; use fixedEvaluation for learning curve."
+  },
+  "fixedEvaluation": {
+    "task": "publisher_identity_not_political_bias",
+    "seed": 42,
+    "trainingRows": 1319,
+    "evaluationRows": 153,
+    "trainingTopics": [
+      "medical_school_quota",
+      "minimum_wage",
+      "nuclear_energy"
+    ],
+    "evaluationTopics": [
+      "electricity_prices",
+      "housing_supply",
+      "pension_reform"
+    ],
+    "fixedEvaluationIdsDigest": "5737c48087675b6e00f8e51610b8881f206eef26c8b9a12cf0d0aedd02dbe946",
+    "classes": [
+      "biz.newdaily.co.kr",
+      "dailian.co.kr",
+      "newdaily.co.kr",
+      "ohmynews.com",
+      "pressian.com"
+    ],
+    "trainingByPublisher": {
+      "dailian.co.kr": 369,
+      "biz.newdaily.co.kr": 196,
+      "ohmynews.com": 327,
+      "pressian.com": 332,
+      "newdaily.co.kr": 95
+    },
+    "evaluationByPublisher": {
+      "dailian.co.kr": 68,
+      "biz.newdaily.co.kr": 11,
+      "newdaily.co.kr": 45,
+      "ohmynews.com": 15,
+      "pressian.com": 14
+    },
+    "majorityClassBaseline": {
+      "trainingMajorityPublisher": "dailian.co.kr",
+      "accuracy": 0.4444444444444444
+    },
+    "crossSplitNearDuplicateTrainingRowsWithheld": 0,
+    "otherEvaluationTopicRowsWithheld": 915,
+    "exactContentHashOverlap": false,
+    "nearDuplicateThreshold": 0.92,
+    "variants": {
+      "raw": {
+        "publisherAccuracy": 0.6797385620915033,
+        "publisherMacroF1": 0.7411267358053713,
+        "confusionMatrix": [
+          [
+            11,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            21,
+            37,
+            10,
+            0,
+            0
+          ],
+          [
+            17,
+            0,
+            28,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            14,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            14
+          ]
+        ],
+        "featureCount": 20000,
+        "perPublisherAccuracy": {
+          "biz.newdaily.co.kr": 1.0,
+          "dailian.co.kr": 0.5441176470588235,
+          "newdaily.co.kr": 0.6222222222222222,
+          "ohmynews.com": 0.9333333333333333,
+          "pressian.com": 1.0
+        }
+      },
+      "publisher_markers_removed": {
+        "publisherAccuracy": 0.7516339869281046,
+        "publisherMacroF1": 0.7560306360306359,
+        "confusionMatrix": [
+          [
+            9,
+            2,
+            0,
+            0,
+            0
+          ],
+          [
+            7,
+            51,
+            7,
+            2,
+            1
+          ],
+          [
+            12,
+            5,
+            26,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            15,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            14
+          ]
+        ],
+        "featureCount": 20000,
+        "perPublisherAccuracy": {
+          "biz.newdaily.co.kr": 0.8181818181818182,
+          "dailian.co.kr": 0.75,
+          "newdaily.co.kr": 0.5777777777777777,
+          "ohmynews.com": 1.0,
+          "pressian.com": 1.0
+        }
+      }
+    },
+    "releaseReady": false,
+    "limitations": [
+      "source_independence_unreviewed",
+      "article_usage_unapproved",
+      "topic_and_genre_review_pending",
+      "fixed_evaluation_reused_not_final_blind_test"
+    ]
+  },
+  "politicalAxisApproved": false,
+  "releaseReady": false
+}

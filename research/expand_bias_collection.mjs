@@ -11,14 +11,14 @@ const {DOMParser}=await import('linkedom/worker');
 const base=path.resolve(process.argv[2]??'.sites-runtime/collection-1000-20261105');
 const target=Number(process.argv[3]??1000);
 if(![1000,2000,3000].includes(target))throw Error('Supported cumulative target: 1000, 2000 or 3000');
-const TARGET_PER_PUBLISHER=target/4,TOPIC_LIMIT=target===3000?165:target===2000?110:45;
+const TARGET_PER_PUBLISHER=target/4,TOPIC_LIMIT=target===3000?200:target===2000?110:45;
 if(!base.startsWith(path.resolve('.sites-runtime')+path.sep))throw Error('Local ignored output required');
 await mkdir(base,{recursive:true});await mkdir(path.join(base,'raw'),{recursive:true});
 const UA='NaeInfoClearResearch/0.2 (OpenAI-assisted local research; public news corpus)';
 const SEARCH_HOSTS=['www.dailian.co.kr','www.newdaily.co.kr'];
 // Keep edition identity in sourceEditionHost; model evaluation separates biz.
 const HOSTS=new Set([...SEARCH_HOSTS,'biz.newdaily.co.kr']);
-const topics={medical_school_quota:{q:['의대 정원','의대 증원'],re:/의대|의과대|의사\s*정원/},pension_reform:{q:['국민연금','연금개혁'],re:/국민연금|연금개혁|연금\s*개혁|소득대체율|보험료율/},minimum_wage:{q:['최저임금'],re:/최저임금|생활임금/},electricity_prices:{q:['전기요금','전기료'],re:/전기\s*(?:요금|료)|전력\s*요금/},housing_supply:{q:['주택 공급','주택공급'],re:/주택|부동산|아파트/},nuclear_energy:{q:['원전','원자력'],re:/원전|원자력|핵폐기/}};
+const topics={medical_school_quota:{q:['의대 정원','의대 증원','의대','의과대'],re:/의대|의과대|의사\s*정원/},pension_reform:{q:['국민연금','연금개혁','보험료율','소득대체율'],re:/국민연금|연금개혁|연금\s*개혁|소득대체율|보험료율/},minimum_wage:{q:['최저임금','생활임금','최저시급'],re:/최저임금|생활임금/},electricity_prices:{q:['전기요금','전기료','전력요금'],re:/전기\s*(?:요금|료)|전력\s*요금/},housing_supply:{q:['주택 공급','주택공급','공공주택','공공임대','재건축','주택','아파트'],re:/주택|부동산|아파트/},nuclear_energy:{q:['원전','원자력','핵폐기'],re:/원전|원자력|핵폐기/}};
 const DROP=/(?:견본주택|모델하우스).*(?:개관|개장|오픈)|주택행정.*(?:우수상|수상|우수.*선정|우수기관|우수\s*시군)|\[포토\]|\[영상\]|\[화보\]|\[카드뉴스\]|\[사진\]|\[인사\]|\[부고\]|ETF|펀드|업무협약|MOU|심포지엄|세미나|성료|포상|공모|특징주|원전주|강세|맞손|제휴|준공식|홍보|수익률|상장|운용|수주|협약/;
 const hash=t=>createHash('sha256').update(t).digest('hex');
 const norm=t=>t.replace(/\s+/g,' ').trim();
