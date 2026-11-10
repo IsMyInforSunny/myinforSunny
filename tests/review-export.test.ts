@@ -125,7 +125,7 @@ describe('review export', () => {
       expect(out.summary?.completedChecks).toBe(count);
       const html = renderToStaticMarkup(createElement(CanvaDashboard, {analysis: live,
         checks: [...checks], researchResults: [...researchResults], onEvidence: () => {}, onArticles: () => {}}));
-      expect(html).toContain('편향 정도 계산 대기');
+      expect(html).toContain('입장 표현 없음');
       expect(html).not.toContain(`사실 주장 1개 중 ${count}개 대조 완료`);
       expect(JSON.stringify(out)).not.toContain(fetched.references[0].text);
     }

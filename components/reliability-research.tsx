@@ -4,7 +4,7 @@ import {useEffect,useRef,useState} from 'react';
 import {ArrowUpRight,LoaderCircle,Search} from 'lucide-react';
 import type {Analysis,Capabilities} from '@/lib/contracts';
 import type {ResearchStage,ResearchVerification} from '@/lib/research-contract';
-import {reliabilityReview,verifiedRecommendations} from '@/lib/reliability';
+import {reliabilityReview,researchProposition,researchRequestTimeout,verifiedRecommendations} from '@/lib/reliability';
 import {RESEARCH_BATCH_CLAIMS,researchWait,runResearch,type ClaimCoverage} from '@/lib/research-runner';
 import DirectEvidence from './direct-evidence';
 const coverageLabel:Record<ClaimCoverage,string>={pending:'대기',reviewing:'조사 중',reviewed:'대조 완료',no_evidence:'공개 본문 미확보',not_completed:'대조 미완료'};
@@ -23,7 +23,7 @@ export default function ReliabilityResearch({analysis,cap,onChange,researchConse
  const focusAfterTransition=useRef<'cancel'|'restart'|'consent'|null>(null);
  const researchFocusChain=useRef(false);
  const ready=!!cap?.live&&cap.webSearch&&cap.webFetch&&analysis.mode==='live';
- const factual=analysis.claims.filter(c=>c.kind==='factual');const proposition=analysis.proposition?.trim()||undefined;const position=proposition?undefined:analysis.claims.find(c=>c.kind==='opinion');const hasTargets=!!factual.length||!!position||!!proposition;
+ const factual=analysis.claims.filter(c=>c.kind==='factual');const proposition=researchProposition(analysis);const position=proposition?undefined:analysis.claims.find(c=>c.kind==='opinion');const hasTargets=!!factual.length||!!position||!!proposition;
  useEffect(()=>{
   if(!started)return;
   if(!consent||!ready||!hasTargets||(autoStarted&&researchConsent!==true)){
@@ -33,7 +33,7 @@ export default function ReliabilityResearch({analysis,cap,onChange,researchConse
   const c=new AbortController();control.current=c;const found:ResearchVerification[]=[];
   void runResearch({sources:analysis.sources,claims:factual,position,proposition,transmissionConsent:true,researchConsent:true},c.signal,{
    now:Date.now,wait:researchWait,firstModelCallAt:Date.parse(analysis.createdAt)+61000,
-   post:async<T,>(body:unknown,signal:AbortSignal)=>{const response=await fetch('/api/research',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.any([signal,AbortSignal.timeout(60000)])});const data=await response.json() as {error?:{message?:string}};if(!response.ok)throw new Error(data.error?.message??'자동 조사에 연결하지 못했어요.');return data as T;},
+   post:async<T,>(body:unknown,signal:AbortSignal)=>{const response=await fetch('/api/research',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.any([signal,AbortSignal.timeout(researchRequestTimeout(cap))])});const data=await response.json() as {error?:{message?:string}};if(!response.ok)throw new Error(data.error?.message??'자동 조사에 연결하지 못했어요.');return data as T;},
   },p=>{if(!c.signal.aborted){setStage(p.stage);setMessage(p.message);setCoverage(p.coverage);setBatchInfo({batch:p.batch,batches:p.batches});callback.current(found,p.stage);}},v=>{if(!c.signal.aborted){found.push({...v,parentAnalysisId:analysis.analysisId});setResults([...found]);callback.current([...found],'comparing');}}).catch(e=>{if(!c.signal.aborted){settleCoverage();setStage('failed');setMessage(e instanceof Error?e.message:'자동 조사에 연결하지 못했어요.');callback.current([...found],'failed');}});
   return ()=>c.abort();
   // The parent remounts this component for each immutable analysis id.
@@ -78,10 +78,11 @@ export default function ReliabilityResearch({analysis,cap,onChange,researchConse
   {cap?.searchProvider==='publisher_feeds'&&<p className="topic-note">공식 RSS에 실린 최근 기사 제목에서 관련 후보를 찾습니다. 전체 웹이나 과거 기사 전체를 검색하는 기능은 아니며, 본문을 확보해 대조한 자료만 점수에 반영합니다.</p>}
   <div className="stance-list"><span>조사 대상 {review.totalClaims}개 주장</span><span>대조 완료 {review.completedClaims}개</span><span>미확인 {review.remaining}개</span><span>취득 자료 {review.sourceCount}개</span></div>
   {!factual.length&&<p className="topic-note">대조할 사실 주장이 없어요. 의견·비교 명제를 참·거짓으로 판정하지 않고 다른 관점의 자료를 찾습니다.</p>}
-  {proposition&&<p className="topic-note">직접 지정한 비교 명제: {proposition} · 이 명제에 대한 기사 입장을 별도로 살펴봅니다.</p>}
+  {proposition&&<p className="topic-note">{analysis.proposition?.trim()?'직접 지정한 비교 명제':'본문 근거에서 추출한 비교 명제'}: {proposition} · 이 명제에 대한 기사 입장을 별도로 살펴봅니다.</p>}
   {!hasTargets?<p className="topic-note">조사할 주장이나 의견을 추출하지 못했어요.</p>:analysis.mode==='demo'?<p className="topic-note">이 예시는 가상 자료입니다. 외부 검색이나 실제 조사 결과가 아닙니다.</p>:!ready?<div className="notice" role="status">자동 신뢰성 조사·관련 기사 검색은 아직 연결 준비 중입니다. 현재 입력한 기사만으로 외부 신뢰성 검토가 완료되지는 않습니다.{waitReasons.length>0&&<ul>{waitReasons.map(r=><li key={r}>대기 이유: {r}</li>)}</ul>}{researchConsent===true&&<p className="topic-note">자동 조사 동의는 확인했지만 위 조건이 준비되지 않아 아무 자료도 전송하지 않았어요.</p>}</div>:<>
    {factual.length>0&&<p className="topic-note">수집 범위: 사실 주장 {factual.length}개{batches>1?`를 한 요청당 최대 ${RESEARCH_BATCH_CLAIMS}개씩 ${batches}묶음으로 나누어 순서대로`:'를'} 조사합니다. 주장마다 검색 1회·허용 출처 본문 최대 2건을 취득하고, 같은 원본 전재는 한 근거로 셉니다.{(position||proposition)?' 다른 관점 검색 1회가 첫 묶음에 포함됩니다.':''} 대조를 마치지 못한 주장은 미확인으로 남깁니다.</p>}
    {autoStarted&&<p className="topic-note">{researchConsent===true?'분석 전에 동의한 자동 조사':'이 창에서 켜 둔 자동 조사'}에 따라 분석 직후 조사를 시작했어요. 언제든 취소할 수 있어요.</p>}
+   <p className="topic-note">본문 분석이 끝난 뒤 외부 자료를 백그라운드에서 조사합니다. 결과는 확인되는 순서대로 추가되며, 조사 중에도 본문 분석 결과를 살펴볼 수 있어요.</p>
    {!started&&<><label className="transmission-consent"><input ref={consentRef} type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/><span>공개 자료에서 추출한 검색어가 {newsProviderLabel(cap?.searchProvider)}로 전송되고, 취득한 기사 발췌와 주장이 선택한 AI 제공자로 전송되는 자동 조사에 동의합니다. 검색어는 검색 제공자 정책에 따라 보관·서비스 개선에 사용될 수 있습니다.</span></label><button className="button secondary" disabled={!consent||directActive} onClick={start}>{factual.length?'공개 자료로 자동 조사하기':'다른 관점의 기사 찾기'}</button><p className="topic-note">무료 한도를 지키며 주장별로 조사하므로 수 분 걸릴 수 있어요. 창을 열어 두세요.</p>
    </>}
    {batchInfo&&batchInfo.batches>1&&busy&&<p className="topic-note">진행 묶음 {batchInfo.batch}/{batchInfo.batches}</p>}

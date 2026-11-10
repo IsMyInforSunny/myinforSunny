@@ -1,5 +1,5 @@
 import {searchLanguagePrompt} from './search-language';
-import { Analysis, BodyTopicAssignment, RawAnalysis, RUBRIC, TextRequest, analysisModelSchema, analysisResponseSchema, Expression, Span, searchQuerySchema } from '../contracts';
+import { Analysis, BodyTopicAssignment, RawAnalysis, RUBRIC, TextRequest, analysisModelSchema, analysisResponseSchema, bodyPositionCandidateSchema, Expression, Span, searchQuerySchema } from '../contracts';
 import { assertAnalysis, indicators, locate, makeSources, naturalSentenceCount, SEGMENTER } from '../domain';
 import { RuntimeConfig, modelName } from './config';
 import { AppError } from './errors';
@@ -9,6 +9,20 @@ export const ANALYZE_PROMPT=`한국어 미디어 리터러시 보조 도구다. 
 
 export function assembleAnalysis(req:TextRequest,raw:RawAnalysis,requestId:string,model:string):Analysis{
   const sources=makeSources(req);const warnings:Analysis['warnings']=[];let damaged=false;
+  const positionProposal=bodyPositionCandidateSchema.safeParse(raw.bodyPosition);
+  const normalizePosition=(value:string)=>value.normalize('NFC').trim().replace(/\s+/g,' ');
+  let bodyPosition:Analysis['bodyPosition'];
+  if(positionProposal.success){
+    const candidate=positionProposal.data;
+    const evidence=candidate.evidence.map(quote=>locate(sources,quote));
+    const proposition=normalizePosition(candidate.proposition);
+    const matchesUser=!req.proposition||proposition===normalizePosition(req.proposition);
+    const hasDimension=!!proposition||['not_expressed','undetermined'].includes(candidate.label);
+    if(matchesUser&&hasDimension&&evidence.every((span):span is Span=>!!span&&span.sourceId==='body')){
+      bodyPosition={proposition,label:candidate.label,evidence,reason:candidate.reason};
+    }
+  }
+  if(!bodyPosition)warnings.push({code:'BODY_POSITION_UNAVAILABLE',message:'본문의 비교 명제와 입장 근거를 확인하지 못했습니다. 다른 분석 결과와 원문을 확인해 주세요.'});
   const spans=(candidates:{sentenceId:string;quote:string}[]):Span[]=>candidates.flatMap(c=>{const s=locate(sources,c);if(!s){damaged=true;return [];}return [s];});
   const seen=new Set<string>();const topics=raw.topics.flatMap(t=>{if(t.id==='not_applicable'){damaged=true;return [];}if(seen.has(t.id)){damaged=true;return [];}seen.add(t.id);const evidence=spans(t.evidence);if(!evidence.length){damaged=true;return [];}return [{...t,evidence}];});
   const topicAssignments=sources.filter(s=>s.kind==='comment').map(s=>{const candidates=raw.topicAssignments.filter(t=>t.sourceId===s.id);const candidate=candidates.length===1?candidates[0]:undefined;
@@ -66,7 +80,7 @@ export function assembleAnalysis(req:TextRequest,raw:RawAnalysis,requestId:strin
     const query=searchQuerySchema.safeParse(suggestion.query);
     return query.success?[{label:suggestion.label,query:query.data.normalize('NFC')}]:[];
   }).slice(0,2);
-  const a:Analysis={schemaVersion:'2.1',analysisId:crypto.randomUUID(),requestId,mode:'live',status:damaged?'partial':'success',versions:{rubric:RUBRIC,prompt:'analysis-4.8',model,segmenter:SEGMENTER},sources,proposition:req.proposition,topics,topicAssignments,bodyTopicAssignments,stances,expressions,claims,perspectiveQuestions:questions,counterArguments,searchSuggestions,indicators:null as unknown as Analysis['indicators'],coverage:{totalSentences:expressions.length,naturalSentences:naturalSentenceCount(sources),factualClaimsExtracted:claims.filter(c=>c.kind==='factual').length,claimsMayBeOmitted:raw.claimsMayBeOmitted||claims.length===5||damaged,scopeNote:'제출한 자료 안에서 추출한 결과입니다. 아직 외부 자료와 대조하지 않았으며, 모든 주장을 빠짐없이 추출했다고 보장하지 않습니다.'},warnings,createdAt:new Date().toISOString()};a.indicators=indicators(a);assertAnalysis(a);return a;
+  const a:Analysis={schemaVersion:'2.1',analysisId:crypto.randomUUID(),requestId,mode:'live',status:damaged?'partial':'success',versions:{rubric:RUBRIC,prompt:'analysis-4.8',model,segmenter:SEGMENTER},sources,proposition:req.proposition,...(bodyPosition?{bodyPosition}:{}),topics,topicAssignments,bodyTopicAssignments,stances,expressions,claims,perspectiveQuestions:questions,counterArguments,searchSuggestions,indicators:null as unknown as Analysis['indicators'],coverage:{totalSentences:expressions.length,naturalSentences:naturalSentenceCount(sources),factualClaimsExtracted:claims.filter(c=>c.kind==='factual').length,claimsMayBeOmitted:raw.claimsMayBeOmitted||claims.length===5||damaged,scopeNote:'제출한 자료 안에서 추출한 결과입니다. 아직 외부 자료와 대조하지 않았으며, 모든 주장을 빠짐없이 추출했다고 보장하지 않습니다.'},warnings,createdAt:new Date().toISOString()};a.indicators=indicators(a);assertAnalysis(a);return a;
 }
 export async function analyze(req:TextRequest,config:RuntimeConfig,requestId:string,signal:AbortSignal){
   if(new Set(req.comments.map(c=>c.id)).size!==req.comments.length)throw new AppError(422,'VALIDATION_ERROR','댓글 ID가 중복되었습니다.');
@@ -75,7 +89,8 @@ export async function analyze(req:TextRequest,config:RuntimeConfig,requestId:str
   if(sentenceIds.length>24)throw new AppError(422,'INPUT_TOO_LARGE','정확한 문장별 분석을 위해 한 번에 최대 24문장씩 입력해 주세요.');
   const input={proposition:req.proposition??null,requiredExpressionSentenceIds:sentenceIds,requiredTopicAssignmentSourceIds:sources.filter(s=>s.kind==='comment').map(s=>s.id),sources:sources.map(s=>({id:s.id,kind:s.kind,sentences:s.sentences.map(t=>({sentenceId:t.id,text:s.text.slice(t.start,t.end)}))}))};
   const coverageInstructions=' 출력은 간결하게 작성한다. 자극적이지 않은 clear 문장은 ID만 clearSentenceIds에 넣고 expressions 객체는 만들지 않는다. flagged 또는 undetermined 문장만 expressions에 넣는다. 두 배열을 합쳐 requiredExpressionSentenceIds의 모든 ID가 정확히 한 번씩 있어야 한다. topicAssignments에는 requiredTopicAssignmentSourceIds의 댓글만 각 1개씩 반환하며 본문 body는 여기에 넣지 않는다. 댓글이 없어도 본문 body의 모든 문장 ID를 bodyAssigned({sentenceId,topicIds}: 해당 논점 있음)·bodyOtherIds(해당 논점 없음)·bodyUndeterminedIds(유보) 중 정확히 한 곳에 한 번씩 넣는다. topicIds는 topics의 id만 쓰며 여러 개 가능하다. topics 근거 인용은 예시일 뿐 분포에 쓰이지 않는다. stances는 proposition이 없으면 빈 배열이다.';
-  const raw=await structured(config,analysisResponseSchema(sources,!!req.proposition),searchLanguagePrompt(ANALYZE_PROMPT+coverageInstructions,config),input,signal,{generationSchema:analysisModelSchema(sources,!!req.proposition)});
+  const bodyPositionInstructions=' bodyPosition은 댓글을 제외한 기사 본문 자체의 입장이다. 과학·교육·경제·건강·소비·환경 등 모든 주제를 다루며 정치적 좌우로 강제하지 않는다. 사용자 proposition이 있으면 그대로 비교하고, 없으면 본문 중심의 찬반 가능한 명제를 긍정형으로 짧게 정한다. label은 그 명제에 대한 본문 입장 support/oppose/mixed/not_expressed/undetermined다. evidence에는 body 문장의 실제 인용만, reason에는 입장 판단 이유를 쓴다. 댓글 의견·취재원 인용을 기사 작성자의 지지로 바꾸지 않는다. 사실만 전달하고 입장을 드러내지 않으면 not_expressed로 두며, 비교할 논쟁이 없으면 proposition은 빈 문자열로 둔다. 수치 점수는 생성하지 않는다.';
+  const raw=await structured(config,analysisResponseSchema(sources,!!req.proposition),searchLanguagePrompt(ANALYZE_PROMPT+coverageInstructions+bodyPositionInstructions,config),input,signal,{generationSchema:analysisModelSchema(sources,!!req.proposition),requestId});
   const {clearSentenceIds,...proposal}=raw;
   const explicitIds=new Set(proposal.expressions.map(e=>e.sentenceId));
   const overlaps=clearSentenceIds.filter(id=>explicitIds.has(id));

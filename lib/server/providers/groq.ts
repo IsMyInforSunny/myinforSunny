@@ -18,6 +18,11 @@ export function retrySeconds(headers:Headers){
 }
 
 export const groqProvider:StructuredProvider={id:'groq',async generate(request,config:RuntimeConfig){
+  const requestId=(request as typeof request&{requestId?:string}).requestId;
+  const logFailure=(reason:'provider_json_validation'|'response_envelope'|'output_limit'|'incomplete_output'|'refusal'|'content_missing')=>{
+    const correlated=requestId&&/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(requestId)?requestId:undefined;
+    console.warn(JSON.stringify({type:'model_output_failure',provider:'groq',stage:'provider_response',reason,...(correlated?{requestId:correlated}:{})}));
+  };
   const callSignal=AbortSignal.any([request.signal,AbortSignal.timeout(REQUEST_TIMEOUT_MS)]);
   let response:Response;
   try{
@@ -35,7 +40,7 @@ export const groqProvider:StructuredProvider={id:'groq',async generate(request,c
     if(response.status===429){await config.onRateLimit?.(retrySeconds(response.headers));throw new AppError(429,'RATE_LIMITED','무료 AI 요청·토큰 한도에 도달했습니다. 안내된 시간이 지난 뒤 다시 이용해 주세요.',true);}
     if(response.status===400){
       const error=await response.json().catch(()=>null) as {error?:{code?:unknown}}|null;
-      if(error?.error?.code==='json_validate_failed')throw new AppError(502,'INVALID_MODEL_OUTPUT','AI가 완전한 분석 형식을 만들지 못했습니다. 입력을 줄이거나 예시를 이용해 주세요.');
+      if(error?.error?.code==='json_validate_failed'){logFailure('provider_json_validation');throw new AppError(502,'INVALID_MODEL_OUTPUT','AI가 완전한 분석 형식을 만들지 못했습니다. 입력을 줄이거나 예시를 이용해 주세요.');}
     }
     // No raw provider message is exposed or logged.
     throw providerFailure(response.status);
@@ -45,6 +50,9 @@ export const groqProvider:StructuredProvider={id:'groq',async generate(request,c
   const usage=data?.usage?.total_tokens;
   if(typeof usage==='number'&&Number.isFinite(usage)&&usage>=0)config.onUsage?.(usage);
   const choice=data?.choices?.[0];
-  if(choice?.finish_reason!=='stop'||choice.message?.refusal||typeof choice.message?.content!=='string')throw new AppError(502,'INVALID_MODEL_OUTPUT','완전한 분석 결과를 받지 못했습니다. 입력을 줄이거나 예시를 이용해 주세요.');
+  if(choice?.finish_reason!=='stop'||choice.message?.refusal||typeof choice.message?.content!=='string'){
+    const reason=!choice?'response_envelope':choice.message?.refusal?'refusal':choice.finish_reason==='length'?'output_limit':choice.finish_reason!=='stop'?'incomplete_output':'content_missing';
+    logFailure(reason);throw new AppError(502,'INVALID_MODEL_OUTPUT','완전한 분석 결과를 받지 못했습니다. 입력을 줄이거나 예시를 이용해 주세요.');
+  }
   return choice.message.content;
 }};

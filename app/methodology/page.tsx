@@ -1,18 +1,65 @@
-import {PROVIDER_NAME,MIN_N_FOR_PERCENT} from '@/lib/display';
-import {capabilities,runtimeConfig} from '@/lib/server/config';
-import {ArrowRight,ChartNoAxesColumnIncreasing,MessageCircle,Search,ShieldCheck} from 'lucide-react';
-import {Header,Footer} from '@/components/site-shell';
-export default async function Methodology(){
- const cap=capabilities(await runtimeConfig());
- return <><Header active="methodology"/><main className="container methodology">
-  <p className="eyebrow">읽는 방법</p><h1>편향 · 자극 · 신뢰,<br/>판단보다 근거를 먼저.</h1>
-  <p className="method-intro">기사에서 확인한 문장과 자료만 표시합니다. ‘문제가 없는 기사’나 ‘거짓 기사’를 자동으로 확정하지 않습니다.</p>
-  <div className="method-grid">
-   <article><span className="mini-icon green"><ChartNoAxesColumnIncreasing/></span><h2>01. 편향</h2><p>같은 주제의 매체 기사들을 검증된 모델의 상대 좌표에 놓습니다. 적격 매체별 기사 좌표 중심을 같은 비중으로 평균한 중간지점을 기준선으로 사용합니다. 입력 기사가 그 기준선에서 얼마나 떨어졌는지와 좌익·우익 중 어느 쪽인지 함께 표시합니다.</p><div className="formula">입력 기사 모델 좌표 − 적격 매체 중심의 동일가중 중간지점 → 방향과 강도(0–2)</div><p>Claude가 정리한 통념적 매체 구분은 좌익 쪽 한겨레·경향신문·오마이뉴스·프레시안, 우익 쪽 조선일보·중앙일보·동아일보입니다. 이 분류는 모델 축의 부호를 정하고 분리 여부를 검증하는 데만 사용하며, 매체에 고정 점수를 부여하지 않습니다. KBS·MBC·SBS·EBS·연합뉴스·한국일보는 방향을 미리 지정하지 않고, 기술·산업 전문지 ZDNET Korea·전자신문은 정치 논조 비교에서 기본 제외합니다.</p><p>같은 비교 주제에서 매체마다 고유 기사 3개 이상, 적격 매체 2곳 이상이 필요합니다. 좌익 기준 매체 중심이 우익 기준 매체 중심보다 모두 왼쪽에 있지 않으면 축 검증에 실패한 것으로 보고 계산을 보류합니다. 반원 게이지는 중간지점에서의 거리 0–2를 0–100점으로 표시하며, 평가 오차 안의 방향은 유보합니다. 매체·기사의 고정 성향이나 진실 확률이 아닙니다.</p><p>모델 학습·평가에는 같은 주제의 이용 가능한 실제 기사, 분리된 평가 표본, 매체별 성능 기록이 필요합니다. 현재 검증된 기사 좌표와 평가 모델이 없어 게이지는 계산 대기 상태입니다. 본문과 댓글의 논점 분포 및 근거 창의 기사 비교 지도는 별도 관찰 정보입니다.</p></article>
-   <article><span className="mini-icon peach"><MessageCircle/></span><h2>02. 자극</h2><p>인신공격, 집단 일반화, 조롱, 공포 유도, 과도한 단정, 위협을 맥락과 함께 검토합니다. 공격성은 이 축 안에서 표현 기준으로 다룹니다.</p><div className="formula">자극 점수 = 검출 자연 문장 수 / 본문·댓글의 전체 자연 문장 수 × 100</div><p>0–100점으로 표시합니다. 미판정 문장이 있으면 현재 검출 점수부터 가능한 상한까지 범위를 표시합니다. 점수와 함께 검출 건수·전체 문장 수를 보여 줍니다.</p><p>FOMO 표현 탐색은 긴급함·희소성·뒤처짐을 유도하는 사전 정의 표현을 본문에서만 찾는 보조 표시입니다. 분모도 본문 문장 수이며, 댓글을 포함하는 자극 축의 전체 문장 수와 구분합니다.</p><div className="formula">본문의 FOMO 표현 후보 문장 수 / 전체 본문 문장 수</div><p>심리검사나 보정된 지수가 아니며 의도·효과·불안 수준을 측정하지 않습니다. 인용·반박·부정 맥락은 놓칠 수 있습니다. 긴 문장의 처리 조각은 자연 문장 한 개로 셉니다.</p></article>
-   <article><span className="mini-icon lavender"><Search/></span><h2>03. 신뢰</h2><p>메인 신뢰 숫자는 출처 가중 근거 점수입니다. 현재 분석에서 실제 취득 원문과 대조한 사실 주장별 뒷받침 가중 비중을 같은 비중으로 평균해 0–100점으로 표시합니다. 대조할 자료가 없으면 산출 대기, 사실 주장이 없으면 해당 없음입니다. 일부 주장만 대조했으면 전체 사실 주장을 분모에 유지하고, 미대조 주장의 가능한 기여도를 상한에만 포함한 범위로 표시합니다. 예를 들어 두 주장 중 한 주장만 70점에 해당하면 35–85점 범위입니다. 진실 확률이나 보정된 정확도가 아닙니다.</p><p>사실 주장마다 실제 웹에서 취득한 자료의 인용 위치, 발행 시점, 원문 출처를 확인합니다. 검증된 자료의 뒷받침·상충·충돌 결과에 공개 근거가 있는 매체별 이용자 신뢰 가중치를 적용합니다. 완전히 같은 본문으로 확인된 전재만 독립 자료 한 집단으로 셉니다. 문장을 고친 전재나 전체 본문을 확인하지 못한 자료는 같은 원본인지 확인하지 못할 수 있습니다. 이 값은 주장별로 검토된 근거의 가중 구성입니다.</p><div className="formula">주장별 뒷받침 가중 비중의 합 / 전체 사실 주장 수 × 100 → 출처 가중 근거 점수</div><p>가중치는 언론사 규모나 이름만으로 만들지 않습니다. 현재는 비교 가능한 공개 이용자 신뢰 응답을 보조 가중치로 사용합니다. 향후 독립 정확도 평가, 정정 투명성, 원자료 추적 가능성 자료가 확보되면 근거와 버전을 붙여 보완합니다. 이용자 신뢰는 정확도와 같지 않습니다. 출처 가중치가 없거나 대조 자료가 없으면 결과를 계산 대기로 둡니다. 주장별로 가중치가 확인된 매체 2곳과 원본 근거 집단 2개 이상이 필요합니다. 설명용 메인 점수는 작은 표본에서도 대조한 주장 수·전체 주장 수와 근거 집단 수를 함께 표시합니다. 세부 가중 구성의 일반 퍼센트 표는 독립 근거 집단 10개 하한을 유지하며, 그보다 작으면 집단 수와 표본 부족 안내를 표시합니다. 현재 자동 조사는 주장당 최대 2개 자료만 취득하므로 이 일반 퍼센트 표의 기준에는 도달하지 않습니다. 점수와 세부 표 모두 실제 검토한 작은 자료 범위의 한계를 갖습니다. 결과는 언론사 단일 등급이나 사실의 참일 확률이 아닙니다.</p><p>근거 출처 명시 점수는 별도 보조 정보입니다. 이름 있는 근거 출처가 연결된 사실 주장 수 / 전체 사실 주장 수 × 100으로 계산하며, 일반 명칭은 분자에서 제외하고 미해결 귀속은 가능한 상한에만 포함합니다. 기사에 적힌 출처의 이름·유형·자료명·시점과 원문 확인 상태를 구분해 보여 줍니다. 원문 확인에는 현재 분석의 취득 자료에서 출처 정체성과 실제 인용 구절이 일치해야 하며, 한 주장의 확인을 같은 출처를 쓰는 다른 주장으로 확대하지 않습니다. 인용 구절이 존재한다는 확인도 사실 정확도를 증명하지는 않습니다.</p><p>한국언론진흥재단의 <a className="inline-link" href="https://www.kpf.or.kr/front/board/boardContentsView.do?board_id=246&amp;contents_id=8cfa6b1bf19b4b6ab16a7b970bb1512e" target="_blank" rel="noopener noreferrer">2024 언론수용자 조사</a>는 5점 척도에서 텔레비전 매체 신뢰도 3.90점을 보고했지만, 보도자료 요약에는 개별 방송사 점수와 조사 설계가 없습니다. Reuters Institute의 <a className="inline-link" href="https://reutersinstitute.politics.ox.ac.uk/digital-news-report/2025/south-korea" target="_blank" rel="noopener noreferrer">2025 한국 페이지</a>에 연결된 <a className="inline-link" href="https://datawrapper.dwcdn.net/3sOWE/2/" target="_blank" rel="noopener noreferrer">매체별 이용자 신뢰 표</a>에는 14개 이름이 확인된 매체의 응답이 있으며, MBC 61%, JTBC 59%, YTN 55%, SBS 54%, KBS 48%, 한겨레 45%, 경향신문 43%, 동아일보 41%, 중앙일보·조선일보 40% 등이 나옵니다. 채널A·MBN·TV조선·연합뉴스TV도 같은 표의 수치를 적용합니다. 현재 출처 가중치는 이 응답 비율을 0–1로 옮깁니다. Trust는 0–10점 중 6–10점 응답 비율이며(5점은 중립, 0–4점은 불신), 해당 매체를 들어 보지 못한 응답자는 분모에서 제외됩니다. 따라서 매체마다 인지 응답자 분모가 다르고, 가중치는 인지자 집단의 주관적 인식을 반영합니다. <a className="inline-link" href="https://reutersinstitute.politics.ox.ac.uk/digital-news-report/2025/methodology" target="_blank" rel="noopener noreferrer">보고서 방법론</a>의 한국 표본은 2,038명이며 YouGov 온라인 할당표집·가중을 사용했습니다. 비확률 표본이고 2%p 이하 차이는 통계적으로 구분하기 어렵습니다. 작은 숫자 차이로 매체 정확도의 우열을 주장하지 않습니다. 이 표의 연합뉴스TV는 연합뉴스 통신사와 구분하고, 표에 없거나 정확한 웹 호스트가 확인되지 않은 출처는 가중치가 없어 해당 주장 계산을 보류합니다.</p><p>{cap.live&&cap.webSearch&&cap.webFetch?'공개 자료 사용과 전송 안내에 동의하면 자동 조사를 시작할 수 있습니다.':'자동 조사와 관련 기사 검색은 준비 중입니다. 가상 예시로 대조 방식을 살펴볼 수 있습니다.'} 수동 대조에는 참고자료 본문을 직접 입력하며, 출처 주소만으로 본문을 가져오지 않습니다. 입력한 자료는 원 사이트에서 가져온 자료와 구분합니다. 같은 보도자료를 옮긴 여러 기사는 독립된 근거가 아닙니다.</p></article>
-  </div>
-  <section className="method-note"><ShieldCheck size={25}/><div><h2>밑줄의 의미</h2><p>밑줄은 확인할 위치를 알려 줍니다. ‘미대조’는 거짓이라는 뜻이 아니고, ‘입력한 출처와 다름’도 해당 자료 범위의 비교입니다. 시간·대상·단위가 다른 자료로 상충을 확정하지 않습니다. 인용 위치가 일치해도 AI의 해석까지 옳다고 보장하지 않습니다.</p><h2>입력과 동작 로그</h2><p>입력은 분석 기록으로 저장하지 않습니다. 실시간 분석에는 필요한 텍스트가 {PROVIDER_NAME}로 전달되며 제공자의 정책이 적용됩니다. 공개·가상 자료만 입력하고 개인정보와 비공개 대화를 넣지 마세요. 동작 로그는 시작·완료·실패 등의 상태만 기록하며 원문·검색어·URL·키를 남기지 않습니다. 화면 로그는 메모리에서만 유지됩니다.</p></div></section>
-  <section className="method-evaluation"><h2>현재 평가 상태</h2><p>기본 분석 기준 rubric-4.0 · analysis-4.5 / 설명용 점수 descriptive-scores-2.0 · JSON 내보내기 2.5입니다. 문장 표시·FOMO 탐색은 별도 모듈입니다. 학습용 예시 7종은 직접 만든 가상 자료로 실제 웹 조사 결과가 아닙니다. 독립 평가자와 대조한 정확도는 아직 없습니다.</p><p>작은 표본은 건수를 우선 표시하고 일반 퍼센트는 분모 {MIN_N_FOR_PERCENT} 이상에서만 표시합니다. 사용자 요청에 따라 편향·자극·신뢰의 설명용 0–100점은 분모가 작아도 원래 건수와 함께 표시하며, 미확인 값은 산출 대기·해당 없음으로 구분합니다. FOMO 탐색도 본문 검출 문장 수와 본문 분모를 함께 보여 줍니다. 미대조·유보·자료 부재를 0점으로 환산하지 않습니다.</p><p>편향 모듈은 동일 주제의 매체 기사 표본·검증된 상대 좌표와 모델 평가가 확인되기 전까지 보류합니다. 기존 매체 좌표의 표본 기준은 참고 도구에만 적용합니다. 실제 SVM 정확도와 독립 평가자의 판단 일치도는 아직 측정되지 않았습니다. 표에 없는 매체의 비교 가능한 가중치와 매체별 독립 정확도 지표도 확보되지 않았습니다.</p><p>{cap.live?'실시간 본문 분석은 무료 한도 내 실험 기능입니다.':'실시간 분석은 준비 중입니다.'} 실제 기사 수집·검색 품질·확장 프로그램 배포는 별도 검증 대상입니다.</p><a className="button primary" href="/analyze?example=provocative">표현 예시 살펴보기 <ArrowRight size={17}/></a></section>
- </main><Footer/></>;
+﻿import {PROVIDER_NAME, MIN_N_FOR_PERCENT} from '@/lib/display';
+import {capabilities, runtimeConfig} from '@/lib/server/config';
+import {ArrowRight, ChartNoAxesColumnIncreasing, MessageCircle, Search, ShieldCheck} from 'lucide-react';
+import {Header, Footer} from '@/components/site-shell';
+
+export default async function Methodology() {
+  const cap = capabilities(await runtimeConfig());
+  return <><Header active="methodology" /><main className="container methodology">
+    <p className="eyebrow">읽는 방법</p>
+    <h1>편향 · 자극 · 신뢰,<br />판단보다 근거를 먼저.</h1>
+    <p className="method-intro">교육·과학·경제·사회·문화·건강·정치 등 본문에 논점이 있는 기사를 분석합니다. 각 결과에서 원문 인용과 계산 기준을 확인할 수 있습니다.</p>
+    <div className="method-grid">
+      <article>
+        <span className="mini-icon green"><ChartNoAxesColumnIncreasing /></span>
+        <h2>01. 편향과 관점</h2>
+        <p>기본 논점 관점은 비교할 명제에 대한 본문의 찬성·반대·복합 관점을 보여 줍니다. 사용자가 비교 명제를 입력하면 그 명제를 사용하고, 없으면 AI가 본문에서 중심 명제를 추출합니다.</p>
+        <p>막대 위치는 분류를 나타냅니다. 수치 강도와 확률은 아직 계산하지 않습니다. 취재원의 인용과 댓글은 기사 작성자의 입장과 구분합니다. 입장 표현이 없거나 근거가 부족하면 해당 상태를 표시합니다.</p>
+        <p>정치 좌우는 별도 선택입니다. 검증된 SVM 모델과 같은 논점의 비교 표본이 준비된 경우에만 기사 좌표와 기준선 거리를 계산합니다. 현재 배포 모델과 검증된 좌표가 없어 계산을 보류합니다. 기존 정치 비교용 매체 구분은 이 선택에만 적용합니다.</p>
+        <div className="formula">정치 좌표 − 적격 매체 중심의 동일가중 기준선 → 방향과 거리</div>
+        <p>정치 비교에는 같은 주제에서 매체별 고유 기사 3개 이상과 적격 매체 2곳 이상, 분리된 평가 표본과 매체별 성능 기록이 필요합니다. 축 방향이 검증되지 않거나 평가 오차 안에 있으면 방향을 유보합니다.</p>
+        <p>PCA는 연구 단계에 있습니다. 현재 관련 기사는 취득한 원문과 인용, 같은 명제에 대한 입장을 확인해 분류합니다. 좌표 거리 기반 추천은 아직 구현되지 않았습니다.</p>
+      </article>
+      <article>
+        <span className="mini-icon peach"><MessageCircle /></span>
+        <h2>02. 자극과 공격성</h2>
+        <p>자극은 공포 유도와 과도한 단정을 집계합니다. 공격성은 인신공격·집단 일반화·조롱·위협을 별도로 집계합니다. 한 문장이 두 기준에 모두 해당할 수 있습니다.</p>
+        <div className="formula">표현 비율 = 해당 기준이 검출된 자연 문장 수 / 분석 대상 자연 문장 수 × 100</div>
+        <p>기본 분모는 본문입니다. 댓글도 함께 집계를 선택하면 본문과 댓글을 합칩니다. 미판정 문장이 있으면 가능한 비율 범위를 표시하며, 모든 문장이 미판정이면 분석 대기로 표시합니다. 긴 문장의 처리 조각은 자연 문장 한 개로 셉니다.</p>
+        <p>근거 창의 FOMO 표현 탐색은 긴급함·희소성·뒤처짐을 유도하는 사전 정의 표현을 본문에서 찾는 보조 표시입니다. 본문 검출 문장 수와 분모를 표시하며 인용·반박·부정 맥락을 놓칠 수 있습니다.</p>
+      </article>
+      <article>
+        <span className="mini-icon lavender"><Search /></span>
+        <h2>03. 신뢰</h2>
+        <p>메인 신뢰 칸에는 사실 주장의 근거 출처 명시 비율을 표시합니다. 이름 있는 출처가 연결된 사실 주장 수를 전체 사실 주장 수로 나누며, 미해결 귀속은 가능한 상한에 포함합니다. 사실 주장이 없으면 해당 없음으로 표시합니다.</p>
+        <div className="formula">이름 있는 출처가 연결된 사실 주장 수 / 전체 사실 주장 수 × 100</div>
+        <p>외부 자료 대조를 실행하면 출처 원문과 시점, 뒷받침·상충을 확인하고 출처 가중 근거 점수를 보조 결과로 제공합니다. 출처 명시 여부와 외부 자료의 뒷받침은 각각 확인합니다.</p>
+        <p>보조 점수는 사실 주장별 뒷받침 가중 비중의 합을 전체 사실 주장 수로 나눕니다. 일부 주장만 대조했으면 미대조 주장의 가능한 기여도를 상한에 포함합니다. 두 주장 중 하나만 70점이면 35–85점 범위입니다. 주장별로 가중치가 확인된 매체 2곳과 원본 근거 집단 2개 이상이 필요합니다.</p>
+        <p>현재 보조 가중치는 Reuters Institute의 매체별 이용자 신뢰 응답을 0–1로 옮깁니다. 이용자 신뢰 응답은 0–10점 중 6–10점 비율이며 해당 매체 인지자만 분모에 포함합니다. 한국 표본은 2,038명이고 온라인 할당표집과 가중을 사용했습니다. 매체별 분모가 다르고 주관적 인식과 표집 한계가 있습니다. 연합뉴스TV와 연합뉴스 통신사를 구분하며 표에 없는 매체는 가중치 계산을 보류합니다.</p>
+        <p>가중치와 조사 방법의 출처를 확인할 수 있습니다.</p>
+        <ul>
+          <li><a className="inline-link" href="https://reutersinstitute.politics.ox.ac.uk/digital-news-report/2025/south-korea" target="_blank" rel="noopener noreferrer">2025 한국 보고서</a></li>
+          <li><a className="inline-link" href="https://datawrapper.dwcdn.net/3sOWE/2/" target="_blank" rel="noopener noreferrer">매체별 이용자 신뢰 표</a></li>
+          <li><a className="inline-link" href="https://reutersinstitute.politics.ox.ac.uk/digital-news-report/2025/methodology" target="_blank" rel="noopener noreferrer">조사 방법론</a></li>
+        </ul>
+        <p>완전히 같은 본문으로 확인된 전재만 한 원본 집단으로 셉니다. 문장을 바꾼 전재나 전체 본문이 없는 자료는 원본 관계를 확인하지 못할 수 있습니다. 원문 확인에는 현재 취득 자료의 출처 정체성과 인용 구절이 일치해야 하며, 한 주장의 확인을 다른 주장으로 확대하지 않습니다.</p>
+        <p>{cap.live && cap.webSearch && cap.webFetch ? '공개 자료 사용과 전송 안내에 동의하면 자동 조사를 시작할 수 있습니다.' : '자동 조사와 관련 기사 검색은 준비 중입니다.'} 수동 대조에는 참고자료 본문을 직접 입력합니다. 입력 자료는 웹에서 취득한 자료와 구분합니다.</p>
+      </article>
+    </div>
+    <section className="method-note"><ShieldCheck size={25} /><div>
+      <h2>AI와 처리 시간</h2>
+      <p>첫 AI 호출에서 논점·사실과 의견·본문 입장·표현 후보와 원문 인용을 추출합니다. 인용 위치를 원문과 확인한 뒤 화면 비율을 계산합니다. 실제 서비스와 실행 모델은 분석 화면의 처리 과정에서 확인할 수 있습니다.</p>
+      <p>추가 조사는 별도 계획·검색·대조 호출을 순차 수행하며 무료 한도의 대기 시간이 추가됩니다. 본문 분석과 추가 조사 진행 상태를 각각 표시합니다.</p>
+      <h2>밑줄과 동작 로그</h2>
+      <p>밑줄은 검토할 원문 위치를 알려 줍니다. 자료의 시간·대상·단위를 함께 살펴보세요. 인용 위치가 일치해도 해석 오류는 생길 수 있습니다.</p>
+      <p>입력은 분석 기록으로 저장하지 않습니다. 실시간 분석에는 필요한 텍스트가 {PROVIDER_NAME}로 전달되며 제공자의 정책이 적용됩니다. 공개·가상 자료를 입력해 주세요. 동작 로그는 원문·검색어·URL·키를 제외한 상태를 기록합니다. 모델 형식 오류 진단은 고정된 단계·오류 코드·스키마 필드명만 사용합니다.</p>
+    </div></section>
+    <section className="method-evaluation">
+      <h2>현재 평가 상태</h2>
+      <p>기본 분석 기준 rubric-4.0 · analysis-4.8, 화면 요약 article-overview-1.0, JSON 내보내기 2.5입니다. 학습용 예시 7종은 직접 만든 가상 자료입니다. 독립 평가자의 판단과 비교한 정확도는 아직 측정되지 않았습니다.</p>
+      <p>일반 퍼센트 표는 분모 {MIN_N_FOR_PERCENT} 이상에서 표시합니다. 메인 화면의 자극·공격성·출처 명시 비율은 작은 표본에서도 건수와 분모를 함께 표시합니다. 미확인 값은 분석 대기·해당 없음으로 구분합니다.</p>
+      <p>정치 좌우의 SVM 정확도와 거리 기반 추천 품질은 아직 검증되지 않았습니다. {cap.live ? '실시간 본문 분석은 무료 한도 내 실험 기능입니다.' : '실시간 분석은 준비 중입니다.'} 실제 기사 수집·검색 품질은 별도 검증 대상입니다.</p>
+      <a className="button primary" href="/analyze?example=provocative">표현 예시 살펴보기 <ArrowRight size={17} /></a>
+    </section>
+  </main><Footer /></>;
 }

@@ -9,6 +9,7 @@ import type {BiasAnalysisResult} from './bias-analysis';
 import {observationsFromResearch} from './source-reliability-adapter';
 import {SOUTH_KOREA_PUBLIC_TRUST_PRIOR_2025} from './public-trust-prior';
 import {reviewedCitedSources} from './cited-source-confirmations';
+import {languageMetrics} from './language-metrics';
 
 // Export completed review data only, never signed plans, evidence tokens or runtime settings.
 function reviewData(v: Verification) {
@@ -51,6 +52,13 @@ export function buildReviewExport({analysis, checks, feedback, includeRaw, inclu
     stale: !!analysis && stale,
     inputState: !analysis ? 'no_analysis' : stale ? 'stale' : 'current',
     scores: buildAnalysisScores(analysis,biasAssessment,{observations:analysis?observationsFromResearch(analysis,research):[],weightSet:SOUTH_KOREA_PUBLIC_TRUST_PRIOR_2025}),
+    articleOverview: analysis ? {
+      version: 'article-overview-1.0',
+      primaryTrustMetric: 'attribution',
+      bodyLanguage: languageMetrics(analysis, 'body'),
+      includingCommentsLanguage: languageMetrics(analysis, 'all'),
+      bodyPosition: analysis.bodyPosition ? {label: analysis.bodyPosition.label, evidenceCount: analysis.bodyPosition.evidence.length} : null,
+    } : null,
     sourcing: sourcing ? {version: sourcing.version, summary: sourcing.summary, note: sourcing.note} : null,
     sourceAssessment:assessedSources?{version:assessedSources.version,summary:assessedSources.summary,note:assessedSources.note}:null,
     summary: analysis ? {

@@ -3,10 +3,11 @@ import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import type {Analysis,Capabilities} from '@/lib/contracts';
 import type {EvidenceBundle,ResearchInput,ResearchStage,ResearchVerification} from '@/lib/research-contract';
 import {researchWait} from '@/lib/research-runner';
+import {researchProposition,researchRequestTimeout} from '@/lib/reliability';
 
 export default function DirectEvidence({analysis,cap,locked,onBusy,onProgress,onResult}:{analysis:Analysis;cap:Capabilities|null;locked:boolean;onBusy:(busy:boolean)=>void;onProgress:(stage:ResearchStage)=>void;onResult:(result:ResearchVerification)=>void}){
  const factual=analysis.claims.filter(c=>c.kind==='factual');
- const proposition=analysis.proposition?.trim()||undefined,position=proposition?undefined:analysis.claims.find(claim=>claim.kind==='opinion');
+ const proposition=researchProposition(analysis),position=proposition?undefined:analysis.claims.find(claim=>claim.kind==='opinion');
  let comparisonId=position?.id??'comparison_position';
  if(proposition){const ids=new Set(factual.map(claim=>claim.id));while(ids.has(comparisonId))comparisonId+='_';}
  const targets=[...factual.map(claim=>({id:claim.id,text:`사실 주장: ${claim.text}`})),...(proposition||position?[{id:comparisonId,text:`비교 명제: ${proposition??position!.text}`}]:[])];
@@ -36,7 +37,7 @@ export default function DirectEvidence({analysis,cap,locked,onBusy,onProgress,on
   if(!targetId){controller.current=null;setBusy(false);callbacks.current.onBusy(false);return;}
   const input:ResearchInput={sources:analysis.sources,claims:selectedClaim?[selectedClaim]:[],proposition,position,transmissionConsent:true,researchConsent:true};
   async function post<T>(body:unknown):Promise<T>{
-   const response=await fetch('/api/research',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.any([c.signal,AbortSignal.timeout(60000)])});
+   const response=await fetch('/api/research',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.any([c.signal,AbortSignal.timeout(researchRequestTimeout(cap))])});
    const data=await response.json() as {error?:{message?:string}};if(c.signal.aborted)throw new DOMException('취소됨','AbortError');
    if(!response.ok)throw new Error(data.error?.message??'기사 본문을 대조하지 못했어요.');return data as T;
   }

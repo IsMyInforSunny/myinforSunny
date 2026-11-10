@@ -25,6 +25,7 @@ export type TopicAssignment = { sourceId:string; topicIds:string[]; status:'assi
 /** One processing unit of the body. Complete only when every body unit has exactly one entry. */
 export type BodyTopicAssignment = { sentenceId:string; topicIds:string[]; status:'assigned'|'other'|'undetermined'; reason?:string };
 export type Stance = { sourceId:string; label:z.infer<typeof stanceLabelSchema>; evidence:Span[]; reason?:string };
+export type BodyPosition = {proposition:string;label:z.infer<typeof stanceLabelSchema>;evidence:Span[];reason:string};
 export type CounterArgument = {claimId:string;kind:'counterpoint'|'qualification';text:string;reasoning:string;evidenceNeeded:string;basis:Span[];provenance:'ai_suggestion'|'curated_example'};
 // Plain keywords only: keep Korean names/numbers instead of forcing translation.
 // Space separates words. Hyphen, decimal point, percent and middle dot are
@@ -43,6 +44,7 @@ export type Analysis = {
   schemaVersion:'2.1'; analysisId:string; requestId:string; mode:'demo'|'live'; status:'success'|'partial';
   versions:{rubric:string;prompt:string;model:string;segmenter:string};
   sources:InputSource[]; proposition?:string; topics:Topic[]; topicAssignments:TopicAssignment[]; bodyTopicAssignments?:BodyTopicAssignment[]; stances?:Stance[];
+  bodyPosition?:BodyPosition;
   expressions:Expression[]; claims:Claim[]; perspectiveQuestions:{text:string;basis:Span[]}[];
   counterArguments?:CounterArgument[];searchSuggestions?:SearchSuggestion[];
   indicators:{topics:{topicId:string;coverage:Ratio}[];expression:Ratio;expressionUndetermined:number;evidenceSupport:Ratio;verificationProgress:Ratio};
@@ -69,10 +71,15 @@ export type Capabilities = {aiProvider?:'groq'|'nvidia';searchProvider?:'gdelt'|
 
 // Model output is a proposal: offsets and final indicators are always server-owned.
 const quoteCandidate=z.object({sentenceId:id,quote:text(8000)}).strict();
+export const bodyPositionCandidateSchema=z.object({
+  proposition:z.string().trim().max(160),label:stanceLabelSchema,
+  evidence:z.array(quoteCandidate).min(1).max(3),reason:text(300),
+}).strict();
 export const rawAnalysisSchema=z.object({
   topics:z.array(z.object({id,label:text(50),description:text(300),evidence:z.array(quoteCandidate).min(1).max(5)}).strict()).max(5),
   topicAssignments:z.array(z.object({sourceId:id,topicIds:z.array(id).max(5),status:z.enum(['assigned','other','undetermined']),evidence:z.array(quoteCandidate).max(5),reason:z.string().max(300)}).strict()).max(5),
   stances:z.array(z.object({sourceId:id,label:stanceLabelSchema,evidence:z.array(quoteCandidate).max(5),reason:z.string().max(300)}).strict()).max(5),
+  bodyPosition:bodyPositionCandidateSchema.optional().catch(undefined),
   // Compact body classification: every body unit id must appear exactly once across these three lists.
   bodyAssigned:z.array(z.object({sentenceId:id,topicIds:z.array(id).max(5)}).strict()).max(24),
   bodyOtherIds:z.array(id).max(24),
@@ -98,6 +105,7 @@ export function analysisModelSchema(sources:InputSource[],hasProposition:boolean
   topics:z.array(rawAnalysisSchema.shape.topics.element.extend({evidence:z.array(quote).min(1).max(5)})).min(1).max(5),
   topicAssignments:z.array(rawAnalysisSchema.shape.topicAssignments.element.extend({sourceId:commentId,evidence:z.array(quote).max(5)})).length(commentIds.length),
   stances:z.array(rawAnalysisSchema.shape.stances.element.extend({sourceId:commentId,evidence:z.array(quote).max(5)})).length(hasProposition?commentIds.length:0),
+  bodyPosition:bodyPositionCandidateSchema,
   bodyAssigned:z.array(rawAnalysisSchema.shape.bodyAssigned.element).max(bodyUnits),
   bodyOtherIds:z.array(id).max(bodyUnits),
   bodyUndeterminedIds:z.array(id).max(bodyUnits),
@@ -112,6 +120,7 @@ export function analysisModelSchema(sources:InputSource[],hasProposition:boolean
 /** Optional discovery hints cannot invalidate otherwise usable core analysis. */
 export function analysisResponseSchema(sources:InputSource[],hasProposition:boolean){
  return analysisModelSchema(sources,hasProposition).extend({
+  bodyPosition:bodyPositionCandidateSchema.optional().catch(undefined),
   searchSuggestions:z.unknown().optional().transform(value=>Array.isArray(value)?value:[]),
  });
 }

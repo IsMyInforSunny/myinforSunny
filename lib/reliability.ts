@@ -1,6 +1,31 @@
-import type {Analysis,Check,Reference} from './contracts';
+import type {Analysis,Capabilities,Check,Reference} from './contracts';
 import type {Recommendation,ResearchStage,ResearchVerification,ReliabilityReview} from './research-contract';
 import {canonicalArticleUrl} from './media-position';
+import {validSpan} from './domain';
+
+type ResearchPositionSource=Partial<Pick<Analysis,'proposition'|'bodyPosition'|'sources'>>;
+
+/** A user-selected proposition takes priority. Automatic targets need evidence
+ * from this analysis's body, never a comment's stance or an unbound quote. */
+export function researchProposition(analysis:ResearchPositionSource):string|undefined{
+ const explicit=analysis.proposition?.trim();
+ if(explicit)return explicit;
+ const candidate=analysis.bodyPosition;
+ const proposition=candidate?.proposition.trim();
+ if(!candidate||!proposition||proposition.length>160||!candidate.evidence.length||!analysis.sources)return undefined;
+ const bodySources=analysis.sources.filter(source=>source.kind==='body');
+ const grounded=candidate.evidence.every(span=>
+  Number.isInteger(span.start)&&Number.isInteger(span.end)&&
+  !!span.quote.trim()&&validSpan(bodySources,span),
+ );
+ return grounded?proposition:undefined;
+}
+
+/** NVIDIA's server request window is ten minutes. Allow transport overhead
+ * while keeping cancellation and the shorter Groq request window intact. */
+export function researchRequestTimeout(cap:Pick<Capabilities,'aiProvider'>|null|undefined):number{
+ return cap?.aiProvider==='nvidia'?660_000:60_000;
+}
 
 function validRelation(ref:Reference|undefined,r:{quote:string;start:number;end:number}){return !!ref&&ref.provenance==='web_fetched'&&Number.isInteger(r.start)&&Number.isInteger(r.end)&&r.start>=0&&r.end>r.start&&r.end<=ref.text.length&&!!r.quote.trim()&&ref.text.slice(r.start,r.end)===r.quote;}
 function safeLink(value:string|undefined){try{const u=new URL(value??'');return ['http:','https:'].includes(u.protocol)&&!u.username&&!u.password?u:null;}catch{return null;}}
@@ -52,11 +77,16 @@ export function reliabilityReview(analysis:Pick<Analysis,'claims'>&ReviewIdentit
 }
 
 /** A factual contradiction is not automatically a policy/opinion disagreement. */
-export function verifiedRecommendations(verifications:ResearchVerification[],analysis?:(Pick<Analysis,'analysisId'|'mode'>&Partial<Pick<Analysis,'claims'|'proposition'>>)):Recommendation[]{
+export function verifiedRecommendations(verifications:ResearchVerification[],analysis?:(Pick<Analysis,'analysisId'|'mode'>&Partial<Pick<Analysis,'claims'|'proposition'|'bodyPosition'|'sources'>>)):Recommendation[]{
  const scoped=inScope(verifications,analysis);
  const known=analysis?.claims?new Set(analysis.claims.filter(c=>c.kind==='factual').map(c=>c.id)):null;
  const normal=(value:string)=>value.trim().replace(/\s+/g,' ');
- const positions=analysis?new Set([analysis.proposition,...(analysis.claims??[]).filter(c=>c.kind==='opinion').map(c=>c.text)].filter((p):p is string=>!!p).map(normal)):null;
+ const selectedProposition=analysis?researchProposition(analysis):undefined;
+ const positions=analysis?new Set([selectedProposition,...(analysis.claims??[]).filter(c=>c.kind==='opinion').map(c=>c.text)].filter((p):p is string=>!!p).map(normal)):null;
+ const groundedBodyProposition=analysis?researchProposition({bodyPosition:analysis.bodyPosition,sources:analysis.sources}):undefined;
+ const sameBodyProposition=!!groundedBodyProposition&&normal(groundedBodyProposition)===normal(selectedProposition??'');
+ const articleLabel=sameBodyProposition?analysis?.bodyPosition?.label:undefined;
+ const articleDirection=articleLabel==='support'?'supports_position':articleLabel==='oppose'?'opposes_position':undefined;
  const latest=new Map<string,{index:number;check:Check}>();
  scoped.forEach((v,index)=>{for(const check of v.checks)latest.set(claimKey(v,check.claimId),{index,check});});
  const perspectiveKey=(v:ResearchVerification,url:URL,position:string)=>JSON.stringify([v.mode,v.parentAnalysisId??null,articleIdentity(url),normal(position)]);
@@ -75,11 +105,18 @@ export function verifiedRecommendations(verifications:ResearchVerification[],ana
   let kind:Recommendation['kind'],reason:string,quote:string,start:number,end:number;
   if(perspective&&['opposes_position','supports_position'].includes(perspective.stance)){
    kind=perspective.stance==='opposes_position'?'opposing_view':'supporting_view';reason=perspective.explanation;({quote,start,end}=perspective);
+  }else if(perspective?.stance==='adds_context'){
+   kind='context';reason=perspective.explanation;({quote,start,end}=perspective);
   }else if(related){kind=related.relation==='contradicts'?'different_evidence':'context';reason=related.explanation;({quote,start,end}=related);}
   else continue;
+  let relationToArticle:Recommendation['relationToArticle']='unclassified';
+  if(kind==='context'||kind==='different_evidence')relationToArticle='context';
+  else if(articleDirection&&perspective&&normal(perspective.positionText)===normal(groundedBodyProposition!)){
+   relationToArticle=perspective.stance===articleDirection?'similar':'opposing';
+  }
   const key=articleIdentity(u);const old=cards.get(key);
-  if(old&&old.kind==='opposing_view')continue;
-  cards.set(key,{referenceId:r.id,title:r.title??u.hostname,url:u.href,publisherDomain:u.hostname.replace(/^www\./,''),kind,reason,quote,start,end,provenance:'web_fetched'});
+  if(old&&(articleDirection?old.relationToArticle==='opposing':old.kind==='opposing_view'))continue;
+  cards.set(key,{referenceId:r.id,title:r.title??u.hostname,url:u.href,publisherDomain:u.hostname.replace(/^www\./,''),kind,relationToArticle,reason,quote,start,end,provenance:'web_fetched'});
  }}
- return [...cards.values()].sort((a,b)=>Number(b.kind==='opposing_view')-Number(a.kind==='opposing_view')).slice(0,6);
+ return [...cards.values()].sort((a,b)=>articleDirection?Number(b.relationToArticle==='opposing')-Number(a.relationToArticle==='opposing'):Number(b.kind==='opposing_view')-Number(a.kind==='opposing_view')).slice(0,6);
 }
