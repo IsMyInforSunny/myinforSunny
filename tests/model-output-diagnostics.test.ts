@@ -58,4 +58,34 @@ describe('모델 출력 실패의 제한된 서버 진단',()=>{
     expect(await run()).toEqual({claims:[{kind:'factual'}]});
     expect(warn).not.toHaveBeenCalled();expect(fetch).toHaveBeenCalledTimes(1);
   });
+
+  it('공급자 검증 거절에 포함된 완전한 JSON을 서버 스키마로 다시 검증한다',async()=>{
+    const warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
+    const candidate={claims:[{kind:'factual'}]};
+    const fetch=vi.fn().mockResolvedValue(Response.json({error:{code:'json_validate_failed',message:privateValue,failed_generation:JSON.stringify(candidate)}},{status:400}));
+    vi.stubGlobal('fetch',fetch);
+    expect(await run()).toEqual(candidate);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(privateValue);
+  });
+
+  it('복구 후보의 잘못된 값은 기존 서버 스키마가 거절한다',async()=>{
+    const warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
+    const fetch=vi.fn().mockResolvedValue(Response.json({error:{code:'json_validate_failed',failed_generation:JSON.stringify({claims:[{kind:privateValue}]})}},{status:400}));
+    vi.stubGlobal('fetch',fetch);
+    await expect(run()).rejects.toMatchObject({code:'INVALID_MODEL_OUTPUT',status:502});
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(warn.mock.calls[1][0])).toMatchObject({stage:'schema_validation',issues:[{path:'claims.0.kind',code:'invalid_value'}]});
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(privateValue);
+  });
+
+  it.each(['{"claims":', '[]', 'null', '"complete string"', ' '.repeat(128001)])('완전한 JSON 객체가 없는 공급자 오류는 복구하지 않는다',async(candidate)=>{
+    vi.spyOn(console,'warn').mockImplementation(()=>{});
+    const fetch=vi.fn().mockResolvedValue(Response.json({error:{code:'json_validate_failed',failed_generation:candidate}},{status:400}));
+    vi.stubGlobal('fetch',fetch);
+    await expect(run()).rejects.toMatchObject({code:'INVALID_MODEL_OUTPUT',status:502});
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
 });

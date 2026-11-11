@@ -10,6 +10,7 @@ import {analyzeBiasCoordinate, type BiasArticleCoordinate, type BiasOrientationS
 import type {EvidenceObservation, PublisherWeightSet} from '@/lib/source-reliability';
 import {buildAnalysisScores} from '@/lib/analysis-scores';
 import {languageMetrics} from '@/lib/language-metrics';
+import CollectedArticles from './collected-articles';
 
 type Props = {
   analysis: Analysis | null;
@@ -73,7 +74,7 @@ export default function CanvaDashboard({analysis, researchResults, researchStage
   const sourceScore = scores.attribution;
   const sourceText = sourceScore.status === 'not_applicable' ? '해당 없음' : percentageText(sourceScore);
   const scope = includeComments ? '본문·댓글' : '본문';
-  const status = !analysis ? '기사를 입력해 주세요' : stale ? '입력 변경 · 다시 분석해 주세요' : analysis.mode === 'demo' ? '가상 예시 결과' : analysis.status === 'partial' ? '본문 일부 분석 완료' : '본문 분석 완료';
+  const status = !analysis ? '기사를 입력해 주세요' : stale ? '입력 변경 · 다시 분석해 주세요' : analysis.mode === 'demo' ? '가상 예시 결과' : analysis.status === 'partial' ? '본문 일부 분석 완료' : analysis.warnings.some(warning=>warning.code==='CACHED_ANALYSIS') ? '최근 분석 재사용' : '본문 분석 완료';
 
   return <section className="article-studio" aria-label="기사 분석 화면">
     <div className="studio-statusbar"><span role="status"><i className={stale ? 'is-stale' : ''} />{status}</span><span>논점과 표현, 근거를 한눈에</span></div>
@@ -126,7 +127,7 @@ export default function CanvaDashboard({analysis, researchResults, researchStage
         <section className="studio-recommendations" aria-labelledby={`${id}-recommendations`}>
           <div className="studio-section-heading"><h2 id={`${id}-recommendations`}>함께 읽을 기사</h2><button type="button" className="studio-text-button" disabled={!analysis} onClick={onArticles}>{researchLabels[researchStage]} <ChevronRight size={14} /></button></div>
           <div className="studio-filter" role="group" aria-label="추천 기사 관점 선택">{([['all', '관련 기사'], ['similar', '같은 관점'], ['opposing', '다른 관점']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={recommendationMode === value} onClick={() => setRecommendationMode(value)}>{label}</button>)}</div>
-          <div className="studio-card-grid">{cards.map(card => <a key={card.url} href={card.url} target="_blank" rel="noopener noreferrer" className="studio-article-card"><span>{card.relationToArticle === 'similar' ? '본문과 같은 관점' : card.relationToArticle === 'opposing' ? '본문과 다른 관점' : card.kind === 'different_evidence' ? '다른 사실 근거' : '관련 맥락'}</span><h3>{card.title}</h3><p>{card.reason}</p><footer>{card.publisherDomain}<ArrowUpRight size={14} /></footer></a>)}{Array.from({length: Math.max(0, 3 - cards.length)}, (_, index) => <div key={index} className="studio-article-card is-empty"><Newspaper size={23} strokeWidth={1.3} /><p>{analysis ? '자료 대조에서 관련 기사와 본문 인용을 확인해 주세요.' : ['같은 논점의 기사', '함께 살펴볼 관점', '비교할 근거 자료'][index]}</p></div>)}</div>
+          {analysis?.mode === 'live' && recommendationMode === 'all' && allCards.length === 0 ? <CollectedArticles key={analysis.analysisId} analysis={analysis} stale={stale}/> : <div className="studio-card-grid">{cards.map(card => <a key={card.url} href={card.url} target="_blank" rel="noopener noreferrer" className="studio-article-card"><span>{card.relationToArticle === 'similar' ? '본문과 같은 관점' : card.relationToArticle === 'opposing' ? '본문과 다른 관점' : card.kind === 'different_evidence' ? '다른 사실 근거' : '관련 맥락'}</span><h3>{card.title}</h3><p>{card.reason}</p><footer>{card.publisherDomain}<ArrowUpRight size={14} /></footer></a>)}{Array.from({length: Math.max(0, 3 - cards.length)}, (_, index) => <div key={index} className="studio-article-card is-empty"><Newspaper size={23} strokeWidth={1.3} /><p>{analysis ? '자료 대조에서 관련 기사와 본문 인용을 확인해 주세요.' : ['같은 논점의 기사', '함께 살펴볼 관점', '비교할 근거 자료'][index]}</p></div>)}</div>}
         </section>
 
         <details className="studio-method"><summary>분석 기준과 AI 처리 과정</summary><div>

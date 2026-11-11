@@ -6,7 +6,7 @@ const text = (max: number) => z.string().max(max).refine(v => v.trim().length > 
 export const analyzeRequestSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('demo'), fixtureId: id }).strict(),
   z.object({ kind:z.literal('url'), url:z.string().trim().url().max(2048).refine(v=>v.startsWith('https://'),'HTTPS 기사 주소를 입력해 주세요.'), comments:z.array(z.object({id,text:text(200)}).strict()).max(5), proposition:text(160).optional(),transmissionConsent:z.literal(true) }).strict(),
-  z.object({ kind: z.literal('text'), body: text(2000), comments: z.array(z.object({ id, text: text(200) }).strict()).max(5), proposition: text(160).optional(), transmissionConsent:z.literal(true) }).strict(),
+  z.object({ kind: z.literal('text'), body: text(8000), comments: z.array(z.object({ id, text: text(200) }).strict()).max(5), proposition: text(160).optional(), transmissionConsent:z.literal(true) }).strict(),
 ]);
 export type TextRequest = Omit<Extract<z.infer<typeof analyzeRequestSchema>, {kind:'text'}>,'transmissionConsent'>;
 export const spanSchema = z.object({ sourceId: id, sentenceId: id, start: z.number().int().nonnegative(), end: z.number().int().positive(), quote: text(8000) });

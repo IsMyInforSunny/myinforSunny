@@ -30,7 +30,7 @@ describe('URL article analysis — synthetic sources only',()=>{
   const model=mockBody();const result=await call();expect(model.mock.calls[0][0]).toMatchObject({kind:'text',transmissionConsent:true,comments:[]});expect(result.article).toMatchObject({url:req.url,title:'합성 기사',truncated:false});expect(result.sources[0].text).toBe(model.mock.calls[0][0].body);
  });
  it('discloses truncation and never expands the model input budget',async()=>{
-  const model=mockBody('합성 정책 기사입니다. '.repeat(300));const result=await call();expect(model.mock.calls[0][0].body.length).toBeLessThanOrEqual(2000);expect(result.article?.truncated).toBe(true);expect(result.warnings.some(w=>w.code==='ARTICLE_TRUNCATED')).toBe(true);
+  const model=mockBody('합성 정책 기사입니다. '.repeat(1000));const result=await call();expect(model.mock.calls[0][0].body.length).toBeLessThanOrEqual(8000);expect(result.article?.truncated).toBe(true);expect(result.warnings.some(w=>w.code==='ARTICLE_TRUNCATED')).toBe(true);
  });
  it('does not call the model when no body is available',async()=>{
   const model=mockBody();vi.mocked(retrieval.retrieve).mockResolvedValue(null);await expect(call()).rejects.toMatchObject({code:'ARTICLE_BODY_UNAVAILABLE'});expect(model).not.toHaveBeenCalled();

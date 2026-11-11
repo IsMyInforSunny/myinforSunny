@@ -8,7 +8,7 @@ describe('v4 입력과 표시 계약',()=>{
  it('동의와 축소한 한도를 강제한다',()=>{
   const req={kind:'text',body:'공개 예시',comments:[],transmissionConsent:true};
   expect(analyzeRequestSchema.safeParse(req).success).toBe(true);
-  for(const r of [{...req,transmissionConsent:false},{...req,body:'가'.repeat(2001)},{...req,comments:Array.from({length:6},(_,i)=>({id:`c${i}`,text:'댓글'}))}])expect(analyzeRequestSchema.safeParse(r).success).toBe(false);
+  for(const r of [{...req,transmissionConsent:false},{...req,body:'가'.repeat(8001)},{...req,comments:Array.from({length:6},(_,i)=>({id:`c${i}`,text:'댓글'}))}])expect(analyzeRequestSchema.safeParse(r).success).toBe(false);
  });
  it('참고자료와 주장은 한 번에 최대 2개·1개다',()=>{
   const a=demoAnalysis('conflict');const req={kind:'text',sources:a.sources,claims:a.claims,references:[],useWebSearch:false,transmissionConsent:true};

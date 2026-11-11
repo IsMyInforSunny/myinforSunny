@@ -45,7 +45,8 @@ export default function DirectEvidence({analysis,cap,locked,onBusy,onProgress,on
    setMessage('선택한 공개 기사 본문을 가져오고 있어요.');callbacks.current.onProgress('fetching');
    const evidence=await post<EvidenceBundle>({operation:'import',input,claimId:targetId,urls:selected});
    if(!evidence.references.length)throw new Error('허용된 공개 본문을 확보하지 못했어요. 접속 실패는 거짓 판정이 아닙니다.');
-   const remaining=Math.max(0,Date.parse(analysis.createdAt)+61000-Date.now(),lastComparison.current+61000-Date.now());
+   const interval=cap?.aiProvider==='nvidia'?0:61000;
+   const remaining=Math.max(0,Date.parse(analysis.createdAt)+interval-Date.now(),lastComparison.current+interval-Date.now());
    if(remaining){setMessage(`무료 AI 한도를 지키기 위해 약 ${Math.ceil(remaining/1000)}초 기다립니다.`);callbacks.current.onProgress('waiting');await researchWait(remaining,c.signal);}
    setMessage('취득한 본문과 선택한 주장을 대조하고 있어요.');callbacks.current.onProgress('comparing');
    lastComparison.current=Date.now();

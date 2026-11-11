@@ -6,7 +6,7 @@ export const RESEARCH_BATCH_CLAIMS=5;
 /** Per-claim scope state. Only `reviewed` means a completed comparison against fetched text. */
 export type ClaimCoverage='pending'|'reviewing'|'reviewed'|'no_evidence'|'not_completed';
 export type ResearchProgress={stage:ResearchStage;completed:number;total:number;message:string;batch:number;batches:number;coverage:Record<string,ClaimCoverage>};
-type Dependencies={post:<T>(body:unknown,signal:AbortSignal)=>Promise<T>;wait:(ms:number,signal:AbortSignal)=>Promise<void>;now:()=>number;firstModelCallAt?:number};
+type Dependencies={post:<T>(body:unknown,signal:AbortSignal)=>Promise<T>;wait:(ms:number,signal:AbortSignal)=>Promise<void>;now:()=>number;firstModelCallAt?:number;modelIntervalMs?:number};
 /** Split every factual claim of one analysis into requests of at most five claims.
  * The opinion/proposition comparison target is attached to the first batch only so the
  * perspective search runs once. Each batch is its own signed plan (same sources, consents).
@@ -22,6 +22,7 @@ export function researchBatches(input:ResearchInput):ResearchInput[]{
 }
 export async function runResearch(input:ResearchInput,signal:AbortSignal,deps:Dependencies,onProgress:(p:ResearchProgress)=>void,onResult:(v:ResearchVerification)=>void){
  const ensureActive=()=>{if(signal.aborted)throw new DOMException('취소됨','AbortError');};
+ const modelIntervalMs=deps.modelIntervalMs??61000;
  const batches=researchBatches(input);const coverage:Record<string,ClaimCoverage>={};
  for(const b of batches)for(const c of b.claims)coverage[c.id]='pending';
  const total=Object.keys(coverage).length;let completed=0,reviewed=0,plannedQueries=0,batchIndex=0;const completedIds=new Set<string>();
@@ -62,7 +63,7 @@ export async function runResearch(input:ResearchInput,signal:AbortSignal,deps:De
     if(signal.aborted)throw new DOMException('취소됨','AbortError');
     emit('comparing','취득한 기사 본문과 주장을 대조하고 있어요.');
     ensureActive();const result=await deps.post<ResearchVerification>({operation:'compare',input:batch,evidenceToken:evidence.token},signal);ensureActive();
-    next=deps.now()+61000;
+    next=deps.now()+modelIntervalMs;
     onResult(result);ensureActive();
     for(const c of result.checks)if(batchIds.has(c.claimId)){if(c.execution==='completed'){completedIds.add(c.claimId);coverage[c.claimId]='reviewed';}else if(coverage[c.claimId]!=='reviewed')coverage[c.claimId]='not_completed';}
     if(result.status==='success'&&result.references.length)reviewed++;completed=completedIds.size;

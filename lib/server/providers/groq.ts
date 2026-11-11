@@ -39,8 +39,21 @@ export const groqProvider:StructuredProvider={id:'groq',async generate(request,c
    try{
     if(response.status===429){await config.onRateLimit?.(retrySeconds(response.headers));throw new AppError(429,'RATE_LIMITED','무료 AI 요청·토큰 한도에 도달했습니다. 안내된 시간이 지난 뒤 다시 이용해 주세요.',true);}
     if(response.status===400){
-      const error=await response.json().catch(()=>null) as {error?:{code?:unknown}}|null;
-      if(error?.error?.code==='json_validate_failed'){logFailure('provider_json_validation');throw new AppError(502,'INVALID_MODEL_OUTPUT','AI가 완전한 분석 형식을 만들지 못했습니다. 입력을 줄이거나 예시를 이용해 주세요.');}
+      const error=await response.json().catch(()=>null) as {error?:{code?:unknown;failed_generation?:unknown}}|null;
+      if(error?.error?.code==='json_validate_failed'){
+        logFailure('provider_json_validation');
+        // Groq can reject its generated object while still returning complete JSON.
+        // Pass only that complete object to structured(), which applies the existing
+        // server schema and grounding checks. This never dispatches another request.
+        const candidate=error.error.failed_generation;
+        if(typeof candidate==='string'&&candidate.length<=128000){
+          try{
+            const object:unknown=JSON.parse(candidate);
+            if(object&&typeof object==='object'&&!Array.isArray(object))return candidate;
+          }catch{/* Incomplete or non-JSON generations retain the provider failure. */}
+        }
+        throw new AppError(502,'INVALID_MODEL_OUTPUT','AI가 완전한 분석 형식을 만들지 못했습니다. 입력을 줄이거나 예시를 이용해 주세요.');
+      }
     }
     // No raw provider message is exposed or logged.
     throw providerFailure(response.status);

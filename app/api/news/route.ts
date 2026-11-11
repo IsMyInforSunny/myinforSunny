@@ -2,6 +2,7 @@ import {withAudit} from '@/lib/server/with-audit';
 import {newsRequestSchema} from '@/lib/news-contract';
 import {containsContactInfo} from '@/lib/privacy';
 import {searchNews} from '@/lib/server/news';
+import {searchIndexedNews} from '@/lib/server/indexed-news';
 import {isSearchLockBusy,releaseSearch,reserveSearch} from '@/lib/server/search-budget';
 import {capabilities,runtimeConfig} from '@/lib/server/config';
 import {AppError,errorResponse,json,readJson} from '@/lib/server/errors';
@@ -10,6 +11,7 @@ async function handlePost(request:Request){const id=crypto.randomUUID();try{
  if(!parsed.success)throw new AppError(422,'VALIDATION_ERROR','검색 전송 확인과 한국어·영문 핵심어 3~100자를 확인해 주세요. 연산자·주소·제어문자는 사용할 수 없습니다.');
  if(containsContactInfo(parsed.data.query))throw new AppError(422,'PRIVACY_INPUT_REJECTED','개인 연락처를 검색어로 사용할 수 없습니다.');
  const config=await runtimeConfig();
+ const indexed=searchIndexedNews(parsed.data.query,config);if(indexed)return json(indexed);
  // An unready provider must not consume site search quota.
  if(!capabilities(config).webSearch)throw new AppError(503,'SEARCH_UNAVAILABLE','관련 기사 검색을 준비 중입니다. 잠시 후 다시 확인해 주세요.');
  await reserveSearch(request,config,id);

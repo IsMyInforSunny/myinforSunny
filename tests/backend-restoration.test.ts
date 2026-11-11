@@ -26,7 +26,7 @@ describe('원사이트 본문 추출 복구 — 합성 HTML만 사용',()=>{
  it('일반 div 기사에서 메뉴를 빼고 본문을 복원한다',()=>{
   const paragraph='공개 도서관이 운영 시간을 안내했다. 자료에는 운영 대상과 기간을 설명하고 시민의 이용 방법을 구체적으로 알렸다. ';
   const result=extractArticle(`<html><head><title>공개 도서관 안내</title></head><body><nav>제외할 메뉴</nav><div id="content">${Array.from({length:5},()=>`<p>${paragraph}</p>`).join('')}</div><footer>제외할 꼬리말</footer></body></html>`,'https://news.example/a');
-  expect(result?.text).toContain(paragraph.trim());expect(result?.text).not.toContain('제외할');expect(result?.extractionVersion).toBe('readability-text-1.1');
+  expect(result?.text).toContain(paragraph.trim());expect(result?.text).not.toContain('제외할');expect(result?.extractionVersion).toBe('readability-text-1.2');
  });
  it.each(['<meta name="robots" content="noai">','<meta name="googlebot" content="nosnippet">','<script type="application/ld+json">{"@graph":[{"isAccessibleForFree":false}]}</script>'])('접근 제한이 명시적 본문이나 보조 추출로 되살아나지 않는다 (%s)',restriction=>{
   expect(extractArticle(`<head>${restriction}</head><article itemprop="articleBody">공개 기사처럼 보이는 제한 자료.</article>`,'https://news.example/a')).toBeNull();

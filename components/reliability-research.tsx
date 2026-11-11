@@ -31,8 +31,9 @@ export default function ReliabilityResearch({analysis,cap,onChange,researchConse
    setMessage('입력이 바뀌었거나 조사 기능을 사용할 수 없어 중단했어요. 다시 조사하려면 동의를 확인하고 시작해 주세요.');callback.current([...results],'cancelled');return;
   }
   const c=new AbortController();control.current=c;const found:ResearchVerification[]=[];
+  const modelIntervalMs=cap?.aiProvider==='nvidia'?0:61000;
   void runResearch({sources:analysis.sources,claims:factual,position,proposition,transmissionConsent:true,researchConsent:true},c.signal,{
-   now:Date.now,wait:researchWait,firstModelCallAt:Date.parse(analysis.createdAt)+61000,
+   now:Date.now,wait:researchWait,modelIntervalMs,firstModelCallAt:Date.parse(analysis.createdAt)+modelIntervalMs,
    post:async<T,>(body:unknown,signal:AbortSignal)=>{const response=await fetch('/api/research',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.any([signal,AbortSignal.timeout(researchRequestTimeout(cap))])});const data=await response.json() as {error?:{message?:string}};if(!response.ok)throw new Error(data.error?.message??'자동 조사에 연결하지 못했어요.');return data as T;},
   },p=>{if(!c.signal.aborted){setStage(p.stage);setMessage(p.message);setCoverage(p.coverage);setBatchInfo({batch:p.batch,batches:p.batches});callback.current(found,p.stage);}},v=>{if(!c.signal.aborted){found.push({...v,parentAnalysisId:analysis.analysisId});setResults([...found]);callback.current([...found],'comparing');}}).catch(e=>{if(!c.signal.aborted){settleCoverage();setStage('failed');setMessage(e instanceof Error?e.message:'자동 조사에 연결하지 못했어요.');callback.current([...found],'failed');}});
   return ()=>c.abort();

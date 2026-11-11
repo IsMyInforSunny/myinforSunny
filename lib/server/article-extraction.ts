@@ -2,7 +2,7 @@ import {Readability} from '@mozilla/readability';
 import {DOMParser} from 'linkedom/worker';
 import {ARTICLE_EXTRACTION_VERSION,articleTextPrefix,extractArticleDocument,publicationDate} from './article-document';
 
-export const EXTRACTION_VERSION='readability-text-1.1';
+export const EXTRACTION_VERSION='readability-text-1.2';
 export type ArticleText={text:string;title?:string;publishedAt?:string;language?:string;extractionVersion:string};
 const BODY_SELECTOR='article[itemprop~="articleBody"],section[itemprop~="articleBody"],div[itemprop~="articleBody"],article.article_body,section.article_body,div.article_body,article.news_view,section.news_view,div.news_view,div.at_contents';
 const BLOCKS=new Set(['P','DIV','SECTION','ARTICLE','H1','H2','H3','H4','LI','BR','BLOCKQUOTE','TR']);
@@ -54,7 +54,7 @@ export function extractArticle(html:string,url:string):ArticleText|null{
   // Publication dates come from the existing strict calendar/timezone parser.
   // A generic <time> could be an update or another article's timestamp.
   const publishedAt=publicationDate(original.publishedAt);
-  for(const node of Array.from(document.querySelectorAll('script,style,noscript,iframe,object,embed,nav,footer,header,aside,button,[hidden],[data-nosnippet]')))node.remove();
+  for(const node of Array.from(document.querySelectorAll('script,style,noscript,iframe,object,embed,nav,footer,header,aside,button,[hidden],[data-nosnippet],a[href^="mailto:"],a[href^="tel:"]')))node.remove();
   // ASP.NET can wrap the whole article in a form. Keep only the exact outer
   // framework wrapper with an explicit article body, never nested comment forms.
   for(const form of Array.from(document.querySelectorAll('form'))){

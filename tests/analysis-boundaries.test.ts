@@ -35,11 +35,7 @@ describe('무료 분석 입력 경계 (공급자 모의, 실제 모델 품질 �
   const fetch=vi.fn().mockResolvedValue(Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify(clearOutput(req))}}],usage:{total_tokens:3000}}));vi.stubGlobal('fetch',fetch);
   const result=await analyze(req,config,'boundary-long-sentence',new AbortController().signal);
   expect(result.coverage).toMatchObject({totalSentences:2,naturalSentences:1});expect(result.bodyTopicAssignments).toHaveLength(2);expect(fetch).toHaveBeenCalledTimes(1);
-  // 24 natural sentences, one of them long, are 25 processing units: refused before any provider call (limit counts units).
-  const over:TextRequest={kind:'text',body:`${request(23).body} ${'가나다라마바사아자차'.repeat(60)}.`,comments:[]};
-  expect(makeSources(over)[0].sentences.length).toBeGreaterThan(24);
-  fetch.mockClear();
-  return expect(analyze(over,config,'boundary-units',new AbortController().signal)).rejects.toMatchObject({code:'INPUT_TOO_LARGE'}).then(()=>expect(fetch).not.toHaveBeenCalled());
+
  });
  it('본문 분류가 빠진 모델 출력은 임의 완성 없이 거절하고 재호출하지 않는다',async()=>{
   const req=request(3),{bodyAssigned,bodyOtherIds,bodyUndeterminedIds,...incomplete}=clearOutput(req);void bodyAssigned;void bodyOtherIds;void bodyUndeterminedIds;
@@ -47,10 +43,13 @@ describe('무료 분석 입력 경계 (공급자 모의, 실제 모델 품질 �
   await expect(analyze(req,config,'boundary-missing-body',new AbortController().signal)).rejects.toMatchObject({code:'INVALID_MODEL_OUTPUT'});
   expect(fetch).toHaveBeenCalledTimes(1);
  });
- it('25문장은 공급자 호출 전에 거절한다',async()=>{
-  const fetch=vi.fn();vi.stubGlobal('fetch',fetch);
-  await expect(analyze(request(25),config,'boundary-25',new AbortController().signal)).rejects.toMatchObject({code:'INPUT_TOO_LARGE'});
-  expect(fetch).not.toHaveBeenCalled();
+ it('accepts more than 24 sentences with NVIDIA',async()=>{
+  const req=request(40);
+  const fetch=vi.fn().mockResolvedValue(Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify(clearOutput(req))}}]}));vi.stubGlobal('fetch',fetch);
+  const result=await analyze(req,{AI_PROVIDER:'nvidia',NVIDIA_API_KEY:'synthetic-not-real'},'boundary-40',new AbortController().signal);
+  expect(result.coverage.totalSentences).toBe(40);
+  expect(result.expressions).toHaveLength(40);
+  expect(fetch).toHaveBeenCalledTimes(1);
  });
  it('문자수 상한 안이어도 실제 토큰 예산을 넘으면 외부 전송하지 않는다',async()=>{
   const req:TextRequest={kind:'text',body:'가나다라마바사아자차카타파하'.repeat(142),comments:Array.from({length:5},(_,i)=>({id:`c${i}`,text:'가나다라마바사아자차카타파하'.repeat(14)}))};
