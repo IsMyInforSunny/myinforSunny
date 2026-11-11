@@ -11,13 +11,12 @@ import ReliabilityResearch from './reliability-research';
 import ArticleReview from './article-review';
 import ArticleMap from './article-map';
 import CanvaDashboard from './canva-dashboard';
-import ReviewDialog from './review-dialog';
+import ReviewSection from './review-section';
 import ReviewTabs from './review-tabs';
 import type {ReviewTab} from './review-tabs';
 import MediaPositionMap from './media-position-map';
 import SourceObservations from './source-observations';
 import ActivityLog from './activity-log';
-import PopupLauncher from './popup-launcher';
 import {recordActivity} from '@/lib/activity-log';
 import {buildReviewExport} from '@/lib/review-export';
 import {observationsFromResearch} from '@/lib/source-reliability-adapter';
@@ -154,9 +153,9 @@ export default function Workbench(){
     <nav className="canva-native-utilities" aria-label="분석 도구">
       <button type="button" onClick={focusInput}><FileText size={15}/> 기사 입력</button>
       <button type="button" onClick={()=>setView('coordinates')}>매체 좌표</button>
-      <button type="button" onClick={()=>setView('tools')}>작은 창 · 동작 기록</button>
+      <button type="button" onClick={()=>setView('tools')}>동작 기록</button>
     </nav>
-    <ReviewDialog open={view==='evidence'} title="분석근거" onClose={()=>setView(null)}>
+    <ReviewSection open={view==='evidence'} title="분석근거" onClose={()=>{setView(null);focusReport();}}>
       {error&&<div className="notice error" role="alert"><Info size={16}/>{error}</div>}
       {busy==='verify'&&<div className="notice" role="status"><LoaderCircle size={16} className="spin"/><span>선택한 주장과 자료를 대조하고 있어요.</span><button type="button" className="small-button" onClick={cancel}>요청 취소</button></div>}
       {cancelled&&<p role="status">요청을 취소했습니다. 이미 확인한 결과만 표시합니다.</p>}
@@ -180,14 +179,14 @@ export default function Workbench(){
       <Perspectives searchReady={!!cap?.webSearch&&!!cap?.webFetch} analysis={analysis} checks={checks} checkSources={checkSources} onSelect={selectSpan}/>
       {analysis.warnings.filter(w=>w.code!=='DEMO').map((w,i)=><p className="topic-note" key={i}>{w.message}</p>)}<p className="report-foot">{analysis.coverage.scopeNote}</p><details className="export-area"><summary><Download size={12} style={{display:'inline',marginRight:5}}/> 잘못된 부분이 있나요? 검토 기록 내보내기</summary><label htmlFor="feedback-note">어떤 부분을 다시 살펴보면 좋을까요?</label><textarea id="feedback-note" value={feedback} maxLength={1000} onChange={e=>setFeedback(e.target.value)} placeholder="예: 농담을 비하 표현으로 분석한 것 같아요."/><label><input type="checkbox" checked={includeRaw} onChange={e=>setIncludeRaw(e.target.checked)}/> 입력 원문과 상세 분석 포함</label><label><input type="checkbox" checked={includeRefs} onChange={e=>setIncludeRefs(e.target.checked)}/> 대조 자료와 인용 포함</label><details className="export-preview"><summary>저장할 내용 미리보기</summary><pre>{JSON.stringify(exportData,null,2)}</pre></details><button type="button" className="small-button" style={{marginTop:10}} onClick={download}><Download size={12}/> JSON 파일로 저장</button><p className="topic-note">내보내기는 팀에 자동 접수되지 않아요. 전달할 내용과 개인 정보를 먼저 확인해 주세요.</p></details>
     </div>}
-    </ReviewDialog>
-    <ReviewDialog open={view==='coordinates'} title="매체 좌표와 편향 비교" onClose={()=>setView(null)}>
+    </ReviewSection>
+    <ReviewSection open={view==='coordinates'} title="매체 좌표와 편향 비교" onClose={()=>{setView(null);focusReport();}}>
       {error&&<div className="notice error" role="alert"><Info size={16}/>{error}</div>}
       {stale&&<p className="notice" role="status">입력 내용이 바뀌어 이전 분석에 연결된 좌표를 표시합니다. 현재 입력의 편향 판단으로 사용하지 말고 다시 분석해 주세요.</p>}
       <section className="forecast-coordinate-section" id="media-coordinates"><div className="forecast-section-heading"><div><span className="forecast-kicker">02 / PERSPECTIVE MAP</span><h2>같은 사실, 서로 다른 시선.</h2></div><p>매체의 관측 입장을 좌표에 놓고<br/>기준선과 얼마나 다른지 확인하세요.</p></div>{analysis?<MediaPositionMap key={analysis.analysisId} analysis={analysis} results={researchResults}/>:<div className="forecast-map-empty"><div className="forecast-empty-axis"><span>반대 −1</span><i/><span>찬성 +1</span></div><h3>기사들의 위치가 모이면, 차이가 보입니다.</h3><p>먼저 기사를 분석하거나 가상 예시를 선택해 주세요.<br/>자료가 없을 때는 언론사 위치나 편향 수치를 만들어 내지 않습니다.</p><button className="small-button" onClick={()=>{void loadExample('supported',()=>setView('coordinates'));}}>예시로 좌표 체험 시작하기 <ArrowUpRight size={14}/></button></div>}</section>
-    </ReviewDialog>
-    <ReviewDialog open={view==='tools'} title="작은 창 · 동작 기록" onClose={()=>setView(null)}>
-      <PopupLauncher/><ActivityLog/><p className="topic-note">동작 기록은 현재 창 메모리에만 남습니다. 원문과 API 키를 담지 않습니다.</p><a href="/methodology" className="inline-link">분석 기준과 한계 <ArrowUpRight size={14}/></a>
-    </ReviewDialog>
+    </ReviewSection>
+    <ReviewSection open={view==='tools'} title="동작 기록" onClose={()=>{setView(null);focusReport();}}>
+      <ActivityLog/><p className="topic-note">동작 기록은 현재 창 메모리에만 남습니다. 원문과 API 키를 담지 않습니다.</p><a href="/methodology" className="inline-link">분석 기준과 한계 <ArrowUpRight size={14}/></a>
+    </ReviewSection>
   </div>;
 }

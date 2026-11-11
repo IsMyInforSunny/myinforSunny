@@ -1,4 +1,4 @@
-﻿import {PROVIDER_NAME, MIN_N_FOR_PERCENT} from '@/lib/display';
+import {MIN_N_FOR_PERCENT} from '@/lib/display';
 import {capabilities, runtimeConfig} from '@/lib/server/config';
 import {ArrowRight, ChartNoAxesColumnIncreasing, MessageCircle, Search, ShieldCheck} from 'lucide-react';
 import {Header, Footer} from '@/components/site-shell';
@@ -52,7 +52,7 @@ export default async function Methodology() {
       <p>추가 조사는 별도 계획·검색·대조 호출을 순차 수행하며 무료 한도의 대기 시간이 추가됩니다. 본문 분석과 추가 조사 진행 상태를 각각 표시합니다.</p>
       <h2>밑줄과 동작 로그</h2>
       <p>밑줄은 검토할 원문 위치를 알려 줍니다. 자료의 시간·대상·단위를 함께 살펴보세요. 인용 위치가 일치해도 해석 오류는 생길 수 있습니다.</p>
-      <p>입력은 분석 기록으로 저장하지 않습니다. 실시간 분석에는 필요한 텍스트가 {PROVIDER_NAME}로 전달되며 제공자의 정책이 적용됩니다. 공개·가상 자료를 입력해 주세요. 동작 로그는 원문·검색어·URL·키를 제외한 상태를 기록합니다. 모델 형식 오류 진단은 고정된 단계·오류 코드·스키마 필드명만 사용합니다.</p>
+      <p>입력은 분석 기록으로 저장하지 않습니다. 실시간 분석에는 필요한 텍스트가 {cap.aiProvider==='nvidia'?'NVIDIA DeepSeek':'Groq'}로 전달되며 제공자의 정책이 적용됩니다. 공개·가상 자료를 입력해 주세요. 동작 로그는 원문·검색어·URL·키를 제외한 상태를 기록합니다. 모델 형식 오류 진단은 고정된 단계·오류 코드·스키마 필드명만 사용합니다.</p>
     </div></section>
     <section className="method-evaluation">
       <h2>현재 평가 상태</h2>
