@@ -148,6 +148,7 @@ export default function Workbench(){
         availability={cap?{biasModelReady:!!releasedBiasModel,articleResearchReady:!!cap.webSearch&&!!cap.webFetch,biasComparisonGroup:releasedBiasModel?.topicScope?null:releasedBiasModel?.comparisonGroup??null}:null}
         reliabilityObservations={evidenceObservations}
         sourceWeightSet={SOUTH_KOREA_PUBLIC_TRUST_PRIOR_2025} biasArticleCoordinates={biasCoordinates} biasOrientationSet={CLAUDE_MEDIA_ORIENTATION_SET} selectedBiasArticleId={analysis?.analysisId}
+        relativeBody={inputMode==='text'?body:!stale?analysis?.sources.find(source=>source.kind==='body')?.text??'':''} relativeTitle={!stale?analysis?.article?.title??'':''}
         stale={stale} inputPanel={inputPanel} articlePanel={articlePanel} providerLabel={PROVIDER_NAME} onQuote={selectSpan} onInput={focusInput} onCoordinates={()=>setView('coordinates')} onEvidence={()=>showDetails('evidence')} onArticles={()=>showDetails('articles')}/>
     </div>
     <nav className="canva-native-utilities" aria-label="분석 도구">
@@ -190,4 +191,3 @@ export default function Workbench(){
     </ReviewSection>
   </div>;
 }
-

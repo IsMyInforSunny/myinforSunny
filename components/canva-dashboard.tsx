@@ -1,4 +1,5 @@
 'use client';
+import RelativeTopicComparison from './relative-topic-comparison';
 
 import {useId, useState, type ReactNode} from 'react';
 import {ArrowUpRight, ChevronRight, FileSearch, Newspaper, Search} from 'lucide-react';
@@ -25,6 +26,8 @@ type Props = {
   sourceWeightSet?: PublisherWeightSet | null;
   stale?: boolean;
   inputPanel?: ReactNode;
+  relativeBody?: string;
+  relativeTitle?: string;
   articlePanel?: ReactNode;
   providerLabel?: string;
   onEvidence: () => void;
@@ -49,7 +52,7 @@ function PercentageBar({value, label}: {value: number | null; label: string}) {
 
 export default function CanvaDashboard({analysis, researchResults, researchStage = 'not_started', availability,
   biasArticleCoordinates = [], biasOrientationSet = null, selectedBiasArticleId, reliabilityObservations = [], sourceWeightSet = null,
-  stale = false, inputPanel, articlePanel, providerLabel, onEvidence, onArticles, onInput, onCoordinates, onQuote}: Props) {
+  stale = false, inputPanel, articlePanel, providerLabel, relativeBody, relativeTitle, onEvidence, onArticles, onInput, onCoordinates, onQuote}: Props) {
   const id = useId();
   const [axisMode, setAxisMode] = useState<'argument' | 'political'>('argument');
   const [recommendationMode, setRecommendationMode] = useState<'all' | 'similar' | 'opposing'>('all');
@@ -122,6 +125,7 @@ export default function CanvaDashboard({analysis, researchResults, researchStage
             <div className="studio-claim-counts"><span>사실 주장 <b>{analysis.claims.filter(claim => claim.kind === 'factual').length}</b></span><span>의견 <b>{analysis.claims.filter(claim => claim.kind === 'opinion').length}</b></span><span>공격 표현 <b>{language?.aggression.flagged ?? 0}문장</b></span></div>
             {analysis.status === 'partial' && <p className="studio-metric-note">일부 항목을 판단하지 못했습니다. 분석 근거에서 해당 문장을 확인할 수 있습니다.</p>}
           </>}
+          <RelativeTopicComparison body={relativeBody ?? (!stale ? analysis?.sources.find(source=>source.kind==='body')?.text ?? '' : '')} title={relativeTitle ?? (!stale ? analysis?.article?.title ?? '' : '')}/>
         </section>
 
         <section className="studio-recommendations" aria-labelledby={`${id}-recommendations`}>

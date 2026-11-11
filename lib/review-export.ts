@@ -1,3 +1,4 @@
+import {compareRelativeBaseline} from './relative-baselines';
 import type {Analysis, Check, Verification} from './contracts';
 import type {ResearchStage, ResearchVerification} from './research-contract';
 import {currentResearch} from './current-research';
@@ -54,6 +55,7 @@ export function buildReviewExport({analysis, checks, feedback, includeRaw, inclu
     scores: buildAnalysisScores(analysis,biasAssessment,{observations:analysis?observationsFromResearch(analysis,research):[],weightSet:SOUTH_KOREA_PUBLIC_TRUST_PRIOR_2025}),
     articleOverview: analysis ? {
       version: 'article-overview-1.0',
+      relativeComparison: compareRelativeBaseline(analysis.sources.find(source=>source.kind==='body')?.text??'',analysis.article?.title),
       primaryTrustMetric: 'attribution',
       bodyLanguage: languageMetrics(analysis, 'body'),
       includingCommentsLanguage: languageMetrics(analysis, 'all'),

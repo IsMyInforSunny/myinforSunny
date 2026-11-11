@@ -1,0 +1,157 @@
+{
+  "schemaVersion": "relative-baseline-build-report-1.0",
+  "version": "relative-baselines-2026-11-12.1",
+  "generatedAt": "2026-11-11T23:44:29.376Z",
+  "sourceArticleCount": 3000,
+  "acceptedArticleCount": 3000,
+  "publisherCount": 4,
+  "scopeCharacters": 2000,
+  "metricVersions": {
+    "metrics": "relative-metrics-1.0",
+    "segmenter": "sentence-3.1",
+    "fomo": "fomo-lexical-1.0",
+    "citedSources": "cited-sources-0.2",
+    "topicRules": "policy-topics-1.0"
+  },
+  "articlePeriod": {
+    "from": "2024-01-01",
+    "through": "2026-11-04",
+    "timeZone": "Asia/Seoul"
+  },
+  "checks": {
+    "uniqueUrls": 3000,
+    "uniqueBodies": 3000,
+    "validDates": 3000,
+    "politicalLabelsCreated": 0,
+    "equalPublisherWeight": true
+  },
+  "topics": [
+    {
+      "id": "medical_school_quota",
+      "label": "의대 정원",
+      "n": 650,
+      "publisherCount": 4,
+      "metrics": {
+        "fomo": {
+          "min": 0,
+          "max": 6.7,
+          "zeroPercent": 99.7126436782,
+          "boundaryCount": 21
+        },
+        "attribution": {
+          "min": 0,
+          "max": 83.3,
+          "zeroPercent": 12.6194912989,
+          "boundaryCount": 21
+        }
+      }
+    },
+    {
+      "id": "pension_reform",
+      "label": "국민연금 개혁",
+      "n": 496,
+      "publisherCount": 4,
+      "metrics": {
+        "fomo": {
+          "min": 0,
+          "max": 7.7,
+          "zeroPercent": 98.4215516022,
+          "boundaryCount": 21
+        },
+        "attribution": {
+          "min": 0,
+          "max": 50,
+          "zeroPercent": 16.9960394486,
+          "boundaryCount": 21
+        }
+      }
+    },
+    {
+      "id": "minimum_wage",
+      "label": "최저임금",
+      "n": 416,
+      "publisherCount": 4,
+      "metrics": {
+        "fomo": {
+          "min": 0,
+          "max": 0,
+          "zeroPercent": 100,
+          "boundaryCount": 21
+        },
+        "attribution": {
+          "min": 0,
+          "max": 58.3,
+          "zeroPercent": 16.7508417508,
+          "boundaryCount": 21
+        }
+      }
+    },
+    {
+      "id": "electricity_prices",
+      "label": "전기요금",
+      "n": 181,
+      "publisherCount": 4,
+      "metrics": {
+        "fomo": {
+          "min": 0,
+          "max": 0,
+          "zeroPercent": 100,
+          "boundaryCount": 21
+        },
+        "attribution": {
+          "min": 0,
+          "max": 60,
+          "zeroPercent": 16.6480099502,
+          "boundaryCount": 21
+        }
+      }
+    },
+    {
+      "id": "housing_supply",
+      "label": "주택 공급",
+      "n": 710,
+      "publisherCount": 4,
+      "metrics": {
+        "fomo": {
+          "min": 0,
+          "max": 2.9,
+          "zeroPercent": 99.6970744487,
+          "boundaryCount": 21
+        },
+        "attribution": {
+          "min": 0,
+          "max": 53.8,
+          "zeroPercent": 18.3371809081,
+          "boundaryCount": 21
+        }
+      }
+    },
+    {
+      "id": "nuclear_energy",
+      "label": "원자력 에너지",
+      "n": 547,
+      "publisherCount": 4,
+      "metrics": {
+        "fomo": {
+          "min": 0,
+          "max": 4,
+          "zeroPercent": 99.5016725473,
+          "boundaryCount": 21
+        },
+        "attribution": {
+          "min": 0,
+          "max": 53.3,
+          "zeroPercent": 15.0068986118,
+          "boundaryCount": 21
+        }
+      }
+    }
+  ],
+  "inputSha256": "443077aab4f16b834a013026bf280cd31f52f636d00cc88fb28e54be544ef45c",
+  "realArticleParity": {
+    "checkedTopics": 6,
+    "matchedMetrics": 12,
+    "failed": 0,
+    "scopeCharacters": 2000
+  }
+}
