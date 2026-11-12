@@ -1,0 +1,1 @@
+ALTER TABLE `request_budget` ADD `lease_until` integer;

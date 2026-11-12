@@ -10,6 +10,7 @@ const config={GROQ_API_KEY:'synthetic-test-token',GROQ_MODEL:'openai/gpt-oss-120
 const sources=makeSources(request);
 const quote={sentenceId:'body_s0',quote:body};
 const proposal=()=>({topics:[{id:'hours',label:'도서관 운영',description:'운영 시간 제안',evidence:[quote]}],
+  bodyPosition:{proposition:body,label:'support',attribution:'author',evidence:[quote],reason:'작성자가 운영 시간 확대를 제안한다.'},
   topicAssignments:[],stances:[],bodyAssigned:[{sentenceId:'body_s0',topicIds:['hours']}],bodyOtherIds:[],bodyUndeterminedIds:[],
   clearSentenceIds:['body_s0'],expressions:[],claims:[{id:'proposal',kind:'opinion',text:body,origin:[quote],targetTime:''}],
   perspectiveQuestions:[],counterArguments:[{claimId:'proposal',kind:'qualification',text:'운영 인력도 확인할 수 있다.',reasoning:'시간 확대에는 운영 조건이 필요할 수 있다.',evidenceNeeded:'도서관 운영 자료',basis:[quote]}],

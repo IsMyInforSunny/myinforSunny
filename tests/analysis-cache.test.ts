@@ -11,6 +11,22 @@ beforeEach(()=>{vi.stubGlobal('caches',undefined);});
 afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();});
 
 describe('short-lived analysis reuse',()=>{
+ it('coalesces simultaneous identical requests and gives each response its own identity',async()=>{
+  let resolve!:(value:ReturnType<typeof result>)=>void;
+  const action=vi.fn(()=>new Promise<ReturnType<typeof result>>(done=>{resolve=done;}));
+  const first=cachedAnalysis(request(),input('concurrent article'),config,'first',action);
+  const second=cachedAnalysis(request(),input('concurrent article'),config,'second',action);
+  await vi.waitFor(()=>expect(action).toHaveBeenCalledTimes(1));
+  resolve(result());const responses=await Promise.all([first,second]);
+  expect(action).toHaveBeenCalledTimes(1);expect(responses.map(r=>r.cache).sort()).toEqual(['coalesced','miss']);
+  expect(new Set(responses.map(r=>r.analysis.analysisId)).size).toBe(2);
+ });
+ it('releases a failed in-flight request so a later retry can call the model',async()=>{
+  const action=vi.fn().mockRejectedValueOnce(new Error('upstream offline')).mockResolvedValueOnce(result());
+  await expect(cachedAnalysis(request(),input('retry after failure'),config,'first',action)).rejects.toThrow('upstream offline');
+  expect((await cachedAnalysis(request(),input('retry after failure'),config,'second',action)).cache).toBe('miss');
+  expect(action).toHaveBeenCalledTimes(2);
+ });
  it('reuses an identical input without another model budget reservation and renews response identity',async()=>{
   const action=vi.fn(async()=>result());
   const first=await cachedAnalysis(request(),input('same article'),config,'first',action);

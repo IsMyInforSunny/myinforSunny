@@ -1,0 +1,311 @@
+{
+  "schemaVersion": "relative-baseline-build-report-1.0",
+  "version": "relative-baselines-2026-11-12.2",
+  "generatedAt": "2026-11-12T04:15:19.651Z",
+  "sourceArticleCount": 3000,
+  "acceptedArticleCount": 3000,
+  "publisherCount": 4,
+  "scopeCharacters": 2000,
+  "metricVersions": {
+    "metrics": "relative-metrics-1.0",
+    "segmenter": "sentence-3.1",
+    "fomo": "fomo-lexical-1.0",
+    "citedSources": "cited-sources-0.2",
+    "topicRules": "policy-topics-1.0"
+  },
+  "articlePeriod": {
+    "from": "2024-01-01",
+    "through": "2026-11-04",
+    "timeZone": "Asia/Seoul"
+  },
+  "formatRulesVersion": "article-format-1.0",
+  "formatCounts": [
+    {
+      "id": "report",
+      "label": "보도",
+      "n": 1
+    },
+    {
+      "id": "opinion",
+      "label": "사설·칼럼·기고",
+      "n": 4
+    },
+    {
+      "id": "interview",
+      "label": "인터뷰",
+      "n": 0
+    },
+    {
+      "id": "other",
+      "label": "기타",
+      "n": 1
+    },
+    {
+      "id": "unknown",
+      "label": "형식 미확인",
+      "n": 2994
+    }
+  ],
+  "unidentifiedFormatPercent": 99.8,
+  "checks": {
+    "uniqueUrls": 3000,
+    "uniqueBodies": 3000,
+    "validDates": 3000,
+    "politicalLabelsCreated": 0,
+    "equalPublisherWeight": true
+  },
+  "topics": [
+    {
+      "id": "medical_school_quota",
+      "label": "의대 정원",
+      "n": 650,
+      "publisherCount": 4,
+      "metrics": {
+        "fomo": {
+          "min": 0,
+          "max": 6.7,
+          "zeroPercent": 99.7126436782,
+          "boundaryCount": 21
+        },
+        "attribution": {
+          "min": 0,
+          "max": 83.3,
+          "zeroPercent": 12.6194912989,
+          "boundaryCount": 21
+        }
+      }
+    },
+    {
+      "id": "pension_reform",
+      "label": "국민연금 개혁",
+      "n": 496,
+      "publisherCount": 4,
+      "metrics": {
+        "fomo": {
+          "min": 0,
+          "max": 7.7,
+          "zeroPercent": 98.4215516022,
+          "boundaryCount": 21
+        },
+        "attribution": {
+          "min": 0,
+          "max": 50,
+          "zeroPercent": 16.9960394486,
+          "boundaryCount": 21
+        }
+      }
+    },
+    {
+      "id": "minimum_wage",
+      "label": "최저임금",
+      "n": 416,
+      "publisherCount": 4,
+      "metrics": {
+        "fomo": {
+          "min": 0,
+          "max": 0,
+          "zeroPercent": 100,
+          "boundaryCount": 21
+        },
+        "attribution": {
+          "min": 0,
+          "max": 58.3,
+          "zeroPercent": 16.7508417508,
+          "boundaryCount": 21
+        }
+      }
+    },
+    {
+      "id": "electricity_prices",
+      "label": "전기요금",
+      "n": 181,
+      "publisherCount": 4,
+      "metrics": {
+        "fomo": {
+          "min": 0,
+          "max": 0,
+          "zeroPercent": 100,
+          "boundaryCount": 21
+        },
+        "attribution": {
+          "min": 0,
+          "max": 60,
+          "zeroPercent": 16.6480099502,
+          "boundaryCount": 21
+        }
+      }
+    },
+    {
+      "id": "housing_supply",
+      "label": "주택 공급",
+      "n": 710,
+      "publisherCount": 4,
+      "metrics": {
+        "fomo": {
+          "min": 0,
+          "max": 2.9,
+          "zeroPercent": 99.6970744487,
+          "boundaryCount": 21
+        },
+        "attribution": {
+          "min": 0,
+          "max": 53.8,
+          "zeroPercent": 18.3371809081,
+          "boundaryCount": 21
+        }
+      }
+    },
+    {
+      "id": "nuclear_energy",
+      "label": "원자력 에너지",
+      "n": 547,
+      "publisherCount": 4,
+      "metrics": {
+        "fomo": {
+          "min": 0,
+          "max": 4,
+          "zeroPercent": 99.5016725473,
+          "boundaryCount": 21
+        },
+        "attribution": {
+          "min": 0,
+          "max": 53.3,
+          "zeroPercent": 15.0068986118,
+          "boundaryCount": 21
+        }
+      }
+    }
+  ],
+  "inputSha256": "443077aab4f16b834a013026bf280cd31f52f636d00cc88fb28e54be544ef45c",
+  "events": {
+    "version": "event-baselines-2026-11-12.1",
+    "groupingVersion": "event-groups-1.0",
+    "rules": {
+      "version": "event-groups-1.0",
+      "tokenizer": "event-terms-1.0",
+      "maximumDayDistance": 3,
+      "minimumSimilarity": 0.56,
+      "minimumTitleSimilarity": 0.12,
+      "minimumArticles": 3,
+      "minimumPublishers": 2,
+      "bodyFeatures": 128,
+      "titleFeatures": 48,
+      "ambiguityMargin": 0.04
+    },
+    "groupCount": 2959,
+    "eligibleGroupCount": 1,
+    "eligibleArticleCount": 3,
+    "assignedArticleCount": 3000,
+    "byTopic": [
+      {
+        "id": "medical_school_quota",
+        "label": "의대 정원",
+        "groupCount": 643,
+        "eligibleGroupCount": 1,
+        "eligibleArticleCount": 3
+      },
+      {
+        "id": "pension_reform",
+        "label": "국민연금 개혁",
+        "groupCount": 491,
+        "eligibleGroupCount": 0,
+        "eligibleArticleCount": 0
+      },
+      {
+        "id": "minimum_wage",
+        "label": "최저임금",
+        "groupCount": 408,
+        "eligibleGroupCount": 0,
+        "eligibleArticleCount": 0
+      },
+      {
+        "id": "electricity_prices",
+        "label": "전기요금",
+        "groupCount": 178,
+        "eligibleGroupCount": 0,
+        "eligibleArticleCount": 0
+      },
+      {
+        "id": "housing_supply",
+        "label": "주택 공급",
+        "groupCount": 707,
+        "eligibleGroupCount": 0,
+        "eligibleArticleCount": 0
+      },
+      {
+        "id": "nuclear_energy",
+        "label": "원자력 에너지",
+        "groupCount": 532,
+        "eligibleGroupCount": 0,
+        "eligibleArticleCount": 0
+      }
+    ],
+    "thresholdReview": {
+      "sampleCount": 40,
+      "acceptedMinimumSimilarities": [
+        0.571419474,
+        0.668613475,
+        0.6006766357,
+        0.5913207551,
+        0.5689328304,
+        0.6264334122,
+        0.7525291061,
+        0.5907787829,
+        0.9125758092,
+        0.7143027186,
+        0.5679892552,
+        0.5686956228,
+        0.5756253108,
+        0.5677942426,
+        0.6245708822,
+        0.8043684533,
+        0.6998451279,
+        0.7490100767,
+        0.6726906007,
+        0.7559239042,
+        0.7338089167,
+        0.7460613338,
+        0.6166054403,
+        0.5878572044,
+        0.8487720068,
+        0.6080470023,
+        0.7385172242,
+        0.7129713929,
+        0.5870028803,
+        0.6604214937,
+        0.6284112469,
+        0.6476820874,
+        0.766604064,
+        0.7024216357,
+        0.6213601902,
+        0.5933883177,
+        0.5688116459,
+        0.7436905959,
+        0.7267007778,
+        0.6125302568
+      ],
+      "method": "complete-link cosine; title/body weights 0.35/0.65; every pair within 3 days and similarity threshold",
+      "note": "Keyword proximity forms candidate event groups. This is not a human-validated event accuracy score.",
+      "agentTitleInspection": {
+        "eligibleGroupsInspected": 1,
+        "twoArticleMultiPublisherGroupsInspected": 5,
+        "finding": "Inspected titles were consistent with shared developments; this limited title review is not an accuracy evaluation. Source identities remain in ignored local mapping only."
+      }
+    }
+  },
+  "verification": {
+    "recordedAt": "2026-11-12",
+    "vitest": {
+      "command": "node node_modules/vitest/vitest.mjs run tests/relative-baseline-builder.test.ts tests/article-comparison-groups.test.ts",
+      "filesPassed": 2,
+      "testsPassed": 16,
+      "exitCode": 0
+    },
+    "typecheck": {
+      "command": "node node_modules/typescript/bin/tsc --noEmit",
+      "exitCode": 0
+    },
+    "localMembershipMappingIgnoredByGit": true,
+    "scope": "Builder and matching unit checks. Full application checks and build are coordinated by the parent agent."
+  }
+}

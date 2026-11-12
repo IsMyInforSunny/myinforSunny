@@ -81,7 +81,7 @@ export async function planResearch(request:Request,input:ResearchInput,config:Ru
  const expiresAt=new Date(Date.now()+30*60000).toISOString();const planId=crypto.randomUUID();
  const queries=out.queries.map(query=>({...query,query:query.query.normalize('NFC')}));
  const data:PlanData={planId,inputDigest:await inputHash(input),queries,expiresAt};
- return {schemaVersion:'research-1.0',planId,queries:data.queries,claimCount:input.claims.length,expiresAt,token:await signResearchToken(request,config,'plan',data),nextModelCallAt:new Date(Date.now()+(provider(config)==='nvidia'?0:61000)).toISOString()};
+ return {schemaVersion:'research-1.0',planId,queries:data.queries,claimCount:input.claims.length,expiresAt,token:await signResearchToken(request,config,'plan',data),nextModelCallAt:new Date(Date.now()+(['nvidia','deepseek'].includes(provider(config))?0:61000)).toISOString()};
 }
 /** Pick a bounded excerpt around overlapping terms, retaining offsets in the extracted text. */
 export function researchExcerpt(text:string,claim:string,limit=1500){

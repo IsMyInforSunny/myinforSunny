@@ -21,7 +21,7 @@ const health = await request('/api/health');
 assert.equal(health.status, 200);
 assert.equal((await health.json()).status, 'ok');
 const privateConfig = await request('/.dev.vars');
-assert.equal(privateConfig.status, 403, 'Worker local configuration must not be served.');
+assert.ok([403, 404].includes(privateConfig.status), 'Worker local configuration must not be served.');
 const capabilityResponse = await request('/api/capabilities');
 assert.equal(capabilityResponse.status, 200);
 const capabilities = await capabilityResponse.json();

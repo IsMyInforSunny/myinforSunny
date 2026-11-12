@@ -183,6 +183,9 @@ describe('직접 지정한 비교 명제의 자동 조사 연결 — 외부 호�
   const result=await verify({kind:'text',sources:i.sources,claims:[],references:[],useWebSearch:false},config,'schema-and-budget',signal(),[{id:'r1',text:proposition,url:'https://news.example/position',provenance:'web_fetched',truncated:false}],proposition);
   expect(result.checks).toEqual([]);expect(result.perspectiveChecks?.[0].quote).toBe(proposition);
   expect(call).toHaveBeenCalledTimes(2);
+  const comparisonSchema=JSON.parse(call.mock.calls[1][1].body).response_format.json_schema.schema;
+  expect(comparisonSchema.properties.checks.maxItems).toBe(0);
+  expect(JSON.stringify(comparisonSchema.properties.checks)).not.toContain('originMatches');
   for(const args of call.mock.calls)expect(JSON.parse(args[1].body)).toMatchObject({max_completion_tokens:2000});
  });
  it('명제만 검토할 때 모델이 만든 가상 사실 판정을 스키마에서 거부한다',async()=>{

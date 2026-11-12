@@ -20,7 +20,7 @@ const build=(overrides:Partial<RawAnalysis>={},req:TextRequest={kind:'text',body
 describe('본문 논점 분포 조립',()=>{
   it('댓글이 없어도 문장별 배정으로 본문 분포를 만들고 다중 논점은 겹쳐 센다',()=>{
     const a=build({bodyAssigned:[{sentenceId:'body_s0',topicIds:['safety','budget']},{sentenceId:'body_s1',topicIds:['safety']},{sentenceId:'body_s2',topicIds:['budget']}]});
-    expect(a.status).toBe('success');expect(a.sources.filter(s=>s.kind==='comment')).toHaveLength(0);
+    expect(a.status).toBe('partial');expect(a.sources.filter(s=>s.kind==='comment')).toHaveLength(0);
     expect(a.bodyTopicAssignments).toEqual([{sentenceId:'body_s0',topicIds:['safety','budget'],status:'assigned'},{sentenceId:'body_s1',topicIds:['safety'],status:'assigned'},{sentenceId:'body_s2',topicIds:['budget'],status:'assigned'}]);
     const dist=bodyTopicDistribution(a);expect(dist).toMatchObject({available:true,sentences:3,assigned:3,other:0,undetermined:0});
     expect(dist.topics.map(t=>t.coverage)).toEqual([{numerator:2,denominator:3,percent:66.7},{numerator:2,denominator:3,percent:66.7}]);
@@ -72,7 +72,7 @@ describe('본문 논점 분포 조립',()=>{
   it('댓글 분포는 본문 분포와 따로 유지된다',()=>{
     const req:TextRequest={kind:'text',body,comments:[{id:'c1',text:'신호등이 필요해요.'},{id:'c2',text:'다른 이야기예요.'}]};
     const a=build({topicAssignments:[{sourceId:'comment_0',topicIds:['safety'],status:'assigned',evidence:[{sentenceId:'comment_0_s0',quote:'신호등이 필요해요.'}],reason:''},{sourceId:'comment_1',topicIds:[],status:'other',evidence:[],reason:''}],bodyAssigned:[{sentenceId:'body_s0',topicIds:['safety']},{sentenceId:'body_s1',topicIds:['safety']}],bodyOtherIds:['body_s2']},req);
-    expect(a.status).toBe('success');
+    expect(a.status).toBe('partial');
     expect(a.indicators.topics.find(t=>t.topicId==='safety')!.coverage).toEqual({numerator:1,denominator:2,percent:50});
     expect(bodyTopicDistribution(a).topics.find(t=>t.topicId==='safety')!.coverage).toEqual({numerator:2,denominator:3,percent:66.7});
   });

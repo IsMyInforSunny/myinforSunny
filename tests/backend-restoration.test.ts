@@ -1,7 +1,7 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
 import {extractArticle} from '../lib/server/article-extraction';
 import {searchTavily} from '../lib/server/tavily-search';
-import {parsePublisherFeed,searchPublisherFeeds} from '../lib/server/publisher-feeds';
+import {parsePublisherFeed,searchPublisherFeeds,PUBLISHER_FEEDS} from '../lib/server/publisher-feeds';
 import {runResearch,researchBatches} from '../lib/research-runner';
 import {demoAnalysis,demoVerification} from '../lib/fixtures';
 import type {RuntimeConfig} from '../lib/server/config';
@@ -49,7 +49,7 @@ describe('키 없는 최근 공식 기사 제목 찾기 — 모의 RSS',()=>{
   const fetch=vi.fn().mockImplementation(async(url:string)=>new Response(rss(url.includes('sbs')?'news.sbs.co.kr':'www.donga.com'),{headers:{'content-type':'application/xml'}}));vi.stubGlobal('fetch',fetch);
   const config:RuntimeConfig={NEWS_PROVIDER:'publisher_feeds',ENABLE_NEWS_SEARCH:'true',NEWS_TERMS_APPROVED:'true',DB:{} as D1Database};
   const found=await searchPublisherFeeds('도서관 운영',config,signal());expect(found.articles).toHaveLength(2);expect(found.provider).toBe('publisher_feeds');
-  expect(fetch).toHaveBeenCalledTimes(2);expect(fetch.mock.calls[0][1].redirect).toBe('manual');
+  expect(fetch).toHaveBeenCalledTimes(PUBLISHER_FEEDS.length);expect(fetch.mock.calls[0][1].redirect).toBe('manual');
   const empty=await searchPublisherFeeds('관련없는 우주탐사',config,signal());expect(empty.status).toBe('empty');expect(empty.articles).toEqual([]);
  });
  it('미승인 설정은 네트워크 전에 막는다',async()=>{

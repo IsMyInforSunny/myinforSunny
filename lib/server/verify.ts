@@ -80,7 +80,13 @@ export async function verify(req:VerifyTextRequest,config:RuntimeConfig,requestI
     const schema=rawVerificationSchema.extend({checks:z.array(rawVerificationSchema.shape.checks.element.extend({claimId,relations:z.array(relation).max(10)})).length(req.claims.length)});
     const input={claims:req.claims,sources:req.sources.map(s=>({id:s.id,text:s.text})),references:references.map(ref=>({id:ref.id,title:ref.title??null,publishedAt:ref.publishedAt??null,truncated:ref.truncated,sentences:referenceSentences.filter(s=>s.referenceId===ref.id)}))};
     const perspectiveSchema=z.object({referenceSentenceId:sentenceId,stance:z.enum(['supports_position','opposes_position','adds_context','not_expressed','undetermined']),explanation:z.string().min(1).max(300)}).strict();
-    const extended=schema.extend({perspectives:z.array(perspectiveSchema).max(2)});
+    // Perspective-only calls must not carry an unreachable fact-check item
+    // grammar. Some constrained decoders kept generating inside checks despite
+    // its zero-length bound until the provider output limit was exhausted.
+    const perspectiveOnly=req.claims.length===0;
+    const extended=perspectiveOnly
+      ? z.object({checks:z.array(z.boolean()).length(0),perspectives:z.array(perspectiveSchema).min(1).max(Math.min(2,references.length))}).strict()
+      : schema.extend({perspectives:z.array(perspectiveSchema).max(2)});
     const raw=position&&trustedReferences.length?await structured(config,extended,VERIFY_PROMPT+' position은 사용자가 지정한 비교 명제 또는 원문에서 추출한 제안·의견이다. 이 명제 자체를 사실 판정하거나 원문 인용으로 만들지 않는다. claims가 비어 있으면 checks는 빈 배열이다. 각 참고자료가 이 명제를 명시적으로 지지·반대하는지 perspectives로 구분한다. 사실 수치가 다르다는 이유만으로 의견 반대로 분류하지 않는다. 반대가 명시되지 않으면 adds_context, not_expressed 또는 undetermined다. referenceSentenceId는 해당 입장을 보여 주는 실제 자료 문장이어야 한다. 입장이나 출처를 만들어내지 않는다.',{...input,position},signal):await structured(config,schema,VERIFY_PROMPT,input,signal);
     if('perspectives' in raw){
       const perspectives=z.array(perspectiveSchema).parse(raw.perspectives);
@@ -88,7 +94,8 @@ export async function verify(req:VerifyTextRequest,config:RuntimeConfig,requestI
       perspectiveChecks=candidates.filter(p=>candidates.filter(x=>x.sentence.referenceId===p.sentence.referenceId).length===1).map(p=>({referenceId:p.sentence.referenceId,positionText:position!,stance:p.stance,quote:p.sentence.text,start:p.sentence.start,end:p.sentence.end,explanation:p.explanation}));
     }
     const positions=new Map<object,{start:number;end:number}>();
-    const expanded={checks:raw.checks.map(c=>({...c,relations:c.relations.map(r=>{const s=referenceSentences.find(s=>s.referenceSentenceId===r.referenceSentenceId)!;const relation={referenceId:s.referenceId,quote:s.text,relation:r.relation,explanation:r.explanation};positions.set(relation,{start:s.start,end:s.end});return relation;})}))};
+    const rawChecks=(perspectiveOnly?[]:raw.checks) as z.infer<typeof schema>['checks'];
+    const expanded={checks:rawChecks.map(c=>({...c,relations:c.relations.map(r=>{const s=referenceSentences.find(s=>s.referenceSentenceId===r.referenceSentenceId)!;const relation={referenceId:s.referenceId,quote:s.text,relation:r.relation,explanation:r.explanation};positions.set(relation,{start:s.start,end:s.end});return relation;})}))};
     const result=buildChecks(expanded,req.claims,references,positions);checks=result.checks;damaged=result.damaged;
   }
   const fetched=references.some(r=>r.provenance==='web_fetched'),provided=references.some(r=>r.provenance==='provided_text');

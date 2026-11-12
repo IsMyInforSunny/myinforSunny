@@ -39,7 +39,7 @@ describe('모델 정규화에서 제외한 항목의 부분 결과 표시',()=>{
       {label:'추가 제안',query:'정상 추가 자료'},
     ];
     const result=assembleAnalysis(req,raw,'invalid-optional-search-hint','mock');
-    expect(result.status).toBe('success');expect(result.searchSuggestions).toEqual([
+    expect(result.status).toBe('partial');expect(result.warnings.some(w=>w.code==='BODY_POSITION_UNAVAILABLE')).toBe(true);expect(result.searchSuggestions).toEqual([
       {label:'검증 자료',query:'통계청 3.5% 예산'},
       {label:'추가 제안',query:'정상 추가 자료'},
     ]);

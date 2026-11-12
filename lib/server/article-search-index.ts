@@ -50,6 +50,7 @@ export function searchArticleIndex(query: string, allowedHosts: string[], option
   const required = tokens.length === 1 ? 1 : Math.max(2, Math.ceil(tokens.length * 0.6));
   const matches: {article: IndexedArticle; url: URL; score: number; published: number}[] = [];
   for (const article of (options.index ?? corpus).articles) {
+    if(article.usageStatus!=='approved')continue;
     let url: URL;
     try {url = new URL(article.url);} catch {continue;}
     if (url.protocol !== 'https:' || url.username || url.password || url.port || !hosts.has(url.hostname.toLowerCase())) continue;

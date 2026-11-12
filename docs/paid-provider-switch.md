@@ -1,13 +1,14 @@
-# 미래 유료 전환 절차 — 현재 비활성
+# Direct DeepSeek API 전환 상태
 
-사용자 방침: 지금은 무료 Groq, 나중에 명시적 요청 시 유료 API로 전환. 현재 OpenAI 요청·키 이동·새 키 생성은 하지 않습니다.
+사용자 요청에 따라 공식 DeepSeek Chat Completions API 어댑터를 추가했다. 이 기능은 NVIDIA NIM 어댑터와 별개이며 공식 키 이름은 `DEEPSEEK_API_KEY`, 기본 모델은 `deepseek-flash`다.
 
-전환 시 필요한 작업:
+공식 API는 토큰 사용량에 따라 과금된다. 무료 전용·유료 활성화 확인 플래그가 모두 명시적으로 바뀌기 전에는 제공자 준비 상태와 실시간 분석을 활성화하지 않는다.
 
-1. 사용자의 명시적 제공자 전환 지시와 모델·지출 예산을 확인합니다. 기존 승인된 로컬 OPENAI_API_KEY를 재사용할 수 있으나 비밀값을 출력하거나 불필요하게 복사하지 않습니다.
-2. 공통 structured 분석 계약을 유지하면서 OpenAI 전용 어댑터를 구현·등록합니다. 현재는 미등록이라 플래그만 바꿔도 호출되지 않습니다.
-3. 서버에서 FREE_ONLY=false, ENABLE_PAID_PROVIDER=true, PAID_ACTIVATION_CONFIRMED=true를 모두 요구합니다. AI_PROVIDER와 모델도 명시적으로 설정하며 키 존재 여부를 활성화 조건으로 쓰지 않습니다. 이 값들은 현재 false/무료 전용 상태를 유지합니다.
-4. 공급자별 토큰·금액·일일 예산·시간 제한·오류·데이터 보관·사용자 전송 안내를 함께 변경합니다. 무료 한도 초과를 유료 전환 사유로 자동 처리하지 않습니다.
-5. 같은 한국어 10사례·원문 인용·JSON·자료 대조·지연·비용 시험을 통과한 뒤 저장된 버전을 배포합니다. 실제 소비 금액과 모델을 기록합니다.
+현재 확인 결과:
 
-현재는 Groq 계정·키가 없어 실제 무료 연결도 미완료입니다. 미래 유료 전환 준비와 현재 연결 성공은 다른 상태입니다.
+- Windows 프로세스/사용자 환경변수에는 `NVIDIA_API_KEY`가 있고 `DEEPSEEK_API_KEY`는 없다.
+- 호스팅 Site 환경변수 이름에는 비밀값을 출력하지 않고 점검했으며 `GROQ_API_KEY`와 `NVIDIA_API_KEY`만 있다. `DEEPSEEK_API_KEY`는 없다.
+- NVIDIA 키는 NVIDIA API 인증용이므로 DeepSeek 공식 도메인에 전달하지 않았다.
+- 운영 Site 제공자/비용 플래그는 기존 `nvidia`, `FREE_ONLY=true`, `ENABLE_PAID_PROVIDER=false`, `PAID_ACTIVATION_CONFIRMED=false` 상태로 보존했다.
+
+실제 공식 API 연결 검증에는 공식 DeepSeek 키를 Site secret `DEEPSEEK_API_KEY`로 등록하고, 비용을 검토한 뒤 유료 플래그를 활성화해야 한다. 어댑터는 공식 `https://api.deepseek.com/chat/completions`, `deepseek-flash`, JSON Output, 응답 사용량 기록, 스트림 검증을 사용한다. 사용자 데이터는 JSON Schema 검증 전까지 분석 결과로 표시하지 않는다.

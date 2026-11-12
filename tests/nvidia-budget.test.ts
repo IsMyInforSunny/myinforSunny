@@ -10,6 +10,17 @@ beforeAll(async()=>{
 });
 afterAll(async()=>{await mf.dispose();});
 describe('NVIDIA request accounting without token caps',()=>{
+ it('recovers an expired crashed-server lease and gives a new request a bounded lease',async()=>{
+  const now=Date.now(),orphan=crypto.randomUUID(),next=crypto.randomUUID();
+  await db.prepare('INSERT INTO request_budget(id,actor,day,created_at,reserved,active,lease_until) VALUES(?,?,?,?,0,1,?)').bind(orphan,'orphan',new Date(now).toISOString().slice(0,10),now-60000,now-1).run();
+  const config={AI_PROVIDER:'nvidia',NVIDIA_API_KEY:'synthetic',ENABLE_LIVE_ANALYSIS:'true',DB:db};
+  await withBudget(new Request('http://localhost/api/analyze',{headers:{'cf-connecting-ip':'lease-test'}}),config,next,60000,async()=>{
+   const lease=await db.prepare('SELECT lease_until FROM request_budget WHERE id=?').bind(next).first<{lease_until:number}>();
+   expect(lease!.lease_until).toBeGreaterThan(Date.now());
+   expect(lease!.lease_until-Date.now()).toBeLessThanOrEqual(45000);
+  });
+  expect((await db.prepare('SELECT active FROM request_budget WHERE id=?').bind(orphan).first<{active:number}>())!.active).toBe(0);
+ });
  it('records usage exceeding old caps, blocks duplicate and concurrent requests, releases on error',async()=>{
   const config={AI_PROVIDER:'nvidia',NVIDIA_API_KEY:'synthetic',ENABLE_LIVE_ANALYSIS:'true',DB:db};
   const request=new Request('http://localhost/api/analyze');

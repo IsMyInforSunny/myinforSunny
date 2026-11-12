@@ -1,7 +1,7 @@
 {
   "schemaVersion": "relative-baselines-1.0",
-  "version": "relative-baselines-2026-11-12.1",
-  "generatedAt": "2026-11-11T23:44:29.376Z",
+  "version": "relative-baselines-2026-11-12.2",
+  "generatedAt": "2026-11-12T04:15:19.651Z",
   "scopeCharacters": 2000,
   "metricVersions": {
     "metrics": "relative-metrics-1.0",
@@ -17,6 +17,34 @@
   },
   "sourceArticleCount": 3000,
   "publisherCount": 4,
+  "formatRulesVersion": "article-format-1.0",
+  "formatCounts": [
+    {
+      "id": "report",
+      "label": "보도",
+      "n": 1
+    },
+    {
+      "id": "opinion",
+      "label": "사설·칼럼·기고",
+      "n": 4
+    },
+    {
+      "id": "interview",
+      "label": "인터뷰",
+      "n": 0
+    },
+    {
+      "id": "other",
+      "label": "기타",
+      "n": 1
+    },
+    {
+      "id": "unknown",
+      "label": "형식 미확인",
+      "n": 2994
+    }
+  ],
   "topics": [
     {
       "id": "medical_school_quota",
@@ -284,7 +312,1081 @@
             }
           ]
         }
-      }
+      },
+      "formats": [
+        {
+          "id": "report",
+          "label": "보도",
+          "n": 1,
+          "publisherCount": 1,
+          "metrics": {
+            "fomo": {
+              "boundaries": [
+                {
+                  "percentile": 0,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 5,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 10,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 15,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 20,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 25,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 30,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 35,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 40,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 45,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 50,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 55,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 60,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 65,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 70,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 75,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 80,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 85,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 90,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 95,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 100,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                }
+              ]
+            },
+            "attribution": {
+              "boundaries": [
+                {
+                  "percentile": 0,
+                  "value": 11.8,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 5,
+                  "value": 11.8,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 10,
+                  "value": 11.8,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 15,
+                  "value": 11.8,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 20,
+                  "value": 11.8,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 25,
+                  "value": 11.8,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 30,
+                  "value": 11.8,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 35,
+                  "value": 11.8,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 40,
+                  "value": 11.8,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 45,
+                  "value": 11.8,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 50,
+                  "value": 11.8,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 55,
+                  "value": 11.8,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 60,
+                  "value": 11.8,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 65,
+                  "value": 11.8,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 70,
+                  "value": 11.8,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 75,
+                  "value": 11.8,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 80,
+                  "value": 11.8,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 85,
+                  "value": 11.8,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 90,
+                  "value": 11.8,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 95,
+                  "value": 11.8,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 100,
+                  "value": 11.8,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "opinion",
+          "label": "사설·칼럼·기고",
+          "n": 1,
+          "publisherCount": 1,
+          "metrics": {
+            "fomo": {
+              "boundaries": [
+                {
+                  "percentile": 0,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 5,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 10,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 15,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 20,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 25,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 30,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 35,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 40,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 45,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 50,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 55,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 60,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 65,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 70,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 75,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 80,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 85,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 90,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 95,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 100,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                }
+              ]
+            },
+            "attribution": {
+              "boundaries": [
+                {
+                  "percentile": 0,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 5,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 10,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 15,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 20,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 25,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 30,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 35,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 40,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 45,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 50,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 55,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 60,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 65,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 70,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 75,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 80,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 85,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 90,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 95,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 100,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "other",
+          "label": "기타",
+          "n": 1,
+          "publisherCount": 1,
+          "metrics": {
+            "fomo": {
+              "boundaries": [
+                {
+                  "percentile": 0,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 5,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 10,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 15,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 20,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 25,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 30,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 35,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 40,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 45,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 50,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 55,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 60,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 65,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 70,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 75,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 80,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 85,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 90,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 95,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 100,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                }
+              ]
+            },
+            "attribution": {
+              "boundaries": [
+                {
+                  "percentile": 0,
+                  "value": 1.3,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 5,
+                  "value": 1.3,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 10,
+                  "value": 1.3,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 15,
+                  "value": 1.3,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 20,
+                  "value": 1.3,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 25,
+                  "value": 1.3,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 30,
+                  "value": 1.3,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 35,
+                  "value": 1.3,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 40,
+                  "value": 1.3,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 45,
+                  "value": 1.3,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 50,
+                  "value": 1.3,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 55,
+                  "value": 1.3,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 60,
+                  "value": 1.3,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 65,
+                  "value": 1.3,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 70,
+                  "value": 1.3,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 75,
+                  "value": 1.3,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 80,
+                  "value": 1.3,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 85,
+                  "value": 1.3,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 90,
+                  "value": 1.3,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 95,
+                  "value": 1.3,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 100,
+                  "value": 1.3,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "unknown",
+          "label": "형식 미확인",
+          "n": 647,
+          "publisherCount": 4,
+          "metrics": {
+            "fomo": {
+              "boundaries": [
+                {
+                  "percentile": 0,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.7126436782
+                },
+                {
+                  "percentile": 5,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.7126436782
+                },
+                {
+                  "percentile": 10,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.7126436782
+                },
+                {
+                  "percentile": 15,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.7126436782
+                },
+                {
+                  "percentile": 20,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.7126436782
+                },
+                {
+                  "percentile": 25,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.7126436782
+                },
+                {
+                  "percentile": 30,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.7126436782
+                },
+                {
+                  "percentile": 35,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.7126436782
+                },
+                {
+                  "percentile": 40,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.7126436782
+                },
+                {
+                  "percentile": 45,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.7126436782
+                },
+                {
+                  "percentile": 50,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.7126436782
+                },
+                {
+                  "percentile": 55,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.7126436782
+                },
+                {
+                  "percentile": 60,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.7126436782
+                },
+                {
+                  "percentile": 65,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.7126436782
+                },
+                {
+                  "percentile": 70,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.7126436782
+                },
+                {
+                  "percentile": 75,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.7126436782
+                },
+                {
+                  "percentile": 80,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.7126436782
+                },
+                {
+                  "percentile": 85,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.7126436782
+                },
+                {
+                  "percentile": 90,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.7126436782
+                },
+                {
+                  "percentile": 95,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.7126436782
+                },
+                {
+                  "percentile": 100,
+                  "value": 6.7,
+                  "belowPercent": 99.8563218391,
+                  "atOrBelowPercent": 100
+                }
+              ]
+            },
+            "attribution": {
+              "boundaries": [
+                {
+                  "percentile": 0,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 12.5448115738
+                },
+                {
+                  "percentile": 5,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 12.5448115738
+                },
+                {
+                  "percentile": 10,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 12.5448115738
+                },
+                {
+                  "percentile": 15,
+                  "value": 2.9,
+                  "belowPercent": 14.9358026501,
+                  "atOrBelowPercent": 15.381361237
+                },
+                {
+                  "percentile": 20,
+                  "value": 4.3,
+                  "belowPercent": 19.699884111,
+                  "atOrBelowPercent": 20.5121778063
+                },
+                {
+                  "percentile": 25,
+                  "value": 5.6,
+                  "belowPercent": 24.0616511442,
+                  "atOrBelowPercent": 25.4874610741
+                },
+                {
+                  "percentile": 30,
+                  "value": 6.5,
+                  "belowPercent": 29.4472326174,
+                  "atOrBelowPercent": 30.0752729562
+                },
+                {
+                  "percentile": 35,
+                  "value": 7.4,
+                  "belowPercent": 34.4478219335,
+                  "atOrBelowPercent": 35.2886459487
+                },
+                {
+                  "percentile": 40,
+                  "value": 8.3,
+                  "belowPercent": 38.5184904847,
+                  "atOrBelowPercent": 40.7716268873
+                },
+                {
+                  "percentile": 45,
+                  "value": 9.4,
+                  "belowPercent": 44.7088905486,
+                  "atOrBelowPercent": 45.0047485368
+                },
+                {
+                  "percentile": 50,
+                  "value": 10.3,
+                  "belowPercent": 49.6083382393,
+                  "atOrBelowPercent": 50.0841987509
+                },
+                {
+                  "percentile": 55,
+                  "value": 11.1,
+                  "belowPercent": 52.2817271805,
+                  "atOrBelowPercent": 55.4607232499
+                },
+                {
+                  "percentile": 60,
+                  "value": 12.5,
+                  "belowPercent": 58.3893949836,
+                  "atOrBelowPercent": 60.4372228144
+                },
+                {
+                  "percentile": 65,
+                  "value": 14.3,
+                  "belowPercent": 63.5223252086,
+                  "atOrBelowPercent": 65.3609125724
+                },
+                {
+                  "percentile": 70,
+                  "value": 16.7,
+                  "belowPercent": 68.9789361178,
+                  "atOrBelowPercent": 71.756135648
+                },
+                {
+                  "percentile": 75,
+                  "value": 18.2,
+                  "belowPercent": 74.0760972882,
+                  "atOrBelowPercent": 75.6248491018
+                },
+                {
+                  "percentile": 80,
+                  "value": 20.7,
+                  "belowPercent": 79.6506916243,
+                  "atOrBelowPercent": 80.098021816
+                },
+                {
+                  "percentile": 85,
+                  "value": 23.1,
+                  "belowPercent": 83.2031528636,
+                  "atOrBelowPercent": 85.0272161233
+                },
+                {
+                  "percentile": 90,
+                  "value": 26.7,
+                  "belowPercent": 89.9404336596,
+                  "atOrBelowPercent": 90.2338124193
+                },
+                {
+                  "percentile": 95,
+                  "value": 33.3,
+                  "belowPercent": 94.0964568004,
+                  "atOrBelowPercent": 96.3125612167
+                },
+                {
+                  "percentile": 100,
+                  "value": 83.3,
+                  "belowPercent": 99.8502994012,
+                  "atOrBelowPercent": 100
+                }
+              ]
+            }
+          }
+        }
+      ]
     },
     {
       "id": "pension_reform",
@@ -552,7 +1654,545 @@
             }
           ]
         }
-      }
+      },
+      "formats": [
+        {
+          "id": "opinion",
+          "label": "사설·칼럼·기고",
+          "n": 1,
+          "publisherCount": 1,
+          "metrics": {
+            "fomo": {
+              "boundaries": [
+                {
+                  "percentile": 0,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 5,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 10,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 15,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 20,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 25,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 30,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 35,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 40,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 45,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 50,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 55,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 60,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 65,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 70,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 75,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 80,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 85,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 90,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 95,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 100,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                }
+              ]
+            },
+            "attribution": {
+              "boundaries": [
+                {
+                  "percentile": 0,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 5,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 10,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 15,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 20,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 25,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 30,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 35,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 40,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 45,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 50,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 55,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 60,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 65,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 70,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 75,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 80,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 85,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 90,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 95,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 100,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "unknown",
+          "label": "형식 미확인",
+          "n": 495,
+          "publisherCount": 4,
+          "metrics": {
+            "fomo": {
+              "boundaries": [
+                {
+                  "percentile": 0,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 98.4182403439
+                },
+                {
+                  "percentile": 5,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 98.4182403439
+                },
+                {
+                  "percentile": 10,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 98.4182403439
+                },
+                {
+                  "percentile": 15,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 98.4182403439
+                },
+                {
+                  "percentile": 20,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 98.4182403439
+                },
+                {
+                  "percentile": 25,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 98.4182403439
+                },
+                {
+                  "percentile": 30,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 98.4182403439
+                },
+                {
+                  "percentile": 35,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 98.4182403439
+                },
+                {
+                  "percentile": 40,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 98.4182403439
+                },
+                {
+                  "percentile": 45,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 98.4182403439
+                },
+                {
+                  "percentile": 50,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 98.4182403439
+                },
+                {
+                  "percentile": 55,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 98.4182403439
+                },
+                {
+                  "percentile": 60,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 98.4182403439
+                },
+                {
+                  "percentile": 65,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 98.4182403439
+                },
+                {
+                  "percentile": 70,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 98.4182403439
+                },
+                {
+                  "percentile": 75,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 98.4182403439
+                },
+                {
+                  "percentile": 80,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 98.4182403439
+                },
+                {
+                  "percentile": 85,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 98.4182403439
+                },
+                {
+                  "percentile": 90,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 98.4182403439
+                },
+                {
+                  "percentile": 95,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 98.4182403439
+                },
+                {
+                  "percentile": 100,
+                  "value": 7.7,
+                  "belowPercent": 99.8175182482,
+                  "atOrBelowPercent": 100
+                }
+              ]
+            },
+            "attribution": {
+              "boundaries": [
+                {
+                  "percentile": 0,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 16.8514478371
+                },
+                {
+                  "percentile": 5,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 16.8514478371
+                },
+                {
+                  "percentile": 10,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 16.8514478371
+                },
+                {
+                  "percentile": 15,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 16.8514478371
+                },
+                {
+                  "percentile": 20,
+                  "value": 2.9,
+                  "belowPercent": 19.4523508618,
+                  "atOrBelowPercent": 20.7792085571
+                },
+                {
+                  "percentile": 25,
+                  "value": 3.4,
+                  "belowPercent": 24.2984423903,
+                  "atOrBelowPercent": 25.090985685
+                },
+                {
+                  "percentile": 30,
+                  "value": 4.3,
+                  "belowPercent": 29.0226282773,
+                  "atOrBelowPercent": 30.513468409
+                },
+                {
+                  "percentile": 35,
+                  "value": 5,
+                  "belowPercent": 34.258746027,
+                  "atOrBelowPercent": 35.0262252539
+                },
+                {
+                  "percentile": 40,
+                  "value": 5.9,
+                  "belowPercent": 38.5487860204,
+                  "atOrBelowPercent": 40.9013518367
+                },
+                {
+                  "percentile": 45,
+                  "value": 6.7,
+                  "belowPercent": 43.5115038441,
+                  "atOrBelowPercent": 46.0617224441
+                },
+                {
+                  "percentile": 50,
+                  "value": 7.7,
+                  "belowPercent": 48.7812919411,
+                  "atOrBelowPercent": 50.1963849305
+                },
+                {
+                  "percentile": 55,
+                  "value": 8.7,
+                  "belowPercent": 54.2401278925,
+                  "atOrBelowPercent": 55.4035567401
+                },
+                {
+                  "percentile": 60,
+                  "value": 10,
+                  "belowPercent": 58.7522406842,
+                  "atOrBelowPercent": 60.4380507195
+                },
+                {
+                  "percentile": 65,
+                  "value": 11.8,
+                  "belowPercent": 64.2927471774,
+                  "atOrBelowPercent": 65.0187923124
+                },
+                {
+                  "percentile": 70,
+                  "value": 13.3,
+                  "belowPercent": 69.2699919797,
+                  "atOrBelowPercent": 71.1409679972
+                },
+                {
+                  "percentile": 75,
+                  "value": 15,
+                  "belowPercent": 74.5680833138,
+                  "atOrBelowPercent": 75.9858591832
+                },
+                {
+                  "percentile": 80,
+                  "value": 16.7,
+                  "belowPercent": 78.5485659351,
+                  "atOrBelowPercent": 80.1303255912
+                },
+                {
+                  "percentile": 85,
+                  "value": 21.1,
+                  "belowPercent": 84.485022049,
+                  "atOrBelowPercent": 85.1233868289
+                },
+                {
+                  "percentile": 90,
+                  "value": 25,
+                  "belowPercent": 89.6632479186,
+                  "atOrBelowPercent": 90.6692590822
+                },
+                {
+                  "percentile": 95,
+                  "value": 30.8,
+                  "belowPercent": 94.3130800867,
+                  "atOrBelowPercent": 95.938403126
+                },
+                {
+                  "percentile": 100,
+                  "value": 50,
+                  "belowPercent": 99.7549019608,
+                  "atOrBelowPercent": 100
+                }
+              ]
+            }
+          }
+        }
+      ]
     },
     {
       "id": "minimum_wage",
@@ -820,7 +2460,277 @@
             }
           ]
         }
-      }
+      },
+      "formats": [
+        {
+          "id": "unknown",
+          "label": "형식 미확인",
+          "n": 416,
+          "publisherCount": 4,
+          "metrics": {
+            "fomo": {
+              "boundaries": [
+                {
+                  "percentile": 0,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 5,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 10,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 15,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 20,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 25,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 30,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 35,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 40,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 45,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 50,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 55,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 60,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 65,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 70,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 75,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 80,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 85,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 90,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 95,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 100,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                }
+              ]
+            },
+            "attribution": {
+              "boundaries": [
+                {
+                  "percentile": 0,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 16.7508417508
+                },
+                {
+                  "percentile": 5,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 16.7508417508
+                },
+                {
+                  "percentile": 10,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 16.7508417508
+                },
+                {
+                  "percentile": 15,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 16.7508417508
+                },
+                {
+                  "percentile": 20,
+                  "value": 2.9,
+                  "belowPercent": 19.638047138,
+                  "atOrBelowPercent": 21.2345679012
+                },
+                {
+                  "percentile": 25,
+                  "value": 3.8,
+                  "belowPercent": 24.9719416386,
+                  "atOrBelowPercent": 25.6200897868
+                },
+                {
+                  "percentile": 30,
+                  "value": 4.5,
+                  "belowPercent": 29.9102132435,
+                  "atOrBelowPercent": 30.9511784512
+                },
+                {
+                  "percentile": 35,
+                  "value": 5.3,
+                  "belowPercent": 34.5735129068,
+                  "atOrBelowPercent": 36.4281705948
+                },
+                {
+                  "percentile": 40,
+                  "value": 6.3,
+                  "belowPercent": 39.2789001122,
+                  "atOrBelowPercent": 40.6593714927
+                },
+                {
+                  "percentile": 45,
+                  "value": 7.4,
+                  "belowPercent": 44.7699214366,
+                  "atOrBelowPercent": 45.2637485971
+                },
+                {
+                  "percentile": 50,
+                  "value": 8.7,
+                  "belowPercent": 49.2592592593,
+                  "atOrBelowPercent": 50.0308641975
+                },
+                {
+                  "percentile": 55,
+                  "value": 10,
+                  "belowPercent": 53.8720538721,
+                  "atOrBelowPercent": 55.4264870932
+                },
+                {
+                  "percentile": 60,
+                  "value": 11.8,
+                  "belowPercent": 59.6492704826,
+                  "atOrBelowPercent": 61.3075196409
+                },
+                {
+                  "percentile": 65,
+                  "value": 12.5,
+                  "belowPercent": 61.492704826,
+                  "atOrBelowPercent": 65.5274971942
+                },
+                {
+                  "percentile": 70,
+                  "value": 14.3,
+                  "belowPercent": 68.608305275,
+                  "atOrBelowPercent": 70.3900112233
+                },
+                {
+                  "percentile": 75,
+                  "value": 16,
+                  "belowPercent": 74.4865319865,
+                  "atOrBelowPercent": 75.6397306397
+                },
+                {
+                  "percentile": 80,
+                  "value": 18.2,
+                  "belowPercent": 78.8047138047,
+                  "atOrBelowPercent": 81.2766554433
+                },
+                {
+                  "percentile": 85,
+                  "value": 20,
+                  "belowPercent": 83.9842873176,
+                  "atOrBelowPercent": 85.867003367
+                },
+                {
+                  "percentile": 90,
+                  "value": 22.2,
+                  "belowPercent": 87.8114478114,
+                  "atOrBelowPercent": 90.0140291807
+                },
+                {
+                  "percentile": 95,
+                  "value": 26.3,
+                  "belowPercent": 93.9786756453,
+                  "atOrBelowPercent": 95.2441077441
+                },
+                {
+                  "percentile": 100,
+                  "value": 58.3,
+                  "belowPercent": 99.6913580247,
+                  "atOrBelowPercent": 100
+                }
+              ]
+            }
+          }
+        }
+      ]
     },
     {
       "id": "electricity_prices",
@@ -1088,7 +2998,277 @@
             }
           ]
         }
-      }
+      },
+      "formats": [
+        {
+          "id": "unknown",
+          "label": "형식 미확인",
+          "n": 181,
+          "publisherCount": 4,
+          "metrics": {
+            "fomo": {
+              "boundaries": [
+                {
+                  "percentile": 0,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 5,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 10,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 15,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 20,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 25,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 30,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 35,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 40,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 45,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 50,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 55,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 60,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 65,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 70,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 75,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 80,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 85,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 90,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 95,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 100,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                }
+              ]
+            },
+            "attribution": {
+              "boundaries": [
+                {
+                  "percentile": 0,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 16.6480099502
+                },
+                {
+                  "percentile": 5,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 16.6480099502
+                },
+                {
+                  "percentile": 10,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 16.6480099502
+                },
+                {
+                  "percentile": 15,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 16.6480099502
+                },
+                {
+                  "percentile": 20,
+                  "value": 3.4,
+                  "belowPercent": 19.3470149254,
+                  "atOrBelowPercent": 20.0932835821
+                },
+                {
+                  "percentile": 25,
+                  "value": 4.3,
+                  "belowPercent": 23.9210199005,
+                  "atOrBelowPercent": 25.7524875622
+                },
+                {
+                  "percentile": 30,
+                  "value": 5.3,
+                  "belowPercent": 29.6144278607,
+                  "atOrBelowPercent": 32.0273631841
+                },
+                {
+                  "percentile": 35,
+                  "value": 5.9,
+                  "belowPercent": 34.6050995025,
+                  "atOrBelowPercent": 35.3949004975
+                },
+                {
+                  "percentile": 40,
+                  "value": 7.1,
+                  "belowPercent": 39.3439054726,
+                  "atOrBelowPercent": 44.1355721393
+                },
+                {
+                  "percentile": 45,
+                  "value": 7.7,
+                  "belowPercent": 44.5087064677,
+                  "atOrBelowPercent": 46.1753731343
+                },
+                {
+                  "percentile": 50,
+                  "value": 8.7,
+                  "belowPercent": 49.4651741294,
+                  "atOrBelowPercent": 50.6281094527
+                },
+                {
+                  "percentile": 55,
+                  "value": 9.5,
+                  "belowPercent": 54.8725124378,
+                  "atOrBelowPercent": 55.2456467662
+                },
+                {
+                  "percentile": 60,
+                  "value": 11.1,
+                  "belowPercent": 59.5335820896,
+                  "atOrBelowPercent": 63.2835820896
+                },
+                {
+                  "percentile": 65,
+                  "value": 11.8,
+                  "belowPercent": 63.6567164179,
+                  "atOrBelowPercent": 65.861318408
+                },
+                {
+                  "percentile": 70,
+                  "value": 13.3,
+                  "belowPercent": 69.480721393,
+                  "atOrBelowPercent": 70.2705223881
+                },
+                {
+                  "percentile": 75,
+                  "value": 15.4,
+                  "belowPercent": 73.1001243781,
+                  "atOrBelowPercent": 75.0963930348
+                },
+                {
+                  "percentile": 80,
+                  "value": 20,
+                  "belowPercent": 78.2991293532,
+                  "atOrBelowPercent": 80.1741293532
+                },
+                {
+                  "percentile": 85,
+                  "value": 23.5,
+                  "belowPercent": 83.6722636816,
+                  "atOrBelowPercent": 85.1305970149
+                },
+                {
+                  "percentile": 90,
+                  "value": 28.6,
+                  "belowPercent": 89.210199005,
+                  "atOrBelowPercent": 90.2518656716
+                },
+                {
+                  "percentile": 95,
+                  "value": 36.8,
+                  "belowPercent": 94.835199005,
+                  "atOrBelowPercent": 95.2518656716
+                },
+                {
+                  "percentile": 100,
+                  "value": 60,
+                  "belowPercent": 99.1666666667,
+                  "atOrBelowPercent": 100
+                }
+              ]
+            }
+          }
+        }
+      ]
     },
     {
       "id": "housing_supply",
@@ -1356,7 +3536,545 @@
             }
           ]
         }
-      }
+      },
+      "formats": [
+        {
+          "id": "opinion",
+          "label": "사설·칼럼·기고",
+          "n": 1,
+          "publisherCount": 1,
+          "metrics": {
+            "fomo": {
+              "boundaries": [
+                {
+                  "percentile": 0,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 5,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 10,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 15,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 20,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 25,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 30,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 35,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 40,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 45,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 50,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 55,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 60,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 65,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 70,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 75,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 80,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 85,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 90,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 95,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 100,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                }
+              ]
+            },
+            "attribution": {
+              "boundaries": [
+                {
+                  "percentile": 0,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 5,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 10,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 15,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 20,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 25,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 30,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 35,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 40,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 45,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 50,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 55,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 60,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 65,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 70,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 75,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 80,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 85,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 90,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 95,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 100,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "unknown",
+          "label": "형식 미확인",
+          "n": 709,
+          "publisherCount": 4,
+          "metrics": {
+            "fomo": {
+              "boundaries": [
+                {
+                  "percentile": 0,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.695970696
+                },
+                {
+                  "percentile": 5,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.695970696
+                },
+                {
+                  "percentile": 10,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.695970696
+                },
+                {
+                  "percentile": 15,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.695970696
+                },
+                {
+                  "percentile": 20,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.695970696
+                },
+                {
+                  "percentile": 25,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.695970696
+                },
+                {
+                  "percentile": 30,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.695970696
+                },
+                {
+                  "percentile": 35,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.695970696
+                },
+                {
+                  "percentile": 40,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.695970696
+                },
+                {
+                  "percentile": 45,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.695970696
+                },
+                {
+                  "percentile": 50,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.695970696
+                },
+                {
+                  "percentile": 55,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.695970696
+                },
+                {
+                  "percentile": 60,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.695970696
+                },
+                {
+                  "percentile": 65,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.695970696
+                },
+                {
+                  "percentile": 70,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.695970696
+                },
+                {
+                  "percentile": 75,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.695970696
+                },
+                {
+                  "percentile": 80,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.695970696
+                },
+                {
+                  "percentile": 85,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.695970696
+                },
+                {
+                  "percentile": 90,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.695970696
+                },
+                {
+                  "percentile": 95,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.695970696
+                },
+                {
+                  "percentile": 100,
+                  "value": 2.9,
+                  "belowPercent": 99.8626373626,
+                  "atOrBelowPercent": 100
+                }
+              ]
+            },
+            "attribution": {
+              "boundaries": [
+                {
+                  "percentile": 0,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 18.1870705329
+                },
+                {
+                  "percentile": 5,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 18.1870705329
+                },
+                {
+                  "percentile": 10,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 18.1870705329
+                },
+                {
+                  "percentile": 15,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 18.1870705329
+                },
+                {
+                  "percentile": 20,
+                  "value": 2.4,
+                  "belowPercent": 19.6921623085,
+                  "atOrBelowPercent": 20.1420249459
+                },
+                {
+                  "percentile": 25,
+                  "value": 3,
+                  "belowPercent": 24.1348276116,
+                  "atOrBelowPercent": 25.2413204192
+                },
+                {
+                  "percentile": 30,
+                  "value": 3.6,
+                  "belowPercent": 28.941256584,
+                  "atOrBelowPercent": 30.5015039705
+                },
+                {
+                  "percentile": 35,
+                  "value": 4.5,
+                  "belowPercent": 34.6946087671,
+                  "atOrBelowPercent": 35.1444714045
+                },
+                {
+                  "percentile": 40,
+                  "value": 5.6,
+                  "belowPercent": 39.0415780995,
+                  "atOrBelowPercent": 40.3271002112
+                },
+                {
+                  "percentile": 45,
+                  "value": 6.3,
+                  "belowPercent": 44.7619816315,
+                  "atOrBelowPercent": 45.8684744392
+                },
+                {
+                  "percentile": 50,
+                  "value": 7.1,
+                  "belowPercent": 49.3986123366,
+                  "atOrBelowPercent": 51.4870374455
+                },
+                {
+                  "percentile": 55,
+                  "value": 8,
+                  "belowPercent": 54.7961585252,
+                  "atOrBelowPercent": 55.2533655517
+                },
+                {
+                  "percentile": 60,
+                  "value": 9.1,
+                  "belowPercent": 59.3066629235,
+                  "atOrBelowPercent": 61.1597032833
+                },
+                {
+                  "percentile": 65,
+                  "value": 10.5,
+                  "belowPercent": 64.6902071469,
+                  "atOrBelowPercent": 66.1091999545
+                },
+                {
+                  "percentile": 70,
+                  "value": 11.8,
+                  "belowPercent": 69.3380006551,
+                  "atOrBelowPercent": 70.3121490736
+                },
+                {
+                  "percentile": 75,
+                  "value": 13.3,
+                  "belowPercent": 74.7496774819,
+                  "atOrBelowPercent": 75.4861885377
+                },
+                {
+                  "percentile": 80,
+                  "value": 15.2,
+                  "belowPercent": 79.7370224058,
+                  "atOrBelowPercent": 80.0861708243
+                },
+                {
+                  "percentile": 85,
+                  "value": 17.4,
+                  "belowPercent": 84.8408231063,
+                  "atOrBelowPercent": 85.1606674955
+                },
+                {
+                  "percentile": 90,
+                  "value": 20,
+                  "belowPercent": 88.5581401567,
+                  "atOrBelowPercent": 90.1071512125
+                },
+                {
+                  "percentile": 95,
+                  "value": 25,
+                  "belowPercent": 94.3556589396,
+                  "atOrBelowPercent": 95.5713366621
+                },
+                {
+                  "percentile": 100,
+                  "value": 53.8,
+                  "belowPercent": 99.8958333333,
+                  "atOrBelowPercent": 100
+                }
+              ]
+            }
+          }
+        }
+      ]
     },
     {
       "id": "nuclear_energy",
@@ -1624,7 +4342,545 @@
             }
           ]
         }
-      }
+      },
+      "formats": [
+        {
+          "id": "opinion",
+          "label": "사설·칼럼·기고",
+          "n": 1,
+          "publisherCount": 1,
+          "metrics": {
+            "fomo": {
+              "boundaries": [
+                {
+                  "percentile": 0,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 5,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 10,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 15,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 20,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 25,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 30,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 35,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 40,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 45,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 50,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 55,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 60,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 65,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 70,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 75,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 80,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 85,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 90,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 95,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 100,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                }
+              ]
+            },
+            "attribution": {
+              "boundaries": [
+                {
+                  "percentile": 0,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 5,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 10,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 15,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 20,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 25,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 30,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 35,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 40,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 45,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 50,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 55,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 60,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 65,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 70,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 75,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 80,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 85,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 90,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 95,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                },
+                {
+                  "percentile": 100,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 100
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "unknown",
+          "label": "형식 미확인",
+          "n": 546,
+          "publisherCount": 4,
+          "metrics": {
+            "fomo": {
+              "boundaries": [
+                {
+                  "percentile": 0,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.5016725473
+                },
+                {
+                  "percentile": 5,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.5016725473
+                },
+                {
+                  "percentile": 10,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.5016725473
+                },
+                {
+                  "percentile": 15,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.5016725473
+                },
+                {
+                  "percentile": 20,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.5016725473
+                },
+                {
+                  "percentile": 25,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.5016725473
+                },
+                {
+                  "percentile": 30,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.5016725473
+                },
+                {
+                  "percentile": 35,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.5016725473
+                },
+                {
+                  "percentile": 40,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.5016725473
+                },
+                {
+                  "percentile": 45,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.5016725473
+                },
+                {
+                  "percentile": 50,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.5016725473
+                },
+                {
+                  "percentile": 55,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.5016725473
+                },
+                {
+                  "percentile": 60,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.5016725473
+                },
+                {
+                  "percentile": 65,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.5016725473
+                },
+                {
+                  "percentile": 70,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.5016725473
+                },
+                {
+                  "percentile": 75,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.5016725473
+                },
+                {
+                  "percentile": 80,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.5016725473
+                },
+                {
+                  "percentile": 85,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.5016725473
+                },
+                {
+                  "percentile": 90,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.5016725473
+                },
+                {
+                  "percentile": 95,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 99.5016725473
+                },
+                {
+                  "percentile": 100,
+                  "value": 4,
+                  "belowPercent": 99.8201438849,
+                  "atOrBelowPercent": 100
+                }
+              ]
+            },
+            "attribution": {
+              "boundaries": [
+                {
+                  "percentile": 0,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 14.840518191
+                },
+                {
+                  "percentile": 5,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 14.840518191
+                },
+                {
+                  "percentile": 10,
+                  "value": 0,
+                  "belowPercent": 0,
+                  "atOrBelowPercent": 14.840518191
+                },
+                {
+                  "percentile": 15,
+                  "value": 2.3,
+                  "belowPercent": 14.9997538598,
+                  "atOrBelowPercent": 15.342813058
+                },
+                {
+                  "percentile": 20,
+                  "value": 3.4,
+                  "belowPercent": 19.7414663958,
+                  "atOrBelowPercent": 21.1697983511
+                },
+                {
+                  "percentile": 25,
+                  "value": 4.3,
+                  "belowPercent": 24.5226210623,
+                  "atOrBelowPercent": 25.2539477657
+                },
+                {
+                  "percentile": 30,
+                  "value": 5.6,
+                  "belowPercent": 29.3579342517,
+                  "atOrBelowPercent": 30.5984752633
+                },
+                {
+                  "percentile": 35,
+                  "value": 6.7,
+                  "belowPercent": 34.8440289988,
+                  "atOrBelowPercent": 36.7916404685
+                },
+                {
+                  "percentile": 40,
+                  "value": 7.1,
+                  "belowPercent": 37.8541241271,
+                  "atOrBelowPercent": 40.4947734345
+                },
+                {
+                  "percentile": 45,
+                  "value": 8.3,
+                  "belowPercent": 44.4536947496,
+                  "atOrBelowPercent": 46.1013249506
+                },
+                {
+                  "percentile": 50,
+                  "value": 9.1,
+                  "belowPercent": 47.3664538228,
+                  "atOrBelowPercent": 50.0483440228
+                },
+                {
+                  "percentile": 55,
+                  "value": 10.3,
+                  "belowPercent": 54.754913458,
+                  "atOrBelowPercent": 55.9639471677
+                },
+                {
+                  "percentile": 60,
+                  "value": 11.1,
+                  "belowPercent": 59.1517680336,
+                  "atOrBelowPercent": 63.8880460085
+                },
+                {
+                  "percentile": 65,
+                  "value": 12,
+                  "belowPercent": 64.7934626506,
+                  "atOrBelowPercent": 65.5208219396
+                },
+                {
+                  "percentile": 70,
+                  "value": 13.3,
+                  "belowPercent": 68.6615974618,
+                  "atOrBelowPercent": 71.5164243356
+                },
+                {
+                  "percentile": 75,
+                  "value": 14.3,
+                  "belowPercent": 73.156119708,
+                  "atOrBelowPercent": 75.4946190944
+                },
+                {
+                  "percentile": 80,
+                  "value": 16,
+                  "belowPercent": 79.753190063,
+                  "atOrBelowPercent": 80.2967258226
+                },
+                {
+                  "percentile": 85,
+                  "value": 18.2,
+                  "belowPercent": 84.5394271339,
+                  "atOrBelowPercent": 86.0878842429
+                },
+                {
+                  "percentile": 90,
+                  "value": 21.7,
+                  "belowPercent": 89.7182690144,
+                  "atOrBelowPercent": 90.1213907894
+                },
+                {
+                  "percentile": 95,
+                  "value": 27.3,
+                  "belowPercent": 94.8215102762,
+                  "atOrBelowPercent": 95.2206646369
+                },
+                {
+                  "percentile": 100,
+                  "value": 53.3,
+                  "belowPercent": 99.7807017544,
+                  "atOrBelowPercent": 100
+                }
+              ]
+            }
+          }
+        }
+      ]
     }
   ]
 }

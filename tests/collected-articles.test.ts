@@ -40,18 +40,19 @@ function mount() {
 }
 
 describe('collected article metadata candidates', () => {
-  it('searches bundled metadata even while retrieval and live providers are disabled', async () => {
+  it('withholds bundled metadata until reuse is approved', async () => {
     fixedNow();
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network must not be used'));
     expect(articleIndexHosts()).toContain('www.pressian.com');
-    expect(searchIndexedNews('최저임금', {})).toMatchObject({provider:'local_index',status:'success'});
+    expect(searchIndexedNews('최저임금', {})).toBeNull();
     expect(searchIndexedNews('최저임금', {}, true)).toBeNull();
     const response = await POST(request({query:'최저임금'}));
     const result = await response.json() as NewsResult;
     expect(response.status).toBe(200);
     expect(result.provider).toBe('local_index');
-    expect(result.articles.length).toBeGreaterThan(0);
-    expect(result.articles.every((article: RelatedArticle) => article.stance === 'not_checked')).toBe(true);
+    expect(result.status).toBe('empty');
+    expect(result.articles).toEqual([]);
+    expect(result.scopeNote).toContain('이용 승인 검토');
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -75,7 +76,7 @@ describe('collected article metadata candidates', () => {
     const articles = Array.from({length:4},(_,index)=>({...candidate,id:`row_${index}`,url:`https://www.pressian.com/pages/articles/${index}`}));
     const html = renderToStaticMarkup(createElement(CollectedArticleCards,{articles,message:'검색 중'}));
     expect(html.match(/class="studio-article-card"/g)).toHaveLength(3);
-    expect(html).toContain('수집 기사 · 본문 대조 전');
+    expect(html).toContain('관련 기사 후보 · 본문 대조 전');
     expect(html).toContain('dateTime="2026-11-05T09:00:00+09:00"');
     expect(html).not.toContain('같은 관점');
     expect(html).not.toContain('다른 관점');

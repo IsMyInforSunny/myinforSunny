@@ -12,6 +12,7 @@ import type {EvidenceObservation, PublisherWeightSet} from '@/lib/source-reliabi
 import {buildAnalysisScores} from '@/lib/analysis-scores';
 import {languageMetrics} from '@/lib/language-metrics';
 import CollectedArticles from './collected-articles';
+import {compareArticleViewpoints} from '@/lib/viewpoint-comparison';
 
 type Props = {
   analysis: Analysis | null;
@@ -59,6 +60,7 @@ export default function CanvaDashboard({analysis, researchResults, researchStage
   const [includeComments, setIncludeComments] = useState(false);
   const results = analysis ? currentResearch(analysis, researchResults) : [];
   const bias = analyzeBiasCoordinate(biasArticleCoordinates, biasOrientationSet, selectedBiasArticleId);
+  const viewpoints=analysis?compareArticleViewpoints(analysis,results):null;
   const scores = buildAnalysisScores(analysis, bias, {observations: reliabilityObservations, weightSet: sourceWeightSet});
   const language = analysis ? languageMetrics(analysis, includeComments ? 'all' : 'body') : null;
   const proposition = analysis ? researchProposition(analysis) : undefined;
@@ -69,15 +71,21 @@ export default function CanvaDashboard({analysis, researchResults, researchStage
   const politicalReady = bias.status === 'ready' && bias.selectedCoordinate !== null && bias.classifierAxisSign !== null;
   const positionReady = !!position && ['support', 'oppose', 'mixed'].includes(position.label);
   const marker = axisMode === 'political'
-    ? politicalReady ? (bias.selectedCoordinate! * bias.classifierAxisSign! + 1) * 50 : null
+    ? politicalReady ? (bias.selectedCoordinate! + 1) * 50 : null
     : positionReady ? position!.label === 'support' ? 83 : position!.label === 'oppose' ? 17 : 50 : null;
   const biasLabel = axisMode === 'political' ? politicalReady ? bias.directionLabel ?? '기준선 부근' : '비교 모델 준비 중' : position ? stanceLabels[position.label] : unexpressed ? '입장 표현 없음' : analysis ? '본문 입장 분석 대기' : '분석 대기';
+  const biasNote = axisMode === 'political'
+    ? politicalReady ? `검증된 비교 기준선과의 거리 ${bias.magnitude?.toFixed(2)} · ${bias.eligiblePublisherCount}개 매체` : '좌우 위치는 검증된 매체 좌표 모델과 비교 표본이 준비되어야 표시합니다.'
+    : position ? `비교 명제 · ${proposition} · 본문 입장 방향 표시입니다. 편향 강도 점수는 검증된 동일 논점 SVM이 준비되면 산출합니다.`
+      : unexpressed ? '본문에서 비교 명제에 대한 작성자 입장이 드러나지 않았습니다. 편향 강도 점수는 산출하지 않습니다.'
+        : analysis ? '본문 입장 근거를 확인하지 못했습니다. 편향 강도 점수는 산출하지 않습니다.'
+          : '논점이 있는 모든 분야를 살펴봅니다. 작성자 입장과 인용 근거를 확인합니다.';
   const allCards = analysis?.mode === 'live' ? verifiedRecommendations(results, analysis) : [];
   const cards = allCards.filter(card => recommendationMode === 'all' || card.relationToArticle === recommendationMode).slice(0, 3);
   const sourceScore = scores.attribution;
   const sourceText = sourceScore.status === 'not_applicable' ? '해당 없음' : percentageText(sourceScore);
   const scope = includeComments ? '본문·댓글' : '본문';
-  const status = !analysis ? '기사를 입력해 주세요' : stale ? '입력 변경 · 다시 분석해 주세요' : analysis.mode === 'demo' ? '가상 예시 결과' : analysis.status === 'partial' ? '본문 일부 분석 완료' : analysis.warnings.some(warning=>warning.code==='CACHED_ANALYSIS') ? '최근 분석 재사용' : '본문 분석 완료';
+  const status = !analysis ? '기사를 입력해 주세요' : stale ? '입력 변경 · 다시 분석해 주세요' : analysis.mode === 'demo' ? '가상 예시 결과' : analysis.status === 'partial' ? '분석 미완료 · 일부 결과만 표시' : analysis.warnings.some(warning=>warning.code==='CACHED_ANALYSIS') ? '최근 분석 재사용' : '본문 분석 완료';
 
   return <section className="article-studio" aria-label="기사 분석 화면">
     <div className="studio-statusbar"><span role="status"><i className={stale ? 'is-stale' : ''} />{status}</span><span>논점과 표현, 근거를 한눈에</span></div>
@@ -99,7 +107,16 @@ export default function CanvaDashboard({analysis, researchResults, researchStage
               <span className="studio-axis-center" />{marker !== null && <span className="studio-axis-marker" style={{left: `${Math.max(0, Math.min(100, marker))}%`}} />}
             </div>
             <div className="studio-axis-labels"><span>{axisMode === 'political' ? '좌익' : '반대 관점'}</span><span>{axisMode === 'political' ? '기준선' : '복합 관점'}</span><span>{axisMode === 'political' ? '우익' : '찬성 관점'}</span></div>
-            <p className="studio-metric-note">{axisMode === 'political' ? politicalReady ? `비교 기준선과의 거리 ${bias.magnitude?.toFixed(2)} · ${bias.eligiblePublisherCount}개 매체` : '좌우 좌표를 산출할 검증된 SVM 모델과 비교 표본을 준비하고 있습니다.' : proposition ? `비교 논점 · ${proposition}` : '논점이 있는 모든 분야의 기사를 살펴봅니다. 본문 입장과 인용 근거를 함께 표시합니다.'}</p>
+            <p className="studio-metric-note">{biasNote}</p>
+            {analysis&&axisMode==='argument'&&<div className="studio-viewpoint-comparison" aria-label="같은 논점의 관점 비교">
+              <p><strong>편향 강도 · {scores.bias.value===null?'산출 대기':`${scores.bias.value}점`}</strong></p>
+              <p>{viewpoints?.status==='ready'
+                ? `인용 확인된 비교 기사 ${viewpoints.total}건 · ${viewpoints.publisherCount}개 매체 · 명제 찬성 ${viewpoints.support}건 / 반대 ${viewpoints.oppose}건`
+                : viewpoints?.status==='no_grounded_proposition'?'비교할 본문 명제와 입장 근거 확인이 필요합니다.'
+                  : `같은 명제의 인용 확인 기사 ${viewpoints?.total??0}건 · ${viewpoints?.publisherCount??0}개 매체 · 비교에 최소 3건·2개 매체가 필요합니다.`}</p>
+              <button type="button" className="studio-text-button" onClick={onArticles}>비교 기사와 입장 근거 확인 <ChevronRight size={12}/></button>
+              {viewpoints&&<p className="studio-metric-note">{viewpoints.scopeNote}</p>}
+            </div>}
           </div>
           <div className="studio-metric">
             <div className="studio-metric-heading"><h3>자극 <small>공포 유도·과도한 단정</small></h3><strong>{percentageText(language?.stimulation)}</strong></div>
@@ -125,7 +142,7 @@ export default function CanvaDashboard({analysis, researchResults, researchStage
             <div className="studio-claim-counts"><span>사실 주장 <b>{analysis.claims.filter(claim => claim.kind === 'factual').length}</b></span><span>의견 <b>{analysis.claims.filter(claim => claim.kind === 'opinion').length}</b></span><span>공격 표현 <b>{language?.aggression.flagged ?? 0}문장</b></span></div>
             {analysis.status === 'partial' && <p className="studio-metric-note">일부 항목을 판단하지 못했습니다. 분석 근거에서 해당 문장을 확인할 수 있습니다.</p>}
           </>}
-          <RelativeTopicComparison body={relativeBody ?? (!stale ? analysis?.sources.find(source=>source.kind==='body')?.text ?? '' : '')} title={relativeTitle ?? (!stale ? analysis?.article?.title ?? '' : '')}/>
+          <RelativeTopicComparison body={relativeBody ?? (!stale ? analysis?.sources.find(source=>source.kind==='body')?.text ?? '' : '')} title={relativeTitle ?? (!stale ? analysis?.article?.title ?? '' : '')} publishedAt={!stale?analysis?.article?.publishedAt:undefined}/>
         </section>
 
         <section className="studio-recommendations" aria-labelledby={`${id}-recommendations`}>

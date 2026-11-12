@@ -59,7 +59,7 @@ describe('same-method topic comparison',()=>{
   expect(html).toContain('25점');expect(html).toContain('백분위');
   expect(html).toContain('416');expect(html).toContain('4개 매체');
   expect(html).toContain('2,000');expect(html).toContain('2024-01-01');
-  expect(html).toContain('relative-baselines-2026-11-12.1');
+  expect(html).toContain('relative-baselines-2026-11-12.2');
   expect(html).not.toMatch(/dailian|newdaily|pressian|ohmynews/);
  });
 });

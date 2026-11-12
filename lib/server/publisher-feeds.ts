@@ -8,8 +8,10 @@ import {articleTextPrefix} from './article-document';
  * the network destination. MBC's former news_00.xml redirected to an error page
  * during setup and is intentionally not included in the runtime request list. */
 export const PUBLISHER_FEEDS=[
- {id:'sbs',name:'SBS',url:'https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=01',articleHosts:['news.sbs.co.kr']},
+ {id:'sbs',name:'SBS 전체 뉴스',url:'https://news.sbs.co.kr/news/newsflashRssFeed.do',articleHosts:['news.sbs.co.kr']},
  {id:'donga',name:'동아일보',url:'https://rss.donga.com/total.xml',articleHosts:['www.donga.com','donga.com']},
+ {id:'donga_science',name:'동아일보 과학',url:'https://rss.donga.com/science.xml',articleHosts:['www.donga.com','donga.com']},
+ {id:'donga_health',name:'동아일보 건강',url:'https://rss.donga.com/health.xml',articleHosts:['www.donga.com','donga.com']},
 ] as const;
 export type PublisherFeedId=typeof PUBLISHER_FEEDS[number]['id'];
 export const MAX_FEED_BYTES=512*1024;
@@ -47,7 +49,8 @@ export function parsePublisherFeed(xml:string,sourceId:PublisherFeedId):RelatedA
   if(!title||!link)continue;
   const url=articleUrl(link,source.articleHosts);if(!url||seen.has(url.href))continue;
   seen.add(url.href);
-  articles.push({id:`feed_${source.id}_${articles.length}`,title:articleTextPrefix(title,250),url:url.href,publisherDomain:url.hostname.replace(/^www\./,''),language:'Korean',provenance:'search_result',stance:'not_checked'});
+  const rawDate=item.querySelector('pubDate')?.textContent?.trim();const time=rawDate?Date.parse(rawDate):NaN;
+  articles.push({id:`feed_${source.id}_${articles.length}`,title:articleTextPrefix(title,250),url:url.href,publisherDomain:url.hostname.replace(/^www\./,''),...(Number.isFinite(time)?{publishedAt:new Date(time).toISOString()}:{}),language:'Korean',provenance:'search_result',stance:'not_checked'});
  }
  return articles;
 }
@@ -81,7 +84,7 @@ function relevance(title:string,terms:string[]){
 
 /** Two bounded feed GETs, no accounts, model calls, automatic retries or provider
  * fallbacks. This searches recent feed titles, never the whole web or archives. */
-export async function searchPublisherFeeds(query:string,config:RuntimeConfig,signal:AbortSignal):Promise<NewsResult>{
+export async function searchPublisherFeeds(query:string,config:RuntimeConfig,signal:AbortSignal,options:{includeArchive?:boolean}={}):Promise<NewsResult>{
  if(!publisherFeedsReady(config))throw new AppError(503,'SEARCH_UNAVAILABLE','공식 기사 목록 검색의 운영 설정을 확인해야 합니다.');
  const normalized=query.normalize('NFC'),terms=queryTerms(normalized);
  if(!terms.length)throw new AppError(422,'VALIDATION_ERROR','기사 제목에서 찾을 구체적인 주제·이름·수치를 입력해 주세요.');
@@ -94,12 +97,42 @@ export async function searchPublisherFeeds(query:string,config:RuntimeConfig,sig
  const required=terms.length===1?1:Math.max(2,Math.ceil(terms.length/2));
  const ranked=feeds.flatMap((result,sourceIndex)=>result.status==='fulfilled'?result.value.map((article,index)=>({article,sourceIndex,index,score:relevance(article.title,terms)})):[])
   .filter(candidate=>candidate.score>=required).sort((a,b)=>b.score-a.score||a.index-b.index||a.sourceIndex-b.sourceIndex);
- const counts=new Map<number,number>(),seen=new Set<string>(),articles:RelatedArticle[]=[];
+ const counts=new Map<string,number>(),seen=new Set<string>(),articles:RelatedArticle[]=[];
  for(const candidate of ranked){
   if(articles.length>=MAX_RESULTS)break;
-  const count=counts.get(candidate.sourceIndex)??0;
+  const count=counts.get(candidate.article.publisherDomain)??0;
   if(count>=MAX_PER_PUBLISHER||seen.has(candidate.article.url))continue;
-  counts.set(candidate.sourceIndex,count+1);seen.add(candidate.article.url);articles.push(candidate.article);
+  counts.set(candidate.article.publisherDomain,count+1);seen.add(candidate.article.url);articles.push(candidate.article);
  }
- return {provider:'publisher_feeds',query:normalized,status:articles.length?'success':'empty',articles,searchedAt:new Date().toISOString(),scopeNote:`${successful.join('·')} 공식 RSS의 최근 기사 제목에서 입력 핵심어와 관련된 후보만 찾았습니다. 전체 웹·과거 기사 검색이 아니며 검색 결과만으로 본문·사실·입장을 확인한 것은 아닙니다.${unavailable.length?` 연결하지 못한 피드: ${unavailable.join('·')}. 해당 매체의 기사는 이번 결과에 포함되지 않았습니다.`:''}${!articles.length?' 조건에 맞는 제목을 찾지 못했으며 관련 없는 기사는 채우지 않았습니다.':''}`};
+ let archiveNote='';
+ if(!articles.length&&options.includeArchive){
+  try{articles.push(...await searchDongaArchive(normalized,terms,signal));archiveNote=' 동아일보 공개 검색에서도 과거 기사 후보를 확인했습니다.';}
+  catch{if(signal.aborted)throw new AppError(408,'REQUEST_ABORTED','기사 검색을 취소했습니다.');archiveNote=' 동아일보 과거 기사 검색에는 연결하지 못했습니다.';}
+ }
+ return {provider:'publisher_feeds',query:normalized,status:articles.length?'success':'empty',articles,searchedAt:new Date().toISOString(),scopeNote:`${successful.join('·')} 공식 RSS의 기사 제목에서 핵심어가 맞는 후보를 찾았습니다.${archiveNote} 검색 결과만으로 본문·사실·입장을 확인한 것은 아닙니다.${unavailable.length?` 연결하지 못한 피드: ${unavailable.join('·')}.`:''}${!articles.length?' 현재 검색 범위에 맞는 기사가 없습니다. 다른 관점이 없다는 뜻은 아니며, 관련 없는 기사를 채우지 않았습니다.':''}`};
+}
+
+/** Called only by consented live search, never the automatic metadata route. */
+async function searchDongaArchive(query:string,terms:string[],signal:AbortSignal):Promise<RelatedArticle[]>{
+ const url=new URL('https://www.donga.com/news/search');url.searchParams.set('query',query);
+ const response=await fetch(url,{redirect:'manual',headers:{Accept:'text/html'},signal:AbortSignal.any([signal,AbortSignal.timeout(8000)])});
+ if(!response.ok||response.status>=300||/\b(noai|nosnippet)\b/i.test(response.headers.get('x-robots-tag')??'')){await response.body?.cancel();throw new AppError(503,'SEARCH_UNAVAILABLE','언론사 공개 검색에 연결하지 못했습니다.');}
+ if(!/^text\/html(?:;|$)/i.test(response.headers.get('content-type')??'')){await response.body?.cancel();throw new AppError(502,'SEARCH_INVALID_RESPONSE','검색 응답 형식을 확인하지 못했습니다.');}
+ const reader=response.body?.getReader();if(!reader)return [];
+ const chunks:Uint8Array[]=[];let size=0;
+ while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>1024*1024){await reader.cancel();throw new AppError(502,'SEARCH_INVALID_RESPONSE','검색 응답이 너무 큽니다.');}chunks.push(value);}
+ const bytes=new Uint8Array(size);let at=0;for(const chunk of chunks){bytes.set(chunk,at);at+=chunk.length;}
+ const document=new DOMParser().parseFromString(new TextDecoder('utf-8',{fatal:true}).decode(bytes),'text/html') as unknown as Document;
+ if(Array.from(document.querySelectorAll('meta[name="robots"]')).some(meta=>/\b(noai|nosnippet)\b/i.test(meta.getAttribute('content')??'')))return [];
+ for(const node of Array.from(document.querySelectorAll('script,style,nav,header,footer,[hidden]')))node.remove();
+ const seen=new Set<string>(),matches:{article:RelatedArticle;score:number}[]=[];
+ const required=terms.length===1?1:Math.max(2,Math.ceil(terms.length/2));
+ for(const link of Array.from(document.querySelectorAll('a[href]'))){
+  const candidate=articleUrl(link.getAttribute('href')??'',['www.donga.com','donga.com']);
+  const title=link.textContent?.replace(/\s+/g,' ').trim();
+  if(!candidate||!/^\/news\/[^/]+\/article\/all\/\d{8}\/\d+\/\d+$/.test(candidate.pathname)||!title||title.length<3||seen.has(candidate.href))continue;
+  const score=relevance(title,terms);if(score<required)continue;seen.add(candidate.href);
+  matches.push({score,article:{id:`archive_donga_${matches.length}`,title:articleTextPrefix(title,250),url:candidate.href,publisherDomain:'donga.com',language:'Korean',provenance:'search_result',stance:'not_checked'}});
+ }
+ return matches.sort((a,b)=>b.score-a.score).slice(0,MAX_PER_PUBLISHER).map(row=>row.article);
 }

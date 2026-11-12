@@ -4,9 +4,9 @@ import {readFileSync} from 'node:fs';
 import {articleIndexStatus, searchArticleIndex, type ArticleSearchIndex, type IndexedArticle} from '../lib/server/article-search-index';
 
 const now = Date.parse('2026-11-11T12:00:00+09:00');
-const row = (id: string, host = 'news.example.com', terms: [string, number][] = [['원전', 10], ['전력', 7]]): IndexedArticle => ({
+const row = (id: string, host = 'news.example.com', terms: [string, number][] = [['원전', 10], ['전력', 7]], usageStatus:'approved'|'unapproved'='approved'): IndexedArticle => ({
   id, title: `원전 전력 자료 ${id}`, url: `https://${host}/articles/${id}`, publisherDomain: host,
-  publishedAt: '2026-11-05T10:00:00+09:00', usageStatus: 'unapproved', keywords: terms,
+  publishedAt: '2026-11-05T10:00:00+09:00', usageStatus, keywords: terms,
 });
 const index = (articles: IndexedArticle[]): ArticleSearchIndex => ({
   schemaVersion: 'article-search-index-1.0', generatedAt: '2026-11-10T00:00:00Z',
@@ -20,6 +20,11 @@ describe('collected article search index', () => {
     expect(result[0]).toMatchObject({title: '원전 전력 자료 one', provenance: 'search_result', stance: 'not_checked'});
     expect(result[0]).not.toHaveProperty('text');
     expect(result[0]).not.toHaveProperty('evidence');
+  });
+
+  it('never returns source candidates whose reuse status is unapproved',()=>{
+    const data=index([row('approved'),row('unapproved','news.example.com',[['원전',20]],'unapproved')]);
+    expect(searchArticleIndex('원전',['news.example.com'],{now,index:data}).map(article=>article.id)).toEqual(['approved']);
   });
 
   it('requires configured exact hosts and rejects credentials and alternate schemes', () => {
@@ -65,11 +70,10 @@ describe('collected article search index', () => {
     }
   });
 
-  it('searches the complete local corpus without a model or network call', () => {
+  it('withholds the current local corpus because its source reuse status is unapproved', () => {
     const started = performance.now();
     const results = searchArticleIndex('최저임금', ['www.dailian.co.kr', 'www.newdaily.co.kr', 'biz.newdaily.co.kr', 'www.ohmynews.com', 'www.pressian.com'], {now, maxAgeDays: 1095});
-    expect(results.length).toBeGreaterThan(0);
-    expect(results.length).toBeLessThanOrEqual(5);
+    expect(results).toEqual([]);
     expect(performance.now() - started).toBeLessThan(1000);
   });
 });

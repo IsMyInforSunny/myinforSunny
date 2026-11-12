@@ -1,9 +1,10 @@
 import { z } from 'zod/v4';
 
 export const RUBRIC = 'rubric-4.0';
+export const ANALYSIS_PROMPT_VERSION='analysis-4.16';
 export const MAX_ARTICLE_CHARACTERS = 8000;
 const id = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
-const text = (max: number) => z.string().max(max).refine(v => v.trim().length > 0, '내용을 입력해 주세요.');
+const text = (max: number) => z.string().min(1).max(max).refine(v => v.trim().length > 0, '내용을 입력해 주세요.');
 export const analyzeRequestSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('demo'), fixtureId: id }).strict(),
   z.object({ kind:z.literal('url'), url:z.string().trim().url().max(2048).refine(v=>v.startsWith('https://'),'HTTPS 기사 주소를 입력해 주세요.'), comments:z.array(z.object({id,text:text(200)}).strict()).max(5), proposition:text(160).optional(),transmissionConsent:z.literal(true) }).strict(),
@@ -26,7 +27,7 @@ export type TopicAssignment = { sourceId:string; topicIds:string[]; status:'assi
 /** One processing unit of the body. Complete only when every body unit has exactly one entry. */
 export type BodyTopicAssignment = { sentenceId:string; topicIds:string[]; status:'assigned'|'other'|'undetermined'; reason?:string };
 export type Stance = { sourceId:string; label:z.infer<typeof stanceLabelSchema>; evidence:Span[]; reason?:string };
-export type BodyPosition = {proposition:string;label:z.infer<typeof stanceLabelSchema>;evidence:Span[];reason:string};
+export type BodyPosition = {proposition:string;label:z.infer<typeof stanceLabelSchema>;evidence:Span[];reason:string;attribution?:'author'|'reported_sources'|'unclear'};
 export type CounterArgument = {claimId:string;kind:'counterpoint'|'qualification';text:string;reasoning:string;evidenceNeeded:string;basis:Span[];provenance:'ai_suggestion'|'curated_example'};
 // Plain keywords only: keep Korean names/numbers instead of forcing translation.
 // Space separates words. Hyphen, decimal point, percent and middle dot are
@@ -41,7 +42,7 @@ export const searchQuerySchema=z.string()
  .refine(value=>!/(?:^| )(?:AND|OR|NOT)(?: |$)/.test(value),'검색 연산자 없이 핵심어만 입력해 주세요.');
 export type SearchSuggestion={label:string;query:string};
 export type Analysis = {
-  article?:{url:string;title?:string;fetchedAt:string;fullTextLength:number;analyzedCharacters:number;truncated:boolean};
+  article?:{url:string;title?:string;publishedAt?:string;fetchedAt:string;fullTextLength:number;analyzedCharacters:number;truncated:boolean};
   schemaVersion:'2.1'; analysisId:string; requestId:string; mode:'demo'|'live'; status:'success'|'partial';
   versions:{rubric:string;prompt:string;model:string;segmenter:string};
   sources:InputSource[]; proposition?:string; topics:Topic[]; topicAssignments:TopicAssignment[]; bodyTopicAssignments?:BodyTopicAssignment[]; stances?:Stance[];
@@ -68,13 +69,14 @@ export type Outcome = z.infer<typeof outcomeSchema>;
 export type EvidenceRelation = { referenceId:string;quote:string;start:number;end:number;relation:'supports'|'contradicts'|'context';explanation:string };
 export type Check = { claimId:string;outcome:Outcome;execution:'completed'|'failed'|'skipped';relations:EvidenceRelation[];explanation:string;temporalFit:'matched'|'mismatched'|'unclear';limitations:string[] };
 export type Verification = {schemaVersion:'2.1';requestId:string;parentAnalysisId?:string;mode:'demo'|'live';status:'success'|'partial';versions:{rubric:string;prompt:string;model:string;retriever:string};scope:'provided_text'|'retrieved_documents'|'mixed';references:Reference[];checks:Check[];attempts:{url?:string;query?:string;status:string;reason?:string}[];warnings:{code:string;message:string}[];createdAt:string};
-export type Capabilities = {aiProvider?:'groq'|'nvidia';searchProvider?:'gdelt'|'firecrawl'|'tavily'|'publisher_feeds';live:boolean;webSearch:boolean;webFetch:boolean;directFetch?:boolean;rubricVersion:string;limits:{body:number;comments:number;comment:number;claimsPerCheck:number};reason?:string};
+export type Capabilities = {aiModel?:string;aiProvider?:'groq'|'nvidia'|'deepseek';searchProvider?:'gdelt'|'firecrawl'|'tavily'|'publisher_feeds';live:boolean;webSearch:boolean;webFetch:boolean;directFetch?:boolean;rubricVersion:string;limits:{body:number;comments:number;comment:number;claimsPerCheck:number};reason?:string};
 
 // Model output is a proposal: offsets and final indicators are always server-owned.
 const quoteCandidate=z.object({sentenceId:id,quote:text(8000)}).strict();
 export const bodyPositionCandidateSchema=z.object({
   proposition:z.string().trim().max(160),label:stanceLabelSchema,
   evidence:z.array(quoteCandidate).min(1).max(3),reason:text(300),
+  attribution:z.enum(['author','reported_sources','unclear']).optional(),
 }).strict();
 export const rawAnalysisSchema=z.object({
   topics:z.array(z.object({id,label:text(50),description:text(300),evidence:z.array(quoteCandidate).min(1).max(5)}).strict()).max(5),
@@ -106,14 +108,14 @@ export function analysisModelSchema(sources:InputSource[],hasProposition:boolean
   topics:z.array(rawAnalysisSchema.shape.topics.element.extend({evidence:z.array(quote).min(1).max(5)})).min(1).max(5),
   topicAssignments:z.array(rawAnalysisSchema.shape.topicAssignments.element.extend({sourceId:commentId,evidence:z.array(quote).max(5)})).length(commentIds.length),
   stances:z.array(rawAnalysisSchema.shape.stances.element.extend({sourceId:commentId,evidence:z.array(quote).max(5)})).length(hasProposition?commentIds.length:0),
-  bodyPosition:bodyPositionCandidateSchema,
+  bodyPosition:bodyPositionCandidateSchema.extend({attribution:z.enum(['author','reported_sources','unclear'])}),
   bodyAssigned:z.array(rawAnalysisSchema.shape.bodyAssigned.element).max(bodyUnits),
   bodyOtherIds:z.array(id).max(bodyUnits),
   bodyUndeterminedIds:z.array(id).max(bodyUnits),
   expressions:z.array(rawAnalysisSchema.shape.expressions.element.extend({sentenceId:id,evidence:z.array(quote).max(5)})).max(ids.length),
   claims:z.array(rawAnalysisSchema.shape.claims.element.extend({origin:z.array(quote).min(1).max(5)})).max(5),
   perspectiveQuestions:z.array(rawAnalysisSchema.shape.perspectiveQuestions.element.extend({basis:z.array(quote).min(1).max(5)})).max(2),
-  counterArguments:z.array(rawAnalysisSchema.shape.counterArguments.element.extend({basis:z.array(quote).min(1).max(2)})).min(1).max(2),
+  counterArguments:z.array(rawAnalysisSchema.shape.counterArguments.element.extend({basis:z.array(quote).min(1).max(2)})).max(2),
   // The provider's strict JSON grammar must never contain an untyped {} item.
   searchSuggestions:z.array(z.object({label:z.string().max(60),query:z.string().max(100)}).strict()).max(2),
  });

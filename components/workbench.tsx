@@ -28,7 +28,7 @@ import {releasedBiasModel} from '@/lib/bias-model-release';
 import {biasCoordinatesFromResearch} from '@/lib/bias-model-adapter';
 import {buildAnalysisScores,type Score} from '@/lib/analysis-scores';
 import type {ResearchStage,ResearchVerification} from '@/lib/research-contract';
-import {MIN_N_FOR_PERCENT,DAILY_LIMIT_MESSAGE,countLabel,percentLabel,headline,readerExplanation,outcomeExplanation} from '@/lib/display';
+import {MIN_N_FOR_PERCENT,DAILY_LIMIT_MESSAGE,analysisProviderLabel,countLabel,percentLabel,headline,readerExplanation,outcomeExplanation} from '@/lib/display';
 import {reportStatus} from '@/lib/report-status';
 import { indicators, naturalSentenceCount } from '@/lib/domain';
 import { fixtures, fixtureInput, demoVerification } from '@/lib/fixtures';
@@ -54,7 +54,7 @@ export default function Workbench(){
   const [body,updateBody]=useState('');const [comments,updateComments]=useState<CommentInput[]>([]);const [proposition,updateProposition]=useState('');
   const [fixtureId,setFixtureId]=useState<string|null>(null);const [analysis,setAnalysis]=useState<Analysis|null>(null);const [snapshot,setSnapshot]=useState('');
   const [verification,setVerification]=useState<Verification|null>(null);const [verificationHistory,setVerificationHistory]=useState<Verification[]>([]);const [checkSources,setCheckSources]=useState<Record<string,Reference[]>>({});const [checks,setChecks]=useState<Check[]>([]);const [selectedClaims,setSelectedClaims]=useState<string[]>([]);
-  const [references,updateReferences]=useState<RefInput[]>([]);const [cap,setCap]=useState<Capabilities|null>(null);const PROVIDER_NAME=cap?.aiProvider==='nvidia'?'NVIDIA DeepSeek':'Groq';const [tab,setTab]=useState<ReviewTab>('overview');const [detailsVisible,setDetailsVisible]=useState(false);
+  const [references,updateReferences]=useState<RefInput[]>([]);const [cap,setCap]=useState<Capabilities|null>(null);const PROVIDER_NAME=analysisProviderLabel(cap);const [tab,setTab]=useState<ReviewTab>('overview');const [detailsVisible,setDetailsVisible]=useState(false);
   const [busy,setBusy]=useState<'analyze'|'verify'|null>(null);const [error,setError]=useState('');const [highlight,setHighlight]=useState<Span|null>(null);const [cancelled,setCancelled]=useState(false);
   const [transmissionConsent,setTransmissionConsent]=useState(false);
   const [researchConsent,updateResearchConsent]=useState(false),[analysisResearchConsent,setAnalysisResearchConsent]=useState(false);

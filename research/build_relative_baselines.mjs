@@ -89,29 +89,42 @@ export async function scoreCorpusRows(rows, metricsModule) {
 
 export async function buildRelativeBaselines(rows, options = {}) {
   const shared = options.metricsModule ?? await import('../lib/relative-metrics.ts');
+  const comparison = await import('../lib/article-comparison-groups.ts');
   if (rows.length !== (options.expectedCount ?? 3000)) throw new Error('Reviewed corpus count does not match the expected snapshot.');
   const scored = await scoreCorpusRows(rows, shared);
   const publisherCount = new Set(scored.map(row => row.publisher)).size;
   if (publisherCount !== (options.expectedPublishers ?? 4)) throw new Error('Reviewed corpus does not contain the expected publisher set.');
   const generatedAt = options.generatedAt ?? new Date().toISOString();
+  const formats = rows.map(row=>comparison.classifyArticleFormat({title:row.title,section:row.section,body:row.text}));
+  const distributions = selected => Object.fromEntries(METRICS.map(metric => [metric, {
+    boundaries:weightedBoundaries(selected.map(row => ({publisher:row.publisher,value:row.values[metric].value}))),
+  }]));
   const topics = shared.RELATIVE_TOPICS.map(topic => {
     const selected = scored.filter(row => row.topic === topic.id);
     if (!selected.length) throw new Error('Reviewed corpus lacks a required topic.');
     return {id:topic.id, label:topic.label, n:selected.length,
       publisherCount:new Set(selected.map(row => row.publisher)).size,
-      metrics:Object.fromEntries(METRICS.map(metric => [metric, {
-        boundaries:weightedBoundaries(selected.map(row => ({publisher:row.publisher, value:row.values[metric].value}))),
-      }]))};
+      metrics:distributions(selected),
+      formats:comparison.ARTICLE_FORMATS.flatMap(format=>{
+        const members=scored.filter((row,index)=>row.topic===topic.id&&formats[index].id===format.id);
+        return members.length?[{id:format.id,label:format.label,n:members.length,
+          publisherCount:new Set(members.map(row=>row.publisher)).size,metrics:distributions(members)}]:[];
+      })};
   });
+  const formatCounts=comparison.ARTICLE_FORMATS.map(format=>({id:format.id,label:format.label,
+    n:formats.filter(item=>item.id===format.id).length}));
   const baseline = {
-    schemaVersion:'relative-baselines-1.0', version:'relative-baselines-2026-11-12.1', generatedAt,
+    schemaVersion:'relative-baselines-1.0', version:'relative-baselines-2026-11-12.2', generatedAt,
     scopeCharacters:shared.RELATIVE_SCOPE_CHARACTERS, metricVersions:shared.relativeMetricVersions,
-    articlePeriod:ARTICLE_PERIOD, sourceArticleCount:rows.length, publisherCount, topics,
+    articlePeriod:ARTICLE_PERIOD, sourceArticleCount:rows.length, publisherCount,
+    formatRulesVersion:comparison.ARTICLE_FORMAT_VERSION,formatCounts,topics,
   };
   const summary = {
     schemaVersion:'relative-baseline-build-report-1.0', version:baseline.version, generatedAt,
     sourceArticleCount:rows.length, acceptedArticleCount:scored.length, publisherCount,
     scopeCharacters:baseline.scopeCharacters, metricVersions:baseline.metricVersions, articlePeriod:ARTICLE_PERIOD,
+    formatRulesVersion:comparison.ARTICLE_FORMAT_VERSION,formatCounts,
+    unidentifiedFormatPercent:round((formatCounts.find(format=>format.id==='unknown')?.n??0)/rows.length*100),
     checks:{uniqueUrls:scored.length, uniqueBodies:scored.length, validDates:scored.length,
       politicalLabelsCreated:0, equalPublisherWeight:true},
     topics:topics.map(topic => ({id:topic.id,label:topic.label,n:topic.n,publisherCount:topic.publisherCount,
@@ -125,20 +138,107 @@ export async function buildRelativeBaselines(rows, options = {}) {
   return {baseline, summary};
 }
 
+/** Complete-link clustering avoids joining separate events through a chain of weakly similar articles. */
+export async function buildEventBaselines(rows, options = {}) {
+  const shared=options.metricsModule??await import('../lib/relative-metrics.ts');
+  const comparison=await import('../lib/article-comparison-groups.ts');
+  const scored=await scoreCorpusRows(rows,shared);
+  const frequency=new Map();
+  for(const row of rows){
+    const terms=new Set([...Object.keys(comparison.eventTermCounts(row.text.slice(0,2000))),
+      ...Object.keys(comparison.eventTermCounts(row.title??''))]);
+    for(const term of terms)frequency.set(term,(frequency.get(term)??0)+1);
+  }
+  const idf=Object.fromEntries([...frequency].sort((left,right)=>left[0].localeCompare(right[0]))
+    .map(([term,count])=>[term,round(Math.log((1+rows.length)/(1+count))+1)]));
+  const documents=rows.map(row=>comparison.eventDocument(row.text,row.title??'',idf));
+  const ordered=rows.map((row,index)=>({index,time:Date.parse(row.publishedAt),identity:articleIdentity(row.url)}))
+    .sort((left,right)=>left.time-right.time||left.identity.localeCompare(right.identity));
+  const groups=[];
+  const similaritySamples=[];
+  const maximumDistance=comparison.EVENT_RULES.maximumDayDistance*86400000;
+  for(const article of ordered){
+    const topic=rows[article.index].topicId;
+    let best=null;
+    for(const group of groups){
+      if(group.topic!==topic||article.time-group.start>maximumDistance)continue;
+      let minimum=1,total=0,compatible=true;
+      for(const member of group.indices){
+        const similarity=comparison.eventSimilarity(documents[article.index],documents[member]);
+        if(similarity.value<comparison.EVENT_RULES.minimumSimilarity
+          ||similarity.title!==null&&similarity.title<comparison.EVENT_RULES.minimumTitleSimilarity){compatible=false;break;}
+        minimum=Math.min(minimum,similarity.value);total+=similarity.value;
+      }
+      if(compatible&&(!best||total/group.indices.length>best.mean))best={group,minimum,mean:total/group.indices.length};
+    }
+    if(best){
+      best.group.indices.push(article.index);best.group.through=article.time;
+      if(similaritySamples.length<40)similaritySamples.push(round(best.minimum));
+    }else groups.push({topic,start:article.time,through:article.time,indices:[article.index]});
+  }
+  const centroid=(indices,kind,limit)=>{
+    const sum=new Map();
+    for(const index of indices)for(const [token,value] of documents[index][kind])sum.set(token,(sum.get(token)??0)+value);
+    return comparison.normalizeEventVector([...sum],limit);
+  };
+  const localArticleGroups={};
+  const localEvents=[];
+  const events=[];
+  for(const group of groups){
+    const members=group.indices.map(index=>rows[index]);
+    const publisherCount=new Set(group.indices.map(index=>scored[index].publisher)).size;
+    const id='event_'+sha256(members.map(row=>articleIdentity(row.url)).sort().join('\n')).slice(0,24);
+    for(const index of group.indices){
+      const articleId=rows[index].id??sha256(articleIdentity(rows[index].url));
+      if(localArticleGroups[articleId])throw new Error('Corpus article identities are duplicated.');
+      localArticleGroups[articleId]=id;
+    }
+    localEvents.push({id,topicId:group.topic,start:new Date(group.start).toISOString(),through:new Date(group.through).toISOString(),
+      n:members.length,publisherCount,members:members.map(row=>({id:row.id,title:row.title,url:row.url,publishedAt:row.publishedAt}))});
+    if(members.length<comparison.EVENT_RULES.minimumArticles||publisherCount<comparison.EVENT_RULES.minimumPublishers)continue;
+    events.push({id,topicId:group.topic,start:new Date(group.start).toISOString(),through:new Date(group.through).toISOString(),
+      n:members.length,publisherCount,
+      centroid:centroid(group.indices,'body',comparison.EVENT_RULES.bodyFeatures),
+      titleCentroid:centroid(group.indices,'title',comparison.EVENT_RULES.titleFeatures),
+      metrics:Object.fromEntries(METRICS.map(metric=>[metric,{boundaries:weightedBoundaries(group.indices.map(index=>({
+        publisher:scored[index].publisher,value:scored[index].values[metric].value,
+      })))}]))});
+  }
+  const generatedAt=options.generatedAt??new Date().toISOString();
+  const index={schemaVersion:'event-baselines-1.0',version:'event-baselines-2026-11-12.1',generatedAt,
+    scopeCharacters:shared.RELATIVE_SCOPE_CHARACTERS,metricVersions:shared.relativeMetricVersions,
+    articlePeriod:ARTICLE_PERIOD,sourceArticleCount:rows.length,publisherCount:new Set(scored.map(row=>row.publisher)).size,
+    rules:comparison.EVENT_RULES,idf,events};
+  const summary={version:index.version,groupingVersion:comparison.EVENT_GROUPING_VERSION,rules:comparison.EVENT_RULES,
+    groupCount:groups.length,eligibleGroupCount:events.length,eligibleArticleCount:events.reduce((sum,event)=>sum+event.n,0),
+    assignedArticleCount:Object.keys(localArticleGroups).length,
+    byTopic:shared.RELATIVE_TOPICS.map(topic=>({id:topic.id,label:topic.label,
+      groupCount:groups.filter(group=>group.topic===topic.id).length,
+      eligibleGroupCount:events.filter(event=>event.topicId===topic.id).length,
+      eligibleArticleCount:events.filter(event=>event.topicId===topic.id).reduce((sum,event)=>sum+event.n,0)})),
+    thresholdReview:{sampleCount:similaritySamples.length,acceptedMinimumSimilarities:similaritySamples,
+      method:'complete-link cosine; title/body weights 0.35/0.65; every pair within 3 days and similarity threshold',
+      note:'Keyword proximity forms candidate event groups. This is not a human-validated event accuracy score.'}};
+  return {index,summary,localMapping:{version:index.version,articleGroups:localArticleGroups,events:localEvents}};
+}
+
 function parseArguments(args) {
   const result = {
     input:path.join(ROOT,'.sites-runtime/collection-1000-20261105/articles-reviewed-3000.local.jsonl'),
     output:path.join(ROOT,'lib/data/relative-baselines.json'),
-    report:path.join(ROOT,'docs/test-runs/2026-11-12-relative-baseline-step1/summary.json'),
+    report:path.join(ROOT,'docs/test-runs/2026-11-12-relative-baseline-step23/summary.json'),
+    events:path.join(ROOT,'lib/data/event-baselines.json'),
+    'local-groups':path.join(ROOT,'.sites-runtime/relative-baseline-step23/article-events.local.json'),
   };
   for (let index = 0; index < args.length; index += 2) {
     const key = args[index]?.replace(/^--/, '');
-    if (!['input','output','report'].includes(key) || !args[index+1]) {
-      throw new Error('Use --input, --output and --report with explicit file paths.');
+    if (!['input','output','report','events','local-groups'].includes(key) || !args[index+1]) {
+      throw new Error('Use --input, --output, --events, --local-groups and --report with explicit file paths.');
     }
     result[key] = path.resolve(args[index+1]);
   }
-  if (new Set(Object.values(result)).size !== 3) throw new Error('Input and output files must be distinct.');
+  if (new Set(Object.values(result)).size !== Object.keys(result).length) throw new Error('Input and output files must be distinct.');
+  if(!result['local-groups'].startsWith(path.join(ROOT,'.sites-runtime')+path.sep))throw new Error('Event members must stay in ignored local runtime storage.');
   return result;
 }
 
@@ -161,8 +261,12 @@ async function main() {
   const snapshot = await readFile(files.input,'utf8');
   const rows = snapshot.replace(/^\uFEFF/,'').split(/\r?\n/).filter(Boolean).map(line => JSON.parse(line));
   const {baseline,summary} = await buildRelativeBaselines(rows);
+  const event=await buildEventBaselines(rows,{generatedAt:baseline.generatedAt});
   summary.inputSha256 = sha256(snapshot);
+  summary.events=event.summary;
   await saveJson(files.output,baseline);
+  await saveJson(files.events,event.index);
+  await saveJson(files['local-groups'],event.localMapping);
   await saveJson(files.report,summary);
   console.log(JSON.stringify(summary));
 }

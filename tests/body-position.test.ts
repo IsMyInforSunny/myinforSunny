@@ -26,6 +26,13 @@ function proposal(req:TextRequest=request):RawAnalysis{
 afterEach(()=>vi.unstubAllGlobals());
 
 describe('기사 본문 입장의 명제와 원문 근거',()=>{
+  it.each(['reported_sources','unclear'] as const)('발화 주체 %s인 찬성 제안을 작성자 찬성으로 확정하지 않는다',attribution=>{
+    const raw=proposal();raw.bodyPosition!.attribution=attribution;
+    const result=assembleAnalysis(request,raw,'attribution','mock');
+    expect(result.bodyPosition?.label).toBe(attribution==='reported_sources'?'not_expressed':'undetermined');
+    expect(result.bodyPosition?.proposition).toBe(body);
+    expect(result.bodyPosition?.evidence).toHaveLength(1);
+  });
   it('본문과 반대 댓글의 입장을 각각 보존하고 본문 인용 위치를 서버에서 복원한다',()=>{
     const result=assembleAnalysis(request,proposal(),'body-and-comment','mock');
     expect(result.bodyPosition).toEqual({proposition:body,label:'support',evidence:[{...bodyQuote,sourceId:'body',start:0,end:body.length}],reason:'본문은 운영 시간 연장을 명시적으로 제안한다.'});
@@ -35,7 +42,7 @@ describe('기사 본문 입장의 명제와 원문 근거',()=>{
   it.each([commentQuote,{sentenceId:'body_s0',quote:'본문에 없는 가상 인용'}])('댓글 또는 불일치 인용을 본문 입장 근거로 승격하지 않는다 %j',quote=>{
     const raw=proposal();raw.bodyPosition!.evidence=[quote];
     const result=assembleAnalysis(request,raw,'bad-body-origin','mock');
-    expect(result.bodyPosition).toBeUndefined();expect(result.status).toBe('success');
+    expect(result.bodyPosition).toBeUndefined();expect(result.status).toBe('partial');
     expect(result.warnings.map(w=>w.code)).toContain('BODY_POSITION_UNAVAILABLE');
     expect(result.expressions).toHaveLength(2);expect(result.stances?.[0].label).toBe('oppose');
   });
@@ -61,14 +68,14 @@ describe('기사 본문 입장의 명제와 원문 근거',()=>{
     const malformed=rawAnalysisSchema.parse({...raw,bodyPosition:{label:'support',evidence:'not quotes'}});
     for(const value of [raw,malformed]){
       const result=assembleAnalysis(request,value,'legacy-position','mock');
-      expect(result.status).toBe('success');expect(result.bodyPosition).toBeUndefined();
+      expect(result.status).toBe('partial');expect(result.bodyPosition).toBeUndefined();
       expect(result.warnings.map(w=>w.code)).toContain('BODY_POSITION_UNAVAILABLE');
     }
   });
   it('새 생성 계약은 타입 있는 본문 입장을 요구하고 한 번의 분석 호출에 포함한다',async()=>{
     const sources=makeSources(request),schema=z.toJSONSchema(analysisModelSchema(sources,true),{target:'draft-7'});
     expect(schema.required).toContain('bodyPosition');
-    expect(schema.properties?.bodyPosition).toMatchObject({type:'object',additionalProperties:false,required:['proposition','label','evidence','reason']});
+    expect(schema.properties?.bodyPosition).toMatchObject({type:'object',additionalProperties:false,required:['proposition','label','evidence','reason','attribution']});
     const raw=proposal(),{expressions,...rest}=raw;
     const response={...rest,clearSentenceIds:expressions.map(e=>e.sentenceId),expressions:[]};
     const {bodyPosition:omitted,...legacy}=response;void omitted;

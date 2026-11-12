@@ -1,10 +1,20 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
 import {z} from 'zod/v4';
 import {structured} from '../lib/server/language';
-import {capabilities,NVIDIA_MODEL,providerReady} from '../lib/server/config';
+import {capabilities,NVIDIA_MODEL,NVIDIA_FAST_MODEL,providerReady} from '../lib/server/config';
 afterEach(()=>{vi.unstubAllGlobals();vi.restoreAllMocks();});
 const config={AI_PROVIDER:'nvidia',NVIDIA_API_KEY:'synthetic',ENABLE_LIVE_ANALYSIS:'true',DB:{} as D1Database};
 describe('NVIDIA DeepSeek adapter',()=>{
+ it('supports explicitly selected Lightning without silently falling back from DeepSeek',async()=>{
+  const selected={...config,NVIDIA_MODEL:NVIDIA_FAST_MODEL};expect(providerReady(selected)).toBe(true);
+  const fetch=vi.fn().mockResolvedValue(Response.json({choices:[{finish_reason:'stop',message:{content:'{"ok":true}'}}]}));vi.stubGlobal('fetch',fetch);
+  await structured(selected,z.object({ok:z.boolean()}),'JSON',{},new AbortController().signal);
+  const body=JSON.parse(fetch.mock.calls[0][1].body);
+  expect(body.model).toBe(NVIDIA_FAST_MODEL);expect(body.chat_template_kwargs).toEqual({enable_thinking:false});
+  expect(body.max_tokens).toBe(8192);expect(body.reasoning_effort).toBeUndefined();
+  expect(body.response_format).toMatchObject({type:'json_schema',json_schema:{name:'article_analysis',strict:true}});
+  expect(capabilities(selected)).toMatchObject({aiProvider:'nvidia',aiModel:NVIDIA_FAST_MODEL,live:true});
+ });
  it('requires the selected model and secret, without inheriting Groq account limits',()=>{
   expect(providerReady(config)).toBe(true);
   expect(providerReady({...config,NVIDIA_API_KEY:''})).toBe(false);
@@ -17,7 +27,7 @@ describe('NVIDIA DeepSeek adapter',()=>{
   expect(await structured({...config,onUsage},z.object({ok:z.boolean()}),'Return JSON','x'.repeat(40000),new AbortController().signal)).toEqual({ok:true});
   const [url,init]=fetch.mock.calls[0];const body=JSON.parse(init.body);
   expect(url).toBe('https://integrate.api.nvidia.com/v1/chat/completions');
-  expect(body.model).toBe(NVIDIA_MODEL);expect(body.max_tokens).toBeUndefined();expect(body.max_completion_tokens).toBeUndefined();expect(onUsage).toHaveBeenCalledWith(20000);
+  expect(body.model).toBe(NVIDIA_MODEL);expect(body.reasoning_effort).toBe('none');expect(body.max_tokens).toBeUndefined();expect(body.max_completion_tokens).toBeUndefined();expect(onUsage).toHaveBeenCalledWith(20000);
  });
  it('rejects malformed output without fallback or retry',async()=>{
   const fetch=vi.fn().mockResolvedValue(Response.json({choices:[{finish_reason:'stop',message:{content:'not JSON'}}]}));vi.stubGlobal('fetch',fetch);

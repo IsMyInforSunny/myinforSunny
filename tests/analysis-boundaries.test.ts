@@ -16,7 +16,7 @@ describe('무료 분석 입력 경계 (공급자 모의, 실제 모델 품질 �
   const fetch=vi.fn().mockResolvedValue(Response.json({choices:[{finish_reason:'stop',message:{content:serialized}}],usage:{total_tokens:4000}}));vi.stubGlobal('fetch',fetch);
   const result=await analyze(req,config,'boundary-24',new AbortController().signal);
   expect(result.coverage.totalSentences).toBe(24);expect(result.expressions.every(e=>e.status==='clear')).toBe(true);
-  expect(result.status).toBe('success');expect(fetch).toHaveBeenCalledTimes(1);
+  expect(result.status).toBe('partial');expect(result.warnings.some(w=>w.code==='BODY_POSITION_UNAVAILABLE')).toBe(true);expect(fetch).toHaveBeenCalledTimes(1);
   expect(result.bodyTopicAssignments).toHaveLength(24);expect(result.coverage.naturalSentences).toBe(24);
  });
  it('본문 24문장을 모두 다중 논점으로 배정해도 출력은 2000토큰 안이고 호출은 1회다',async()=>{
@@ -26,7 +26,7 @@ describe('무료 분석 입력 경계 (공급자 모의, 실제 모델 품질 �
   const serialized=JSON.stringify(raw);expect(encode(serialized).length).toBeLessThan(2000);
   const fetch=vi.fn().mockResolvedValue(Response.json({choices:[{finish_reason:'stop',message:{content:serialized}}],usage:{total_tokens:4000}}));vi.stubGlobal('fetch',fetch);
   const result=await analyze(req,config,'boundary-body-topics',new AbortController().signal);
-  expect(result.status).toBe('success');expect(result.bodyTopicAssignments).toHaveLength(24);expect(result.bodyTopicAssignments!.every(a=>a.status==='assigned'&&a.topicIds.length===2)).toBe(true);
+  expect(result.status).toBe('partial');expect(result.bodyTopicAssignments).toHaveLength(24);expect(result.bodyTopicAssignments!.every(a=>a.status==='assigned'&&a.topicIds.length===2)).toBe(true);
   expect(fetch).toHaveBeenCalledTimes(1);
  });
  it('긴 문장 하나는 처리 조각 2개이지만 자연 문장은 1개로 보고하고 24단위 한도는 조각 기준이다',async()=>{

@@ -67,6 +67,7 @@ export function buildAnalysisScores(analysis:Analysis|null,bias?:BiasAnalysisRes
         note:`${scores.attribution.note} 미해결 출처 귀속 ${unresolved}개는 명시 출처 건수에서 제외하고 가능한 상한에만 포함합니다.`}:{}),
     };
   }else {
+    if(analysis.warnings.some(w=>w.code==='CLAIMS_UNAVAILABLE'))return scores;
     scores.attribution={...scores.attribution,status:'not_applicable',numerator:0,denominator:0};
     scores.reliability={...scores.reliability,status:'not_applicable',numerator:0,denominator:0};
     return scores;

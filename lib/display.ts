@@ -1,7 +1,12 @@
-import type {Analysis,Check,Ratio,Outcome} from './contracts';
+import type {Analysis,Check,Ratio,Outcome,Capabilities} from './contracts';
 import {expressionSummary,completedFactualChecks} from './domain';
 export const MIN_N_FOR_PERCENT=10;
 export const PROVIDER_NAME='Groq';
+export function analysisProviderLabel(cap:Capabilities|null){
+ if(cap?.aiProvider==='deepseek')return 'DeepSeek 공식 API';
+ if(cap?.aiProvider==='nvidia')return cap.aiModel==='nvidia/nemotron-3.5-lightning-30b-a3b'?'NVIDIA Nemotron Lightning':'NVIDIA DeepSeek';
+ return 'Groq';
+}
 export const DAILY_LIMIT_MESSAGE='오늘 실시간 분석 한도를 다 썼어요. 예시로 체험해 보세요';
 export function countLabel(r:Ratio,unit:string){return r.denominator?`${r.numerator}/${r.denominator}${unit}`:'해당 없음';}
 export function percentLabel(r:Ratio){return r.denominator>=MIN_N_FOR_PERCENT&&r.percent!==null?`${r.percent}%`:null;}

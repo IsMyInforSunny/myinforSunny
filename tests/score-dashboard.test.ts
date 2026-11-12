@@ -33,7 +33,7 @@ describe('기사 본문을 중심으로 한 대시보드 표시',()=>{
   const analysis=article('학교 도서관 운영 시간을 늘려야 한다.');setPosition(analysis);
   const html=render(analysis);
   expect(argumentAxis(html)).toContain('반대부터 찬성 · 찬성 관점');expect(argumentAxis(html)).toContain('studio-axis-marker');
-  expect(html).toContain('비교 논점 · 학교 도서관 운영 시간을 늘려야 한다.');expect(html).toContain('본문의 제안과 인용을 함께 검토한 결과입니다.');
+  expect(html).toContain('비교 명제 · 학교 도서관 운영 시간을 늘려야 한다.');expect(html).toContain('본문 입장 방향 표시입니다. 편향 강도 점수는 검증된 동일 논점 SVM이 준비되면 산출합니다.');expect(html).toContain('본문의 제안과 인용을 함께 검토한 결과입니다.');
  });
  it('본문과 반대인 댓글 입장이 본문 방향을 대신하지 않는다',()=>{
   const analysis=article('학교 도서관 운영 시간을 늘려야 한다.',['운영 시간을 늘릴 필요가 없다.']);setPosition(analysis);
@@ -51,7 +51,7 @@ describe('기사 본문을 중심으로 한 대시보드 표시',()=>{
   ['새로운 의약품의 성급한 승인을 반대한다.','새로운 의약품을 즉시 승인해야 한다.'],
  ])('기술·과학 논점의 본문 반대 입장을 정치 좌우에 강제하지 않는다', (body,proposition)=>{
   const analysis=article(body);setPosition(analysis,'oppose',proposition);const html=render(analysis);
-  expect(argumentAxis(html)).toContain('반대부터 찬성 · 반대 관점');expect(argumentAxis(html)).toContain('studio-axis-marker');expect(html).toContain(`비교 논점 · ${proposition}`);
+  expect(argumentAxis(html)).toContain('반대부터 찬성 · 반대 관점');expect(argumentAxis(html)).toContain('studio-axis-marker');expect(html).toContain(`비교 명제 · ${proposition}`);
  });
  it('주장 출처 명시 비율과 실제 분모를 기본 신뢰 항목에 표시한다',()=>{
   const html=render(article('정부에 따르면 예산이 늘었다. 통계청의 2025년 사회조사에 따르면 인구가 감소했다.'));

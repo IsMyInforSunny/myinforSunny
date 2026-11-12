@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "stance-training-status-1.0",
+  "ready": false,
+  "version": "stance-teacher-2026-11-12.1",
+  "annotatedArticleCount": 160,
+  "relevantArticleCount": 102,
+  "classCounts": {
+    "non_directional": 57,
+    "support": 17,
+    "oppose": 7
+  },
+  "blockers": [
+    "insufficient_class:oppose",
+    "teacher_agreement_below_threshold",
+    "direction_recall_below_threshold",
+    "usage_review_pending"
+  ],
+  "aiTeacherAgreement": {
+    "macroF1": 0.5661375661375662,
+    "majorityMacroF1": 0.2753623188405797,
+    "recall": {
+      "non_directional": 0.8947368421052632,
+      "oppose": 0.5,
+      "support": 0.16666666666666666
+    }
+  },
+  "humanEvaluationCount": 0
+}

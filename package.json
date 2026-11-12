@@ -19,7 +19,8 @@
     "check:local": "node scripts/check-local-runtime.mjs",
     "check:activation": "node scripts/check-activation-readiness.mjs",
     "check:record": "node scripts/check-record.mjs",
-    "start:nvidia": "node scripts/start-local-nvidia.mjs"
+    "start:nvidia": "node scripts/start-local-nvidia.mjs",
+    "start:deepseek": "node scripts/start-local-deepseek.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

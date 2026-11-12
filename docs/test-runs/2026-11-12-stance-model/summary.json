@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "stance-training-report-1.0",
+  "task": "article_stance_toward_proposition",
+  "scopeCharacters": 2000,
+  "teacher": [
+    "ai",
+    "Codex",
+    "stance-teacher-2026-11-12.1"
+  ],
+  "humanEvaluationCount": 0,
+  "counts": {
+    "annotated": 160,
+    "label:not_expressed": 115,
+    "off_proposition": 58,
+    "label:support": 17,
+    "label:undetermined": 15,
+    "undetermined": 15,
+    "label:oppose": 11,
+    "uncertain": 6,
+    "label:mixed": 2
+  },
+  "classCounts": {
+    "non_directional": 57,
+    "support": 17,
+    "oppose": 7
+  },
+  "trainingArticleCount": 81,
+  "publisherIdentityUsedAsLabel": false,
+  "politicalLabelsCreated": 0,
+  "ready": false,
+  "blockers": [
+    "insufficient_class:oppose",
+    "teacher_agreement_below_threshold",
+    "direction_recall_below_threshold",
+    "usage_review_pending"
+  ],
+  "trainingCount": 54,
+  "heldoutCount": 27,
+  "heldoutGroupCount": 21,
+  "groupOverlap": 0,
+  "splitId": "2d20703609a9de3f83182f788a0f60b4575482bdd4dfaf234e63a93f91a2fe98",
+  "aiTeacherAgreement": {
+    "macroF1": 0.5661375661375662,
+    "balancedAccuracy": 0.52046783625731,
+    "majorityMacroF1": 0.2753623188405797,
+    "recall": {
+      "non_directional": 0.8947368421052632,
+      "oppose": 0.5,
+      "support": 0.16666666666666666
+    },
+    "confusion": [
+      [
+        17,
+        0,
+        2
+      ],
+      [
+        1,
+        1,
+        0
+      ],
+      [
+        5,
+        0,
+        1
+      ]
+    ]
+  },
+  "thresholds": {
+    "macroF1": 0.6,
+    "directionRecall": 0.5
+  },
+  "features": 12000,
+  "automaticChecksPassed": false
+}
