@@ -20,7 +20,11 @@ const schema=z.object({schemaVersion:z.literal(STANCE_MODEL_SCHEMA),version:z.st
   propositions:z.record(z.string(),z.string()),classes:z.array(z.enum(['non_directional','oppose','support'])).length(3),
   vectorizer:z.object({vocabulary:z.record(z.string(),z.number().int().nonnegative()),idf:z.array(finite.positive()).min(1).max(12000)}),
   coefficients:z.array(z.array(finite).min(1).max(12000)).length(3),intercepts:z.array(finite).length(3),
-  coordinateScale:finite.positive(),trainingHashes:z.array(z.string().regex(/^[a-f0-9]{64}$/)),
+  coordinateScale:finite.positive(),trainingHashes:z.array(z.string().regex(/^[a-f0-9]{64}$/)).min(1),
+  release:z.object({schemaVersion:z.literal('stance-release-1.0'),
+    corpusDigest:z.string().regex(/^[a-f0-9]{64}$/),labelsDigest:z.string().regex(/^[a-f0-9]{64}$/),
+    reviewDigest:z.string().regex(/^[a-f0-9]{64}$/),modelDigest:z.string().regex(/^[a-f0-9]{64}$/),
+    trainingAllowed:z.literal(true),modelDistributionAllowed:z.literal(true)}),
   evaluation:z.object({ready:z.literal(true),automaticChecksPassed:z.literal(true),humanEvaluationCount:z.literal(0),
     groupOverlap:z.literal(0),splitId:z.string().min(1),blockers:z.array(z.string()).length(0),
     teacher:z.tuple([z.literal('ai'),z.string().min(1),z.string().min(1)]),
@@ -45,6 +49,14 @@ export function parseStanceModel(value:unknown):ContentStanceModel|null{
   return model;
 }
 
+/** Exact originals used in training must not become comparison evidence. */
+export async function isStanceTrainingArticle(model:ContentStanceModel,body:string):Promise<boolean>{
+  const bytes=new TextEncoder().encode(normalizeBiasText(articleTextPrefix(body,2000)));
+  const digest=await crypto.subtle.digest('SHA-256',bytes);
+  const hash=Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('');
+  return model.trainingHashes.includes(hash);
+}
+
 export function stanceModelText(body:string,topic:StanceTopic):string{
   const text=articleTextPrefix(body,2000).replace(/데일리안|뉴데일리|오마이뉴스|프레시안|(?:www\.)?(?:dailian|newdaily|ohmynews|pressian)\.(?:co\.kr|com)/gi,'');
   return normalizeBiasText(`${STANCE_PROPOSITIONS[topic]}\n${text}`);
@@ -54,10 +66,10 @@ export function stanceModelText(body:string,topic:StanceTopic):string{
 export function stanceTopicRelevant(body:string,topic:StanceTopic):boolean{
   const text=articleTextPrefix(body,2000);
   const rules:Record<StanceTopic,RegExp>={
-    medical_school_quota:/의(?:과)?대[\s\S]{0,35}(?:정원|증원|확대)|(?:정원|증원)[\s\S]{0,35}의(?:과)?대/,
+    medical_school_quota:/의(?:과)?대[\s\S]{0,35}(?:정원|증원|확대|늘리|줄이)|(?:정원|증원)[\s\S]{0,35}의(?:과)?대/,
     pension_reform:/국민연금|보험료율|소득대체율/,
-    minimum_wage:/최저임금|생활임금/,
-    electricity_prices:/(?:전기|전력)\s*(?:요금|료)[\s\S]{0,35}(?:인상|인하|동결|원가|한전|한국전력)|(?:인상|인하|동결)[\s\S]{0,35}전기\s*(?:요금|료)/,
+    minimum_wage:/최저\s*(?:임금|시급)|생활임금/,
+    electricity_prices:/(?:전기|전력)\s*(?:요금|료)[\s\S]{0,35}(?:인상|인하|동결|원가|한전|한국전력|올리|올려|내리|내려|오르|오른|조정|현실화)|(?:인상|인하|동결|올리|올려|내리|내려|조정|현실화)[\s\S]{0,35}(?:전기|전력)\s*(?:요금|료)/,
     housing_supply:/(?:주택|아파트|부동산)[\s\S]{0,35}(?:공급|분양|재건축|재개발)|(?:공급|분양|재건축|재개발)[\s\S]{0,35}(?:주택|아파트)/,
     nuclear_energy:/원전|원자력/,
   };
@@ -67,7 +79,10 @@ export function stanceTopicRelevant(body:string,topic:StanceTopic):boolean{
 /** Fixed questions keep articles about the same policy comparable. */
 export function canonicalStanceProposition(body:string):string|undefined{
   const topic=classifyRelativeTopic(body);
-  return topic&&stanceTopicRelevant(body,topic)?STANCE_PROPOSITIONS[topic]:undefined;
+  if(topic&&stanceTopicRelevant(body,topic))return STANCE_PROPOSITIONS[topic];
+  // A dominant unrelated topic must not be replaced by an incidental mention.
+  // Only the previously absent alias 최저시급 gets a separate fallback.
+  return !topic&&/최저\s*시급/.test(articleTextPrefix(body,2000))?STANCE_PROPOSITIONS.minimum_wage:undefined;
 }
 
 /** Local char TF-IDF + LinearSVC. Margins are not probabilities or human accuracy. */

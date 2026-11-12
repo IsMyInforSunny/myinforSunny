@@ -29,7 +29,8 @@ describe('기사 본문 입장의 명제와 원문 근거',()=>{
   it.each(['reported_sources','unclear'] as const)('발화 주체 %s인 찬성 제안을 작성자 찬성으로 확정하지 않는다',attribution=>{
     const raw=proposal();raw.bodyPosition!.attribution=attribution;
     const result=assembleAnalysis(request,raw,'attribution','mock');
-    expect(result.bodyPosition?.label).toBe(attribution==='reported_sources'?'not_expressed':'undetermined');
+    expect(result.bodyPosition?.label).toBe('undetermined');
+    if(attribution==='reported_sources')expect(result.bodyPosition).toMatchObject({attribution:'unclear',attributionSource:'server_rule'});
     expect(result.bodyPosition?.proposition).toBe(body);
     expect(result.bodyPosition?.evidence).toHaveLength(1);
   });

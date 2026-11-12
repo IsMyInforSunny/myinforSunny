@@ -1,0 +1,35 @@
+{
+  "version": "sentence-voice-1.0",
+  "topics": {
+    "nuclear_energy": {"label":"원자력", "issues": {
+      "expansion":"원자력 발전·신규 원전 건설을 확대해야 한다.",
+      "lifetime":"기존 원전의 수명을 연장·계속 운전해야 한다.",
+      "public_support":"원전 산업에 대한 공적 지원·수출 지원을 확대해야 한다."
+    }},
+    "pension_reform": {"label":"국민연금", "issues": {
+      "premium":"국민연금 보험료율을 인상해야 한다.",
+      "replacement":"국민연금 소득대체율을 인상해야 한다.",
+      "fund_risk":"국민연금 기금의 위험자산 투자 비중을 확대해야 한다."
+    }},
+    "minimum_wage": {"label":"최저임금", "issues": {
+      "increase":"최저임금을 인상해야 한다.",
+      "differentiation":"최저임금을 업종·지역에 따라 차등 적용해야 한다.",
+      "coverage":"최저임금 적용 대상을 확대해야 한다."
+    }},
+    "electricity_prices": {"label":"전기요금", "issues": {
+      "increase":"전기요금을 인상해야 한다.",
+      "progressive":"전기요금 누진제를 강화해야 한다.",
+      "market":"전력 판매 시장의 민간 참여를 확대해야 한다."
+    }},
+    "housing_supply": {"label":"주택 공급", "issues": {
+      "supply":"주택 공급을 확대해야 한다.",
+      "deregulation":"재건축·재개발 규제를 완화해야 한다.",
+      "public_housing":"공공임대·공공분양 주택 공급을 확대해야 한다."
+    }},
+    "medical_school_quota": {"label":"의료 정책", "issues": {
+      "quota":"의과대학 입학 정원을 확대해야 한다.",
+      "regional":"지역 의사 의무복무제를 도입·강화해야 한다.",
+      "public_school":"공공의대를 설립·확대해야 한다."
+    }}
+  }
+}

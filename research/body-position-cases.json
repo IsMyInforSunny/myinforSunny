@@ -1,0 +1,27 @@
+{
+  "version":"body-position-regression-1.0",
+  "synthetic":[
+    {"id":"A","body":"정부가 내년 전기요금을 5% 올리기로 했다고 산업부가 13일 밝혔다.\n이대로 가면 서민 가계는 완전히 파탄 나고 나라 경제가 무너질 것이 뻔하다.\n요금 인상에 찬성하는 사람들은 현실을 전혀 모르는 탁상공론가들뿐이다.\n한 시민단체 관계자는 \"인상 폭이 과도하다\"고 말했다.\n지금 당장 막지 않으면 돌이킬 수 없는 재앙이 닥친다.","expected":{"proposition":"전기요금을 인상해야 한다.","label":"oppose","attribution":"author","minimumFactualClaims":1}},
+    {"id":"medical-support","body":"의대 정원을 늘려야 한다. 의료 인력 부족을 해결하려면 교육 역량도 함께 확충해야 한다.","expected":{"label":"support","attribution":"author"}},
+    {"id":"medical-oppose","body":"의대 정원 확대에 반대한다. 교육 시설을 갖추기 전에는 의대 정원을 늘려서는 안 된다.","expected":{"label":"oppose","attribution":"author"}},
+    {"id":"pension-support","body":"국민연금 보험료율을 인상해야 한다. 기금의 지속 가능성을 위해 더 부담할 필요가 있다.","expected":{"label":"support","attribution":"author"}},
+    {"id":"wage-oppose","body":"최저시급을 올려서는 안 된다. 지금의 최저임금은 동결해야 한다.","expected":{"label":"oppose","attribution":"author"}},
+    {"id":"housing-support","body":"주택 공급을 확대해야 한다. 필요한 곳에 공공주택을 더 공급하는 것이 바람직하다.","expected":{"label":"support","attribution":"author"}},
+    {"id":"nuclear-oppose","body":"원자력 발전을 확대해서는 안 된다. 신규 원전 건설에 반대한다.","expected":{"label":"oppose","attribution":"author"}},
+    {"id":"source-only","body":"최저임금 협상에서 노동조합 관계자는 \"최저임금을 올려야 한다\"고 주장했다. 사용자단체 대표는 \"최저임금을 동결해야 한다\"고 말했다.","expected":{"label":"not_expressed","attribution":"reported_sources"}},
+    {"id":"no-issue","body":"도서관은 오전 9시에 문을 열었다. 안내 데스크는 1층에 있다.","expected":{"proposition":"","label":"not_expressed"}},
+    {"id":"electricity-support","body":"전기료를 올려야 한다. 전기요금 현실화에 찬성한다.","expected":{"label":"support","attribution":"author"}}
+  ],
+  "real":[
+    {"id":"B","url":"https://www.pressian.com/pages/articles/2026102810402838861","expected":{"label":"not_expressed","attribution":"reported_sources"}},
+    {"id":"C","url":"https://www.donga.com/news/Society/article/all/20250701/131913541/1","expected":{"proposition":"","label":"not_expressed"}},
+    {"id":"medical","url":"https://www.pressian.com/pages/articles/2024050810573077475"},
+    {"id":"pension","url":"https://www.pressian.com/pages/articles/2025122617535100071"},
+    {"id":"wage","url":"https://www.pressian.com/pages/articles/2026061510494191443"},
+    {"id":"electricity","url":"https://biz.newdaily.co.kr/site/data/html/2026/10/19/2026101900370.html"},
+    {"id":"housing","url":"https://www.pressian.com/pages/articles/2026071310032447437"},
+    {"id":"nuclear","url":"https://www.pressian.com/pages/articles/2025121616100954018"},
+    {"id":"ohmy","url":"https://www.ohmynews.com/NWS_Web/View/at_pg.aspx?CNTN_CD=A0003271161&isPc=true"},
+    {"id":"dailian","url":"https://www.dailian.co.kr/news/view/1703329"}
+  ]
+}

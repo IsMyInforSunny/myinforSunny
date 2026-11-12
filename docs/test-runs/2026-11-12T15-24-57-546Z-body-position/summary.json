@@ -1,0 +1,67 @@
+{
+  "version": "body-position-regression-1.0",
+  "started": "2026-11-12T15:24:57.546Z",
+  "base": "http://127.0.0.1:5184",
+  "scope": "고정 가상 사례 일치이며 정확도 평가가 아님. 실제 링크는 별도 기록.",
+  "results": [
+    {
+      "id": "A",
+      "kind": "synthetic",
+      "httpStatus": 200,
+      "durationMs": 15507,
+      "cache": "miss",
+      "proposition": "전기요금을 인상해야 한다.",
+      "label": "not_expressed",
+      "attribution": "unclear",
+      "attributionSource": "server_rule",
+      "stimulation": {
+        "numerator": 3,
+        "denominator": 5,
+        "percent": 60
+      },
+      "naturalSentences": 5,
+      "factualClaims": 0,
+      "warnings": [],
+      "errorCode": null,
+      "passed": false
+    },
+    {
+      "id": "B",
+      "kind": "real",
+      "httpStatus": 502,
+      "durationMs": 107856,
+      "cache": null,
+      "proposition": null,
+      "label": null,
+      "attribution": null,
+      "attributionSource": null,
+      "stimulation": null,
+      "naturalSentences": null,
+      "factualClaims": 0,
+      "warnings": [],
+      "errorCode": "INVALID_MODEL_OUTPUT",
+      "passed": false
+    },
+    {
+      "id": "C",
+      "kind": "real",
+      "httpStatus": 200,
+      "durationMs": 36747,
+      "cache": "miss",
+      "proposition": "",
+      "label": "not_expressed",
+      "attribution": "unclear",
+      "attributionSource": "server_rule",
+      "stimulation": {
+        "numerator": 0,
+        "denominator": 20,
+        "percent": 0
+      },
+      "naturalSentences": 20,
+      "factualClaims": 5,
+      "warnings": [],
+      "errorCode": null,
+      "passed": true
+    }
+  ]
+}

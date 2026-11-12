@@ -12,7 +12,7 @@ const TTL_MS = 10 * 60_000;
 const MAX_ENTRIES = 32;
 const memory = new Map<string, Entry>();
 const inFlight=new Map<string,Promise<Analysis>>();
-const CACHE_VERSION = 'article-analysis-4.16-cache-10-canonical';
+const CACHE_VERSION = 'article-analysis-4.18-cache-11-body-position';
 
 async function digest(value: unknown) {
   const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value)));
@@ -34,7 +34,7 @@ export async function cachedAnalysis(
   const hosts = (config.ALLOWED_RETRIEVAL_HOSTS ?? '').split(',').map(host => host.trim()).filter(Boolean);
   const url = input.kind === 'url' ? allowedUrl(input.url, hosts) : null;
   if (input.kind === 'url' && !url) return {analysis:await action(),cache:'miss'};
-  const version = [CACHE_VERSION, RUBRIC, SEGMENTER, config.AI_PROVIDER ?? 'groq', modelName(config)];
+  const version = [CACHE_VERSION, ANALYSIS_PROMPT_VERSION, RUBRIC, SEGMENTER, config.AI_PROVIDER ?? 'groq', modelName(config)];
   const payload = {...input, ...(url ? {url:url.href} : {})};
   const key = await digest([version, hosts, await actorHash(request, config), payload]);
   const now = Date.now();

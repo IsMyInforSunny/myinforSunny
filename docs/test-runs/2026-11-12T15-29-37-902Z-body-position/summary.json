@@ -1,0 +1,73 @@
+{
+  "version": "body-position-regression-1.0",
+  "started": "2026-11-12T15:29:37.902Z",
+  "base": "http://127.0.0.1:5184",
+  "scope": "고정 가상 사례 일치이며 정확도 평가가 아님. 실제 링크는 별도 기록.",
+  "results": [
+    {
+      "id": "A",
+      "kind": "synthetic",
+      "httpStatus": 200,
+      "durationMs": 9815,
+      "cache": "miss",
+      "proposition": "전기요금을 인상해야 한다.",
+      "label": "oppose",
+      "attribution": "author",
+      "attributionSource": null,
+      "stimulation": {
+        "numerator": 3,
+        "denominator": 5,
+        "percent": 60
+      },
+      "naturalSentences": 5,
+      "factualClaims": 0,
+      "warnings": [],
+      "errorCode": null,
+      "passed": false
+    },
+    {
+      "id": "B",
+      "kind": "real",
+      "httpStatus": 200,
+      "durationMs": 20018,
+      "cache": "miss",
+      "proposition": "주택 공급을 확대해야 한다.",
+      "label": "not_expressed",
+      "attribution": "reported_sources",
+      "attributionSource": null,
+      "stimulation": {
+        "numerator": 1,
+        "denominator": 15,
+        "percent": 6.7
+      },
+      "naturalSentences": 15,
+      "factualClaims": 4,
+      "warnings": [],
+      "errorCode": null,
+      "passed": true
+    },
+    {
+      "id": "C",
+      "kind": "real",
+      "httpStatus": 200,
+      "durationMs": 12,
+      "cache": "hit",
+      "proposition": "",
+      "label": "not_expressed",
+      "attribution": "unclear",
+      "attributionSource": "server_rule",
+      "stimulation": {
+        "numerator": 0,
+        "denominator": 20,
+        "percent": 0
+      },
+      "naturalSentences": 20,
+      "factualClaims": 5,
+      "warnings": [
+        "CACHED_ANALYSIS"
+      ],
+      "errorCode": null,
+      "passed": true
+    }
+  ]
+}

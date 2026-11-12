@@ -1,7 +1,7 @@
 import { z } from 'zod/v4';
 
 export const RUBRIC = 'rubric-4.0';
-export const ANALYSIS_PROMPT_VERSION='analysis-4.16';
+export const ANALYSIS_PROMPT_VERSION='analysis-4.18-body-position';
 export const MAX_ARTICLE_CHARACTERS = 8000;
 const id = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 const text = (max: number) => z.string().min(1).max(max).refine(v => v.trim().length > 0, '내용을 입력해 주세요.');
@@ -27,7 +27,7 @@ export type TopicAssignment = { sourceId:string; topicIds:string[]; status:'assi
 /** One processing unit of the body. Complete only when every body unit has exactly one entry. */
 export type BodyTopicAssignment = { sentenceId:string; topicIds:string[]; status:'assigned'|'other'|'undetermined'; reason?:string };
 export type Stance = { sourceId:string; label:z.infer<typeof stanceLabelSchema>; evidence:Span[]; reason?:string };
-export type BodyPosition = {proposition:string;label:z.infer<typeof stanceLabelSchema>;evidence:Span[];reason:string;attribution?:'author'|'reported_sources'|'unclear'};
+export type BodyPosition = {proposition:string;label:z.infer<typeof stanceLabelSchema>;evidence:Span[];reason:string;attribution?:'author'|'reported_sources'|'unclear';attributionSource?:'server_rule'};
 export type CounterArgument = {claimId:string;kind:'counterpoint'|'qualification';text:string;reasoning:string;evidenceNeeded:string;basis:Span[];provenance:'ai_suggestion'|'curated_example'};
 // Plain keywords only: keep Korean names/numbers instead of forcing translation.
 // Space separates words. Hyphen, decimal point, percent and middle dot are
@@ -47,6 +47,7 @@ export type Analysis = {
   versions:{rubric:string;prompt:string;model:string;segmenter:string};
   sources:InputSource[]; proposition?:string; topics:Topic[]; topicAssignments:TopicAssignment[]; bodyTopicAssignments?:BodyTopicAssignment[]; stances?:Stance[];
   bodyPosition?:BodyPosition;
+  sentenceVoices?:import('./sentence-voice').VoiceDocument;
   expressions:Expression[]; claims:Claim[]; perspectiveQuestions:{text:string;basis:Span[]}[];
   counterArguments?:CounterArgument[];searchSuggestions?:SearchSuggestion[];
   indicators:{topics:{topicId:string;coverage:Ratio}[];expression:Ratio;expressionUndetermined:number;evidenceSupport:Ratio;verificationProgress:Ratio};

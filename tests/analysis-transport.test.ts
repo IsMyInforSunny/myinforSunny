@@ -12,6 +12,17 @@ const sources=makeSources(req),ref={sentenceId:'body_s0'};
 function wire(){return {topics:[{id:'toothbrush',label:'칫솔모 개발',description:'압전 칫솔모',evidence:[ref]}],topicAssignments:[],stances:[],bodyPosition:{proposition:'압전 칫솔모는 세균 제거에 효과적이다.',label:'not_expressed',evidence:[ref],reason:'개발 사실을 전달한다.'},bodyAssigned:[{sentenceId:'body_s0',topicIds:['toothbrush']}],bodyOtherIds:[],bodyUndeterminedIds:[],clearSentenceIds:['body_s0'],expressions:[],claims:[{id:'c1',kind:'factual',text:req.body,origin:[ref],targetTime:''}],perspectiveQuestions:[],counterArguments:[],searchSuggestions:[],claimsMayBeOmitted:true};}
 function grouped(){const {bodyAssigned,bodyOtherIds,bodyUndeterminedIds,clearSentenceIds,expressions,...raw}=wire();return {...raw,topics:raw.topics.map(t=>({...t,evidence:['body_s0']})),bodyPosition:{...raw.bodyPosition,attribution:'reported_sources',evidence:['body_s0']},claims:raw.claims.map(c=>({...c,origin:['body_s0']})),sentences:{body_s0:{status:'clear',topics:'1'}}};}
 describe('compact evidence transport',()=>{
+ it('requires a claim for pasted numeric announcements without inventing a missing fact',async()=>{
+  const article={kind:'text' as const,body:'전기요금을 5% 올리기로 했다고 산업부가 13일 밝혔다.',comments:[]};
+  let sent:any;
+  vi.stubGlobal('fetch',vi.fn(async(_url,options)=>{
+   sent=JSON.parse(options.body);
+   return Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify(wire())}}]});
+  }));
+  await analyze(article,{AI_PROVIDER:'nvidia',NVIDIA_API_KEY:'synthetic'},'numeric-claim',new AbortController().signal);
+  expect(JSON.parse(sent.messages[1].content).requiredClaimCount).toBe('1..5');
+  expect(sent.messages[0].content).toContain('factual');
+ });
  it('requires article claims in generation and never reports omitted extraction as a completed no-facts result',async()=>{
   const raw={...wire(),claims:[]};
   expect(compactAnalysisTransport(sources,false,true).generation.safeParse({...grouped(),claims:[]}).success).toBe(false);

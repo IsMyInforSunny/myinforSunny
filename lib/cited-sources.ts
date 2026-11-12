@@ -120,6 +120,31 @@ function cleanName(raw: string): string {
   return raw.replace(/^[\s“"'‘(]+|[\s”"'’)]+$/g, '').replace(/\s+/g, ' ').trim();
 }
 
+/** Body-position guard shares this module's source/attribution rules. A quote
+ * mark around a policy term alone is not evidence of an external speaker. */
+export function sentenceAttributionSignals(text:string,quote?:{start:number;end:number}){
+  const probe={id:'body',kind:'body' as const,text,sentences:[{id:'probe',start:0,end:text.length}]};
+  const review=reviewCitedSources({sources:[probe],claims:[]});
+  const source=review.sources.length>0||ACCORDING_TO.test(text);
+  // ACCORDING_TO is global and shared with matchAll; reset before returning.
+  ACCORDING_TO.lastIndex=0;
+  const speech=SAYING_VERB.test(text)||/(?:요구했다|촉구했다|우려를\s*표시했다|예측했다)(?=[.\s”"’']|$)/.test(text)
+    ||/(?:라|다)고\s*(?:말|밝|강조|주장|지적|설명|전|요구|촉구|예측|했|하)|다며\s*["“‘']/.test(text);
+  let insideQuotation=false;
+  if(quote)for(const pair of [['"','"'],['“','”'],['‘','’'],["'","'"]]){
+    let from=0;
+    while(from<text.length){
+      const start=text.indexOf(pair[0],from);if(start<0)break;
+      const end=text.indexOf(pair[1],start+1);if(end<0)break;
+      if(quote.start>start&&quote.end<=end)insideQuotation=true;
+      from=end+1;
+    }
+  }
+  const explicitSpeaker=SUBJECT_AT_START.test(text)||/관계자|지부장|위원장|교수|대변인/.test(text);
+  return {reported:source||(speech&&(explicitSpeaker||/[“”"‘’']/.test(text)))||insideQuotation,
+    source,speech,insideQuotation};
+}
+
 /** Extract cited sources from body sentences and link them to factual claims by sentence. */
 export function reviewCitedSources(analysis: Pick<Analysis, 'sources' | 'claims'>): CitedSourceReview {
   const sources: CitedSource[] = [];

@@ -9,7 +9,7 @@ sentences는 모든 실제 문장 ID를 키로 갖는 객체다. 각 문장에�
 bodyPosition은 본문 작성자의 입장이다. 사용자 proposition이 있으면 그대로 쓰고, 없으면 비교 명제를 짧게 정한다. support/oppose/mixed/not_expressed/undetermined 중 선택한다. 사실 전달이나 취재원 인용만으로 작성자가 찬성한다고 하지 않는다. 입장이 없으면 not_expressed다. evidence에는 반드시 body 문장 ID를 넣는다. 정치 좌우에 강제하지 않는다.
 claims는 핵심 주장 최대 5개다. 사건·실험·통계·숫자·인용된 사실 설명은 factual이며 참이라는 뜻은 아니다. 제안·가치판단은 opinion, 유형 자체가 모호할 때만 undetermined다. 실제 원문 ID를 origin에 연결한다. 출처·화자를 설명하는 문장이 붙어 있으면 그 ID도 함께 연결한다. targetTime은 명확한 시점만, 없으면 빈 문자열이다. 누락을 배제할 수 없으면 claimsMayBeOmitted=true다.
 topicAssignments는 댓글만 sourceId별 한 개, stances는 proposition이 있을 때만 댓글별 한 개다. 댓글이 없으면 빈 배열이다. perspectiveQuestions는 근거에 연결된 질문 최대 1개다. counterArguments는 실제 의견·제안의 반론이나 성립 조건이 있을 때만 최대 2개, 없으면 빈 배열이다. 확립된 사실을 억지로 반박하거나 숫자·출처를 만들지 않는다. claimId는 추출한 주장, basis는 그 주장의 origin ID만 쓴다.
-searchSuggestions는 한국어 기사 검색 핵심어 2~5단어 query와 짧은 label 최대 2개다. URL·연산자·개인 연락처는 쓰지 않는다. 모든 설명은 간결한 한국어다.`;
+searchSuggestions는 한국어 기사 검색 핵심어 2~5단어 query와 짧은 label 최대 2개다. URL·연산자·개인 연락처는 쓰지 않는다. 모든 설명은 간결한 한국어다. 출력 예산을 지키기 위해 description·reason·explanation은 40자 이내, claims.text는 90자 이내, 반론의 text·reasoning·evidenceNeeded는 각각 60자 이내로 요약한다. clear 문장은 status와 topics 두 필드만 쓴다. 원문을 설명에 반복하지 않는다.`;
 
 /** One required, mutually exclusive decision for every actual sentence. */
 export function compactAnalysisTransport(sources:InputSource[],hasProposition:boolean,article=false){
