@@ -4,7 +4,7 @@ import {useEffect,useRef,useState} from 'react';
 import {ArrowUpRight,LoaderCircle,Search} from 'lucide-react';
 import type {Analysis,Capabilities} from '@/lib/contracts';
 import type {ResearchStage,ResearchVerification} from '@/lib/research-contract';
-import {reliabilityReview,researchProposition,researchRequestTimeout,verifiedRecommendations} from '@/lib/reliability';
+import {recommendationLabel,reliabilityReview,researchProposition,researchRequestTimeout,verifiedRecommendations} from '@/lib/reliability';
 import {RESEARCH_BATCH_CLAIMS,researchWait,runResearch,type ClaimCoverage} from '@/lib/research-runner';
 import DirectEvidence from './direct-evidence';
 const coverageLabel:Record<ClaimCoverage,string>={pending:'대기',reviewing:'조사 중',reviewed:'대조 완료',no_evidence:'공개 본문 미확보',not_completed:'대조 미완료'};
@@ -72,7 +72,6 @@ export default function ReliabilityResearch({analysis,cap,onChange,researchConse
  function settleCoverage(){setCoverage(prev=>Object.fromEntries(Object.entries(prev).map(([id,v])=>[id,v==='pending'||v==='reviewing'?'not_completed':v])) as Record<string,ClaimCoverage>);}
  function cancel(){researchFocusChain.current=false;focusAfterTransition.current='restart';control.current?.abort();settleCoverage();setStage('cancelled');setMessage('조사를 취소했어요. 이미 확인한 자료만 표시합니다.');callback.current(results,'cancelled');}
  function prepareRestart(){researchFocusChain.current=false;focusAfterTransition.current='consent';control.current?.abort();setStarted(false);setConsent(false);setAutoStarted(false);setStage('not_started');setMessage('');setResults([]);setCoverage({});setBatchInfo(null);callback.current([],'not_started');}
- const kindLabel={opposing_view:'다른 입장',supporting_view:'같은 입장',different_evidence:'다른 수치·사실을 담은 자료',context:'관련 맥락'};
  return <><section className="report-section" aria-label="자동 신뢰성 조사">
   <div className="report-section-title"><h3><Search size={16}/> 03. 신뢰성</h3><span className="badge badge-purple">외부 자료 조사</span></div>
   <p className="section-description">{review.label}</p>
@@ -93,7 +92,7 @@ export default function ReliabilityResearch({analysis,cap,onChange,researchConse
    {started&&!busy&&['completed','partial','failed','cancelled'].includes(stage)&&<button ref={restartRef} className="small-button" onClick={prepareRestart}>새 조사 준비하기</button>}
   </>}
   {!!review.completedClaims&&<div className="stance-list"><span>뒷받침 {review.supported}</span><span>상충 {review.contradicted+review.conflicting}</span><span>불충분 {review.insufficient}</span></div>}
-  {cards.length>0&&<><h4>참고할 관련 기사</h4>{cards.map(card=><article className="claim-relations" key={card.url}><span className="badge">{kindLabel[card.kind]}</span><h4><a href={card.url} target="_blank" rel="noopener noreferrer">{card.title} <ArrowUpRight size={12}/></a></h4><p className="topic-note">{card.publisherDomain} · 본문 취득 · 인용 일치 확인</p><blockquote>“{card.quote.slice(0,280)}{card.quote.length>280?'…':''}”</blockquote><p>{card.reason}</p></article>)}</>}
+  {cards.length>0&&<><h4>참고할 관련 기사</h4>{cards.map(card=><article className="claim-relations" key={card.url}><span className="badge">{recommendationLabel(card)}</span><h4><a href={card.url} target="_blank" rel="noopener noreferrer">{card.title} <ArrowUpRight size={12}/></a></h4><p className="topic-note">{card.publisherDomain} · 본문 취득 · 인용 일치 확인</p><blockquote>“{card.quote.slice(0,280)}{card.quote.length>280?'…':''}”</blockquote><p>{card.reason}</p></article>)}</>}
   <p className="topic-note">{review.scopeNote} 자료가 없거나 접속에 실패했다고 거짓으로 분류하지 않습니다.</p>
  </section>
   <DirectEvidence analysis={analysis} cap={cap} locked={started} onBusy={setDirectActive} onProgress={next=>{setStage(next);callback.current(results,next);}} onResult={result=>{const next=[...results,result];setResults(next);setStage('partial');callback.current(next,'partial');}}/>

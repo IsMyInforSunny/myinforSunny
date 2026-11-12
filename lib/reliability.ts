@@ -33,6 +33,15 @@ function safeLink(value:string|undefined){try{const u=new URL(value??'');return 
 // shown to the reader. Tracking aliases are observations of the same article.
 const articleIdentity=(url:URL)=>canonicalArticleUrl(url.href)?.url??url.href;
 type ReviewIdentity=Partial<Pick<Analysis,'analysisId'|'mode'>>;
+/** A stance toward the comparison proposition may be opposite to the input article. */
+export function recommendationLabel(card:Pick<Recommendation,'kind'|'relationToArticle'>):string{
+ if(card.relationToArticle==='similar')return '본문과 같은 관점';
+ if(card.relationToArticle==='opposing')return '본문과 다른 관점';
+ if(card.kind==='different_evidence')return '다른 사실 근거';
+ if(card.kind==='supporting_view')return '비교 명제에 찬성';
+ if(card.kind==='opposing_view')return '비교 명제에 반대';
+ return '관련 맥락';
+}
 function inScope(verifications:ResearchVerification[],analysis?:ReviewIdentity){
  if(!analysis?.analysisId&&!analysis?.mode)return verifications;
  if(analysis.mode==='demo')return [];
@@ -77,8 +86,10 @@ export function reliabilityReview(analysis:Pick<Analysis,'claims'>&ReviewIdentit
 }
 
 /** A factual contradiction is not automatically a policy/opinion disagreement. */
-export function verifiedRecommendations(verifications:ResearchVerification[],analysis?:(Pick<Analysis,'analysisId'|'mode'>&Partial<Pick<Analysis,'claims'|'proposition'|'bodyPosition'|'sources'>>)):Recommendation[]{
+export function verifiedRecommendations(verifications:ResearchVerification[],analysis?:(Pick<Analysis,'analysisId'|'mode'>&Partial<Pick<Analysis,'claims'|'proposition'|'bodyPosition'|'sources'|'article'>>)):Recommendation[]{
  const scoped=inScope(verifications,analysis);
+ const inputUrl=safeLink(analysis?.article?.url);
+ const inputIdentity=inputUrl?articleIdentity(inputUrl):undefined;
  const known=analysis?.claims?new Set(analysis.claims.filter(c=>c.kind==='factual').map(c=>c.id)):null;
  const normal=(value:string)=>value.trim().replace(/\s+/g,' ');
  const selectedProposition=analysis?researchProposition(analysis):undefined;
@@ -99,6 +110,7 @@ export function verifiedRecommendations(verifications:ResearchVerification[],ana
  for(const [index,v] of scoped.entries()){for(const r of v.references){
   const u=safeLink(r.url);if(r.provenance!=='web_fetched'||!u)continue;
   u.hash='';
+  if(inputIdentity&&articleIdentity(u)===inputIdentity)continue;
   const relations=v.checks.flatMap(c=>{const last=latest.get(claimKey(v,c.claimId));return last?.index===index&&last.check===c&&(!known||known.has(c.claimId))&&c.execution==='completed'&&c.temporalFit==='matched'?c.relations:[];}).filter(q=>q.referenceId===r.id&&validRelation(r,q));
   const perspective=v.perspectiveChecks?.find(p=>p.referenceId===r.id&&(!positions||positions.has(normal(p.positionText)))&&latestPerspective.get(perspectiveKey(v,u,p.positionText))===p&&validRelation(r,p));
   const related=relations.find(q=>q.relation==='contradicts')??relations[0];

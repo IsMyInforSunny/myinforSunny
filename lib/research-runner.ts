@@ -43,13 +43,17 @@ export async function runResearch(input:ResearchInput,signal:AbortSignal,deps:De
    // Exclusions are only deduplication hints, never new fetch destinations.
    // A fresh plan starts a fresh set; at most 8 queries x 2 references = 16 URLs.
    const fetchedUrls=new Set<string>();
-   for(let index=0;index<plan.queries.length;index++){
+   // Compare perspectives first so article recommendations do not wait for
+   // every factual claim. Keep the signed plan's original query index.
+   const order=plan.queries.map((query,index)=>({query,index})).sort((a,b)=>Number(b.query.purpose==='perspective')-Number(a.query.purpose==='perspective'));
+   for(let ordinal=0;ordinal<order.length;ordinal++){
+    const {index}=order[ordinal];
     if(signal.aborted)throw new DOMException('취소됨','AbortError');
     // Schedule distinct searches; never retry a failed provider request automatically.
     const now=deps.now();const searchAt=Math.max(searches.length?searches[searches.length-1]+7000:now,searches.length>=3?searches[searches.length-3]+61000:now);
     if(searchAt>now){emit('waiting',`기사 검색 한도를 지키기 위해 약 ${Math.ceil((searchAt-now)/1000)}초 기다립니다.`);await deps.wait(searchAt-now,signal);}
     if(signal.aborted)throw new DOMException('취소됨','AbortError');
-    emit('searching',`${index+1}/${plan.queries.length} · ${plan.queries[index].label} 관련 자료를 찾고 있어요.`);
+    emit('searching',`${ordinal+1}/${plan.queries.length} · ${plan.queries[index].label} 관련 자료를 찾고 있어요.`);
     ensureActive();searches.push(deps.now());const evidence=await deps.post<EvidenceBundle>({operation:'discover',input:batch,planToken:plan.token,queryIndex:index,...(fetchedUrls.size?{excludeUrls:[...fetchedUrls]}:{})},signal);ensureActive();
     for(const reference of evidence.references){
      const normalized=normalizeSourceUrl(reference.url);

@@ -3,7 +3,7 @@ import {createElement} from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {demoAnalysis} from '../lib/fixtures';
 import {locate,makeSources} from '../lib/domain';
-import {researchProposition,researchRequestTimeout,verifiedRecommendations} from '../lib/reliability';
+import {recommendationLabel,researchProposition,researchRequestTimeout,verifiedRecommendations} from '../lib/reliability';
 import type {Analysis,Capabilities} from '../lib/contracts';
 import type {ResearchVerification,SourcePerspective} from '../lib/research-contract';
 import DirectEvidence from '../components/direct-evidence';
@@ -23,6 +23,13 @@ function verification(a:Analysis,stance:SourcePerspective['stance']='opposes_pos
 }
 
 describe('본문 입장 근거에 연결된 조사 명제와 추천',()=>{
+ it('입력 기사 자체는 추적 매개변수가 달라도 다른 관점 기사로 추천하지 않는다',()=>{
+  const a=analysis(),v=verification(a);
+  a.article={url:'https://news.example/body-position?utm_source=input',fetchedAt:'2026-11-12T00:00:00Z',fullTextLength:100,analyzedCharacters:100,truncated:false};
+  expect(verifiedRecommendations([v],a)).toEqual([]);
+  v.references[0].url='https://news.example/another-article';
+  expect(verifiedRecommendations([v],a)).toHaveLength(1);
+ });
  it('사실·의견 주장 추출이 없어도 본문 근거의 명제를 조사 대상으로 사용한다',()=>{
   const a=analysis(),v=verification(a);
   expect(researchProposition(a)).toBe(a.bodyPosition!.proposition);
@@ -58,10 +65,12 @@ describe('본문 입장 근거에 연결된 조사 명제와 추천',()=>{
   opposes.references[0].url='https://news.example/same-position';
   const cards=verifiedRecommendations([opposes,supports],a);
   expect(cards.map(card=>[card.kind,card.relationToArticle])).toEqual([['supporting_view','opposing'],['opposing_view','similar']]);
+  expect(cards.map(recommendationLabel)).toEqual(['본문과 다른 관점','본문과 같은 관점']);
  });
  it.each(['mixed','not_expressed','undetermined'] as const)('본문 입장 %s는 방향의 유사·반대를 확정하지 않는다',label=>{
   const a=analysis();a.bodyPosition!.label=label;
   expect(verifiedRecommendations([verification(a)],a)[0]).toMatchObject({kind:'opposing_view',relationToArticle:'unclassified'});
+  expect(recommendationLabel(verifiedRecommendations([verification(a)],a)[0])).toBe('비교 명제에 반대');
   expect(verifiedRecommendations([verification(a,'adds_context')],a)[0]).toMatchObject({kind:'context',relationToArticle:'context'});
  });
  it('본문 입장 필드가 없는 기존 분석도 명시한 비교 명제로 추천한다',()=>{

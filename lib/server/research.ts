@@ -29,7 +29,6 @@ export function validateResearch(input:ResearchInput){
  if(input.transmissionConsent!==true||input.researchConsent!==true)throw new AppError(422,'VALIDATION_ERROR','분석과 자료 조사 전송에 동의해 주세요.');
  assertResearchBatch(input);
  validateVerifyInput({kind:'text',sources:input.sources,claims:input.claims,references:[],useWebSearch:false});
- if(input.sources.reduce((n,s)=>n+s.sentences.length,0)>24)throw new AppError(422,'VALIDATION_ERROR','원문 처리 단위가 너무 많습니다.');
  if(input.claims.some(c=>c.kind!=='factual'))throw new AppError(422,'VALIDATION_ERROR','사실 주장만 신뢰성 조사 대상으로 선택해 주세요.');
  if(input.position){if(input.position.kind!=='opinion'||input.claims.some(c=>c.id===input.position!.id))throw new AppError(422,'VALIDATION_ERROR','다른 관점의 탐색 대상은 별도로 추출한 의견이어야 합니다.');validateVerifyInput({kind:'text',sources:input.sources,claims:[input.position],references:[],useWebSearch:false});}
  if(input.proposition!==undefined&&(!input.proposition.trim()||input.proposition.length>160))throw new AppError(422,'VALIDATION_ERROR','비교 명제를 160자 이내로 입력해 주세요.');

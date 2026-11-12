@@ -1,12 +1,13 @@
 import { z } from 'zod/v4';
 
 export const RUBRIC = 'rubric-4.0';
+export const MAX_ARTICLE_CHARACTERS = 8000;
 const id = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 const text = (max: number) => z.string().max(max).refine(v => v.trim().length > 0, '내용을 입력해 주세요.');
 export const analyzeRequestSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('demo'), fixtureId: id }).strict(),
   z.object({ kind:z.literal('url'), url:z.string().trim().url().max(2048).refine(v=>v.startsWith('https://'),'HTTPS 기사 주소를 입력해 주세요.'), comments:z.array(z.object({id,text:text(200)}).strict()).max(5), proposition:text(160).optional(),transmissionConsent:z.literal(true) }).strict(),
-  z.object({ kind: z.literal('text'), body: text(8000), comments: z.array(z.object({ id, text: text(200) }).strict()).max(5), proposition: text(160).optional(), transmissionConsent:z.literal(true) }).strict(),
+  z.object({ kind: z.literal('text'), body: text(MAX_ARTICLE_CHARACTERS), comments: z.array(z.object({ id, text: text(200) }).strict()).max(5), proposition: text(160).optional(), transmissionConsent:z.literal(true) }).strict(),
 ]);
 export type TextRequest = Omit<Extract<z.infer<typeof analyzeRequestSchema>, {kind:'text'}>,'transmissionConsent'>;
 export const spanSchema = z.object({ sourceId: id, sentenceId: id, start: z.number().int().nonnegative(), end: z.number().int().positive(), quote: text(8000) });

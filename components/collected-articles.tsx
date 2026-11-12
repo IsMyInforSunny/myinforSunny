@@ -4,6 +4,7 @@ import {useEffect, useState} from 'react';
 import {ArrowUpRight, Newspaper} from 'lucide-react';
 import type {Analysis} from '@/lib/contracts';
 import type {NewsResult, RelatedArticle} from '@/lib/news-contract';
+import {canonicalArticleUrl} from '@/lib/media-position';
 
 type Props = {analysis: Analysis; stale: boolean};
 type SearchState = {analysisId: string; articles: RelatedArticle[]; status: 'loading' | 'completed' | 'failed'};
@@ -41,13 +42,14 @@ export default function CollectedArticles({analysis, stale}: Props) {
       })
       .then(result => {
         if (!controller.signal.aborted) setState({analysisId: analysis.analysisId,
-          articles: result.provider === 'local_index' && Array.isArray(result.articles) ? result.articles.slice(0, 3) : [], status: 'completed'});
+          articles: result.provider === 'local_index' && Array.isArray(result.articles)
+            ? result.articles.filter(article => !analysis.article?.url || canonicalArticleUrl(article.url)?.url !== canonicalArticleUrl(analysis.article.url)?.url).slice(0, 3) : [], status: 'completed'});
       })
       .catch(() => {
         if (!controller.signal.aborted) setState({analysisId: analysis.analysisId, articles: [], status: 'failed'});
       });
     return () => controller.abort();
-  }, [analysis.analysisId, enabled, query]);
+  }, [analysis.analysisId, analysis.article?.url, enabled, query]);
   const current = enabled && state?.analysisId === analysis.analysisId ? state : null;
   const message = stale ? '입력이 변경되어 이전 검색 후보를 표시하지 않습니다.'
     : !enabled ? '분석 결과의 검색 핵심어가 준비되면 수집 기사를 찾습니다.'

@@ -1,5 +1,5 @@
 import type {Analysis} from '../contracts';
-import {analyzeRequestSchema} from '../contracts';
+import {analyzeRequestSchema,MAX_ARTICLE_CHARACTERS} from '../contracts';
 import {containsContactInfo} from '../privacy';
 import {articleTextPrefix} from './article-document';
 import {analyze} from './analyze';
@@ -16,7 +16,7 @@ export async function analyzeUrl(req:Extract<import('zod/v4').infer<typeof analy
  const ref=await retrieve(url.href,'input_article',config,signal);
  console.info(JSON.stringify({type:'article_timing',stage:'retrieved',durationMs:Date.now()-retrievalStarted,requestId}));
  if(!ref||ref.text.trim().length<100)throw new AppError(422,'ARTICLE_BODY_UNAVAILABLE','기사 본문을 가져오지 못했습니다. 언론사 원문 링크인지 확인해 주세요. 로그인·유료·접근 제한 기사는 분석할 수 없습니다.');
- const body=articleTextPrefix(ref.text,8000);
+ const body=articleTextPrefix(ref.text,MAX_ARTICLE_CHARACTERS);
  if(containsContactInfo([body,req.proposition??'',...req.comments.map(c=>c.text)].join('\n')))throw new AppError(422,'PRIVACY_INPUT_REJECTED','기사나 댓글에서 전화번호·이메일 등 개인정보가 발견되어 분석을 중단했습니다.');
  const input=analyzeRequestSchema.safeParse({kind:'text',body,comments:req.comments,proposition:req.proposition,transmissionConsent:true});
  if(!input.success||input.data.kind!=='text')throw new AppError(422,'ARTICLE_BODY_UNAVAILABLE','분석할 기사 본문을 확인하지 못했습니다.');
