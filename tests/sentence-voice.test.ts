@@ -36,5 +36,8 @@ describe('문장 목소리 연구 모델의 집계 경계',()=>{
   expect(compareVoiceCoordinates(article,population,['b0']).status).toBe('insufficient');
   expect(compareVoiceCoordinates(article,[...population,population[0]]).count).toBe(6);
   expect(compareVoiceCoordinates({...article,unresolved:1},population).status).toBe('input_unresolved');
+  const centered=compareVoiceCoordinates({...article,coordinate:-.5},population);
+  expect(centered.score).toBe(0);expect(centered.opposing).toHaveLength(0);
+  expect(centered.similar).toHaveLength(6);
  });
 });

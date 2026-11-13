@@ -15,6 +15,7 @@ import CollectedArticles from './collected-articles';
 import {compareArticleViewpoints} from '@/lib/viewpoint-comparison';
 import SentenceVoicePanel from './sentence-voice-panel';
 import {mainVoiceIssue} from '@/lib/voice-comparison';
+import {voiceAssessmentFromResearch} from '@/lib/voice-model-adapter';
 
 type Props = {
   analysis: Analysis | null;
@@ -63,7 +64,8 @@ export default function CanvaDashboard({analysis, researchResults, researchStage
   const results = analysis ? currentResearch(analysis, researchResults) : [];
   const bias = analyzeBiasCoordinate(biasArticleCoordinates, biasOrientationSet, selectedBiasArticleId);
   const viewpoints=analysis?compareArticleViewpoints(analysis,results):null;
-  const scores = buildAnalysisScores(analysis, bias, {observations: reliabilityObservations, weightSet: sourceWeightSet});
+  const voiceAssessment=voiceAssessmentFromResearch(stale?null:analysis,results);
+  const scores = buildAnalysisScores(analysis, bias, {observations: reliabilityObservations, weightSet: sourceWeightSet},voiceAssessment);
   const language = analysis ? languageMetrics(analysis, includeComments ? 'all' : 'body') : null;
   const proposition = analysis ? researchProposition(analysis) : undefined;
   const groundedProposition = analysis ? researchProposition({bodyPosition: analysis.bodyPosition, sources: analysis.sources}) : undefined;
@@ -115,7 +117,8 @@ export default function CanvaDashboard({analysis, researchResults, researchStage
             <div className="studio-axis-labels"><span>{axisMode === 'political' ? '좌익' : '반대 관점'}</span><span>{axisMode === 'political' ? '기준선' : '복합 관점'}</span><span>{axisMode === 'political' ? '우익' : '찬성 관점'}</span></div>
             <p className="studio-metric-note">{biasNote}</p>
             {analysis&&axisMode==='argument'&&<div className="studio-viewpoint-comparison" aria-label="같은 논점의 관점 비교">
-              <p><strong>편향 강도 · {analysis.sentenceVoices?'같은 사건·쟁점 비교 표본 대기':scores.bias.value===null?'산출 대기':`${scores.bias.value}점`}</strong></p>
+              <p><strong>편향 강도 · {scores.bias.value===null?'같은 사건·쟁점 비교 표본 대기':`${scores.bias.value}점`}</strong></p>
+              {analysis.sentenceVoices?.method==='svm'&&<p>{scores.bias.note}</p>}
               <p>{viewpoints?.status==='ready'
                 ? `인용 확인된 비교 기사 ${viewpoints.total}건 · ${viewpoints.publisherCount}개 매체 · 명제 찬성 ${viewpoints.support}건 / 반대 ${viewpoints.oppose}건`
                 : viewpoints?.status==='no_grounded_proposition'?'비교할 본문 명제와 입장 근거 확인이 필요합니다.'
@@ -150,7 +153,7 @@ export default function CanvaDashboard({analysis, researchResults, researchStage
             {analysis.status === 'partial' && <p className="studio-metric-note">일부 항목을 판단하지 못했습니다. 분석 근거에서 해당 문장을 확인할 수 있습니다.</p>}
           </>}
           <RelativeTopicComparison body={relativeBody ?? (!stale ? analysis?.sources.find(source=>source.kind==='body')?.text ?? '' : '')} title={relativeTitle ?? (!stale ? analysis?.article?.title ?? '' : '')} publishedAt={!stale?analysis?.article?.publishedAt:undefined}/>
-          {analysis&&!stale&&<SentenceVoicePanel analysis={analysis}/>}
+          {analysis&&!stale&&<SentenceVoicePanel analysis={analysis} researchResults={results}/>}
         </section>
 
         <section className="studio-recommendations" aria-labelledby={`${id}-recommendations`}>

@@ -43,8 +43,10 @@ def main():
     artifact, report = checked_release(read_rows(args.corpus), read_rows(args.labels), load(args.candidate),
                                        load(args.usage_review), events, load(args.challenge))
     atomic_json(ROOT / 'lib/data/voice-model.json', artifact)
-    atomic_json(ROOT / 'lib/data/voice-model-status.json', {'version': artifact['version'], 'ready': True,
-                'humanEvaluationCount': 0, 'topics': report['topics']})
+    atomic_json(ROOT / 'lib/data/voice-model-status.json', {'schemaVersion': 'sentence-voice-training-status-1.0',
+                'version': artifact['version'], 'ready': True, 'candidateReady': True,
+                'annotatedArticleCount': report['annotatedArticles'], 'usableSentenceCount': report['usableSentences'],
+                'humanEvaluationCount': 0, 'teacher': report['teacher'], 'blockers': [], 'topics': report['topics']})
     print(json.dumps({'released': True, 'version': artifact['version']}))
 
 

@@ -23,6 +23,7 @@ import {observationsFromResearch} from '@/lib/source-reliability-adapter';
 import {SOUTH_KOREA_PUBLIC_TRUST_PRIOR_2025} from '@/lib/public-trust-prior';
 import {assessWeightedClaimEvidence} from '@/lib/source-reliability';
 import {analyzeBiasCoordinate} from '@/lib/bias-analysis';
+import {voiceAssessmentFromResearch} from '@/lib/voice-model-adapter';
 import {CLAUDE_MEDIA_ORIENTATION_SET} from '@/lib/bias-profile-set';
 import {releasedBiasModel} from '@/lib/bias-model-release';
 import {biasCoordinatesFromResearch} from '@/lib/bias-model-adapter';
@@ -124,7 +125,8 @@ export default function Workbench(){
   const weightedReliability=analysis?assessWeightedClaimEvidence(evidenceObservations,SOUTH_KOREA_PUBLIC_TRUST_PRIOR_2025,analysis.claims.filter(c=>c.kind==='factual').map(c=>c.id)):null;
   const biasCoordinates=analysis&&!stale?biasCoordinatesFromResearch(analysis,researchResults,releasedBiasModel,CLAUDE_MEDIA_ORIENTATION_SET):[];
   const biasAssessment=analyzeBiasCoordinate(biasCoordinates,CLAUDE_MEDIA_ORIENTATION_SET,analysis?.analysisId);
-  const scores=buildAnalysisScores(analysis,biasAssessment,{observations:evidenceObservations,weightSet:SOUTH_KOREA_PUBLIC_TRUST_PRIOR_2025});
+  const voiceAssessment=voiceAssessmentFromResearch(stale?null:analysis,researchResults);
+  const scores=buildAnalysisScores(analysis,biasAssessment,{observations:evidenceObservations,weightSet:SOUTH_KOREA_PUBLIC_TRUST_PRIOR_2025},voiceAssessment);
   const exportData=buildReviewExport({analysis,checks,feedback,includeRaw,includeRefs,verifications:verificationHistory,researchResults,researchStage,biasAssessment,stale});
   function download(){recordActivity('export','completed');const blob=new Blob([JSON.stringify(exportData,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`정보성분표_검토기록_${new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'})}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
   function showDetails(section: string){setView('evidence');setDetailsVisible(true);if(section==='evidence')setTab('overview');setTimeout(()=>document.getElementById(section==='articles'?'related-review':'analysis-details')?.scrollIntoView({behavior:'smooth',block:'start'}),100);}

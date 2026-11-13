@@ -5,6 +5,7 @@ export type VoiceCoordinate={id:string;url:string;publisher:string;bodyHash:stri
 /** Same sub-issue, event, encoder/version and scope. Equal weight per publisher; never publisher rankings. */
 export function compareVoiceCoordinates(input:VoiceCoordinate,articles:VoiceCoordinate[],trainingHashes:readonly string[]=[]){
   const empty={status:'insufficient' as 'insufficient'|'ready'|'input_unresolved',score:null as number|null,
+    magnitude:null as number|null,
     baseline:null as number|null,opposing:[] as VoiceCoordinate[],similar:[] as VoiceCoordinate[],count:0,publisherCount:0};
   const eligible=(item:VoiceCoordinate)=>Number.isFinite(item.coordinate)&&Math.abs(item.coordinate)<=1&&item.directional>=3
     &&item.unresolved===0&&!item.trainingOriginal&&!trainingHashes.includes(item.bodyHash)&&!!item.bodyHash&&!!item.eventId&&item.version===VOICE_VERSION;
@@ -28,13 +29,15 @@ export function compareVoiceCoordinates(input:VoiceCoordinate,articles:VoiceCoor
   }
   const delta=input.coordinate-baseline,target=2*baseline-input.coordinate;
   const opposing=population.filter(item=>(item.coordinate-baseline)*delta<0).sort((a,b)=>Math.abs(a.coordinate-target)-Math.abs(b.coordinate-target));
-  const similar=population.filter(item=>(item.coordinate-baseline)*delta>0).sort((a,b)=>Math.abs(a.coordinate-input.coordinate)-Math.abs(b.coordinate-input.coordinate));
-  return {status:'ready' as const,score:Math.round(Math.abs(delta)/2*100),baseline,opposing,similar,count:population.length,publisherCount:publishers.length};
+  const similar=population.filter(item=>Math.abs(delta)<1e-12||(item.coordinate-baseline)*delta>=0)
+    .sort((a,b)=>Math.abs(a.coordinate-input.coordinate)-Math.abs(b.coordinate-input.coordinate));
+  return {status:'ready' as const,score:Math.round(Math.abs(delta)/2*100),magnitude:Math.abs(delta),baseline,opposing,similar,count:population.length,publisherCount:publishers.length};
 }
 export function mainVoiceIssue(body:string,document:VoiceDocument){
   const summary=summarizeVoices(body,document);if(!summary)return null;
   const ranked=[...summary.issues].sort((a,b)=>b.directional-a.directional);
   // Tied leading issues must be selected explicitly; never collapse unrelated propositions.
   if(!ranked[0]?.directional||ranked[0].directional===ranked[1]?.directional)return null;
-  return {...ranked[0],method:summary.method,modelVersion:summary.modelVersion,topic:summary.topic};
+  return {...ranked[0],coordinate:summary.unresolved?null:ranked[0].coordinate,
+    unresolved:summary.unresolved,method:summary.method,modelVersion:summary.modelVersion,topic:summary.topic};
 }

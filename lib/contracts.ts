@@ -48,6 +48,7 @@ export type Analysis = {
   sources:InputSource[]; proposition?:string; topics:Topic[]; topicAssignments:TopicAssignment[]; bodyTopicAssignments?:BodyTopicAssignment[]; stances?:Stance[];
   bodyPosition?:BodyPosition;
   sentenceVoices?:import('./sentence-voice').VoiceDocument;
+  voiceCoordinates?:import('./voice-comparison').VoiceCoordinate[];
   expressions:Expression[]; claims:Claim[]; perspectiveQuestions:{text:string;basis:Span[]}[];
   counterArguments?:CounterArgument[];searchSuggestions?:SearchSuggestion[];
   indicators:{topics:{topicId:string;coverage:Ratio}[];expression:Ratio;expressionUndetermined:number;evidenceSupport:Ratio;verificationProgress:Ratio};
@@ -63,6 +64,7 @@ export type VerifyTextRequest = Omit<Extract<z.infer<typeof verifyRequestSchema>
 export type Reference = { id:string;provenance:'provided_text'|'web_fetched';text:string;url?:string;title?:string;publishedAt?:string;fetchedAt?:string;truncated:boolean;publisherGroup?:string;fullTextLength?:number;extractionVersion?:string;
  /** Server-owned digest of retrieved text before excerpting (not a digest of the displayed quote). */
   contentDigest?:string;retrievedTextLength?:number;retrievedTruncated?:boolean;
+  voiceCoordinates?:import('./voice-comparison').VoiceCoordinate[];
   /** Server-generated prediction over retrieved text before excerpting. */
   biasPrediction?:import('./bias-model').CompactBiasPrediction };
 export const outcomeSchema = z.enum(['supported','contradicted','conflicting','insufficient','unchecked','inaccessible','not_applicable']);

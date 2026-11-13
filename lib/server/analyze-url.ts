@@ -6,6 +6,7 @@ import {analyze} from './analyze';
 import {capabilities,type RuntimeConfig} from './config';
 import {AppError} from './errors';
 import {allowedUrl,retrieve} from './retrieval';
+import {attachVoiceCoordinates} from './voice-analysis';
 
 export async function analyzeUrl(req:Extract<import('zod/v4').infer<typeof analyzeRequestSchema>,{kind:'url'}>,config:RuntimeConfig,requestId:string,signal:AbortSignal):Promise<Analysis>{
  const hosts=(config.ALLOWED_RETRIEVAL_HOSTS??'').split(',').map(s=>s.trim()).filter(Boolean);
@@ -23,5 +24,5 @@ export async function analyzeUrl(req:Extract<import('zod/v4').infer<typeof analy
  const result=await analyze(input.data,config,requestId,signal,{article:true});
  result.article={url:ref.url??url.href,title:ref.title,...(ref.publishedAt?{publishedAt:ref.publishedAt}:{}),fetchedAt:ref.fetchedAt??new Date().toISOString(),fullTextLength:ref.fullTextLength??ref.text.length,analyzedCharacters:body.length,truncated:!!ref.truncated||body.length<ref.text.length};
  if(result.article.truncated)result.warnings.push({code:'ARTICLE_TRUNCATED',message:'긴 기사에서 처음 8,000자 이내만 분석했습니다. 기사 전체에 대한 결과가 아닙니다.'});
- return result;
+ return attachVoiceCoordinates(result);
 }

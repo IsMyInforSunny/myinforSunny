@@ -1,0 +1,186 @@
+{
+  "scope": "nuclear_energy; first 2000 UTF-16 characters; retained real articles only",
+  "reviewedArticles": 29,
+  "reviewedSentences": 643,
+  "usableSentences": 582,
+  "humanEvaluationCount": 0,
+  "trainingReport": {
+    "schemaVersion": "sentence-voice-report-1.0",
+    "version": "sentence-voice-1.0",
+    "teacher": [
+      "ai",
+      "Codex",
+      "voice-review-2026-11-13.1"
+    ],
+    "humanEvaluationCount": 0,
+    "annotatedArticles": 29,
+    "usableSentences": 582,
+    "ready": false,
+    "blockers": [
+      "nuclear_energy:teacher_agreement_below_threshold",
+      "nuclear_energy:direction_recall_below_threshold",
+      "nuclear_energy:speaker_or_issue_below_threshold",
+      "nuclear_energy:runtime_teacher_agreement_below_threshold",
+      "nuclear_energy:runtime_direction_recall_below_threshold",
+      "nuclear_energy:runtime_speaker_or_issue_below_threshold",
+      "nuclear_energy:flip_challenge_missing_or_failed",
+      "nuclear_energy:usage_review_pending"
+    ],
+    "topics": {
+      "nuclear_energy": {
+        "ready": false,
+        "classCounts": {
+          "neutral": 479,
+          "support": 40,
+          "oppose": 63
+        },
+        "blockers": [
+          "teacher_agreement_below_threshold",
+          "direction_recall_below_threshold",
+          "speaker_or_issue_below_threshold",
+          "runtime_teacher_agreement_below_threshold",
+          "runtime_direction_recall_below_threshold",
+          "runtime_speaker_or_issue_below_threshold",
+          "flip_challenge_missing_or_failed",
+          "usage_review_pending"
+        ],
+        "labelCoverage": {
+          "direction": {
+            "neutral": {
+              "sentences": 479,
+              "articles": 29,
+              "groups": 18
+            },
+            "oppose": {
+              "sentences": 63,
+              "articles": 15,
+              "groups": 7
+            },
+            "support": {
+              "sentences": 40,
+              "articles": 9,
+              "groups": 8
+            }
+          },
+          "speaker": {
+            "journalist": {
+              "sentences": 336,
+              "articles": 28,
+              "groups": 17
+            },
+            "source": {
+              "sentences": 246,
+              "articles": 29,
+              "groups": 18
+            }
+          },
+          "issue": {
+            "expansion": {
+              "sentences": 208,
+              "articles": 21,
+              "groups": 14
+            },
+            "lifetime": {
+              "sentences": 83,
+              "articles": 9,
+              "groups": 6
+            },
+            "none": {
+              "sentences": 240,
+              "articles": 28,
+              "groups": 17
+            },
+            "public_support": {
+              "sentences": 51,
+              "articles": 8,
+              "groups": 8
+            }
+          }
+        },
+        "groupOverlap": 0,
+        "heldoutArticleCount": 7,
+        "macroF1": 0.37584541062801935,
+        "majorityMacroF1": 0.30806257521058966,
+        "supportRecall": 0.0,
+        "opposeRecall": 0.1111111111111111,
+        "speakerMacroF1": 0.7240740740740741,
+        "issueMacroF1": 0.566661874640598,
+        "maskingAgreement": 1.0,
+        "flipAccuracy": null,
+        "flipChallenge": null,
+        "independentFlipPairCount": 0,
+        "runtime": {
+          "minimumMarginGap": 0.15,
+          "count": 149,
+          "jointUsableCount": 96,
+          "jointCoverage": 0.6442953020134228,
+          "heads": {
+            "direction": {
+              "acceptedCount": 147,
+              "abstainedCount": 2,
+              "coverage": 0.9865771812080537,
+              "macroF1": 0.3103030303030303,
+              "jointMacroF1": 0.25
+            },
+            "speaker": {
+              "acceptedCount": 121,
+              "abstainedCount": 28,
+              "coverage": 0.8120805369127517,
+              "macroF1": 0.7,
+              "jointMacroF1": 0.6040372670807453
+            },
+            "issue": {
+              "acceptedCount": 118,
+              "abstainedCount": 31,
+              "coverage": 0.7919463087248322,
+              "macroF1": 0.5902255639097744,
+              "jointMacroF1": 0.5498136467889908
+            }
+          },
+          "macroF1": 0.25,
+          "supportRecall": 0.0,
+          "opposeRecall": 0.0,
+          "jointCorrectCount": 52,
+          "jointAccuracy": 0.5416666666666666
+        },
+        "trainingSentences": 433,
+        "heldoutSentences": 149,
+        "splitId": "1523a013059900da37759163b720a17c3cdeb04f325b9207bd3c66610a705506"
+      }
+    }
+  },
+  "runtimeParity": {
+    "modelVersion": "bb524038c69e615c47451c12",
+    "modelStatus": "research",
+    "articles": 130,
+    "sentences": 2856,
+    "unresolved": 899,
+    "mismatches": 0,
+    "latencyMs": {
+      "median": 17.554000000000087,
+      "p95": 24.65570000000116,
+      "max": 28.116900000000896
+    },
+    "meaning": "Cross-language arithmetic and abstention parity on retained actual articles; not human accuracy or release approval."
+  },
+  "productModelActivated": false,
+  "productionDeploymentPerformed": false,
+  "apiAnnotationAttempts": 18,
+  "apiAnnotationsCompleted": 17,
+  "apiNeedsReview": 1,
+  "annotationReservedTokens": 117000,
+  "actualProviderTokenUsage": null,
+  "checks": {
+    "typecheck": "passed",
+    "vitest": {
+      "passed": 938,
+      "skipped": 13
+    },
+    "python": {
+      "passed": 14,
+      "subtestsPassed": 7
+    },
+    "build": "passed"
+  },
+  "note": "AI label agreement and arithmetic parity are not human accuracy. Unapproved source rights and missing independent flip challenge remain release blockers."
+}

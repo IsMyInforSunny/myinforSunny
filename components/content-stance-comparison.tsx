@@ -13,7 +13,7 @@ export default function ContentStanceComparison({body,title=''}:{body:string;tit
   const topic=classifyRelativeTopic(body,title),prediction=model&&topic?inferContentStance(model,body,topic):null;
   const status=training as {version?:string;annotatedArticleCount:number;relevantArticleCount:number;blockers:string[];classCounts:Record<string,number>;aiTeacherAgreement?:{macroF1:number;majorityMacroF1:number;recall:Record<string,number>};humanEvaluationCount:number};
   return <div className="studio-content-stance">
-    <p><strong>기사 내용의 입장 비교 모델</strong></p>
+    <p><strong>기사 전체 작성자 입장 모델 · 별도 연구</strong></p>
     {topic?<p>공통 비교 명제 · {STANCE_PROPOSITIONS[topic]}</p>
       :<p>이 연구 SVM은 6개 정책 명제만 대상으로 합니다. 다른 분야의 기사는 위의 일반 논점 분석에서 본문 입장과 인용 근거를 확인해 주세요.</p>}
     {prediction?.status==='ready'?<p>{prediction.label==='support'?'찬성':'반대'} 관점 · 모델 좌표 {prediction.coordinate!.toFixed(2)} · {model!.version}</p>

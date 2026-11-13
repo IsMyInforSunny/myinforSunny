@@ -7,6 +7,7 @@ import type {InputSource} from './contracts';
 
 export const VOICE_VERSION=definition.version;
 export const VOICE_SCOPE=2000;
+export const VOICE_MARGIN_GAP=.15;
 export type VoiceTopic=keyof typeof definition.topics;
 export const VOICE_TOPICS=definition.topics as Record<VoiceTopic,{label:string;issues:Record<string,string>}>;
 export const voiceLabelSchema=z.object({sentenceId:z.string(),issue:z.string(),
@@ -40,7 +41,7 @@ export function validateVoiceDocument(body:string,document:VoiceDocument){
     if(!parsed?.success||(!Object.hasOwn(topic.issues,parsed.data.issue)&&!['none','unknown'].includes(parsed.data.issue)))
       return {sentenceId:unit.sentenceId,issue:'unknown',direction:'uncertain' as const,speaker:'unknown' as const};
     const label=parsed.data;
-    if((['support','oppose'].includes(label.direction)&&['none','unknown'].includes(label.issue))||label.speaker==='mixed')
+    if(label.issue==='unknown'||(['support','oppose'].includes(label.direction)&&label.issue==='none')||label.speaker==='mixed'||label.speaker==='unknown')
       return {...label,direction:'uncertain' as const};
     return label;
   });
@@ -71,8 +72,13 @@ export function summarizeVoices(body:string,document:VoiceDocument){
 export function voiceModelText(text:string){
   return normalizeBiasText(text.replace(/데일리안|뉴데일리|오마이뉴스|프레시안|(?:www\.)?(?:dailian|newdaily|ohmynews|pressian)\.(?:co\.kr|com)/gi,''));
 }
+export function voiceContextText(text:string,previous='',following=''){
+  return voiceModelText(`[PREVIOUS] ${previous}\n[CURRENT] ${text}\n[CURRENT] ${text}\n[NEXT] ${following}`);
+}
 const finite=z.number().finite();
 const head=z.object({classes:z.array(z.string()).min(2),coefficients:z.array(z.array(finite)),intercepts:z.array(finite)});
+const runtimeHead=z.object({acceptedCount:z.number().int().nonnegative(),abstainedCount:z.number().int().nonnegative(),
+  coverage:finite.min(0).max(1),macroF1:finite.min(0).max(1),jointMacroF1:finite.min(.6).max(1)});
 const topicModel=z.object({vectorizer:z.object({vocabulary:z.record(z.string(),z.number().int().nonnegative()),idf:z.array(finite.positive()).min(1).max(12000)}),
   direction:head,speaker:head,issue:head,
   evaluation:z.object({ready:z.literal(true),groupOverlap:z.literal(0),heldoutArticleCount:z.number().int().min(2),
@@ -80,9 +86,19 @@ const topicModel=z.object({vectorizer:z.object({vocabulary:z.record(z.string(),z
     supportRecall:finite.min(.5).max(1),opposeRecall:finite.min(.5).max(1),
     speakerMacroF1:finite.min(.6).max(1),issueMacroF1:finite.min(.6).max(1),
     maskingAgreement:finite.min(.95).max(1),flipAccuracy:finite.min(.5).max(1),
+    independentFlipPairCount:z.number().int().min(10),
+    flipChallenge:z.object({pairAccuracy:finite.min(.5).max(1),pairCount:z.number().int().min(10),
+      itemAccuracy:finite.min(.5).max(1),abstainedCount:z.number().int().nonnegative()}),
+    runtime:z.object({minimumMarginGap:z.literal(VOICE_MARGIN_GAP),count:z.number().int().positive(),
+      jointUsableCount:z.number().int().positive(),jointCoverage:finite.min(0).max(1),
+      jointCorrectCount:z.number().int().nonnegative(),jointAccuracy:finite.min(0).max(1),
+      macroF1:finite.min(.6).max(1),supportRecall:finite.min(.5).max(1),opposeRecall:finite.min(.5).max(1),
+      heads:z.object({direction:runtimeHead,speaker:runtimeHead,issue:runtimeHead})}),
     classCounts:z.record(z.string(),z.number().int().nonnegative())})});
 const bundle=z.object({schemaVersion:z.literal('sentence-voice-svm-1.0'),version:z.string().min(1),
   status:z.literal('ready'),segmenter:z.literal(SEGMENTER),definitionVersion:z.literal(VOICE_VERSION),scopeCharacters:z.literal(VOICE_SCOPE),
+  trainerVersion:z.literal('sentence-voice-trainer-1.2'),trainingConfig:z.object({minimumMarginGap:z.literal(VOICE_MARGIN_GAP),
+    encoderVersion:z.literal('voice-context-1.0'),contextSentences:z.literal(1),currentRepeats:z.literal(2)}),
   topics:z.record(z.string(),topicModel),trainingArticleHashes:z.array(z.string().regex(/^[a-f0-9]{64}$/)).min(1),
   release:z.object({schemaVersion:z.literal('voice-release-1.0'),corpusDigest:z.string().regex(/^[a-f0-9]{64}$/),labelsDigest:z.string().regex(/^[a-f0-9]{64}$/),
     reviewDigest:z.string().regex(/^[a-f0-9]{64}$/),modelDigest:z.string().regex(/^[a-f0-9]{64}$/),trainingAllowed:z.literal(true),modelDistributionAllowed:z.literal(true)})});
@@ -94,7 +110,18 @@ export function parseVoiceModel(value:unknown):VoiceModel|null{
     const size=model.vectorizer.idf.length,ids=Object.values(model.vectorizer.vocabulary),evaluation=model.evaluation;
     if(ids.length!==size||new Set(ids).size!==size||ids.some(id=>id>=size)
       ||Object.keys(model.vectorizer.vocabulary).some(term=>Array.from(term).length<2||Array.from(term).length>4)
-      ||evaluation.macroF1<=evaluation.majorityMacroF1||['support','oppose','neutral'].some(label=>(evaluation.classCounts[label]??0)<10))return null;
+      ||evaluation.macroF1<=evaluation.majorityMacroF1||evaluation.runtime.macroF1<=evaluation.majorityMacroF1
+      ||['support','oppose','neutral'].some(label=>(evaluation.classCounts[label]??0)<10))return null;
+    const runtime=evaluation.runtime;
+    const close=(a:number,b:number)=>Math.abs(a-b)<1e-9;
+    if(runtime.jointUsableCount>runtime.count||runtime.jointCorrectCount>runtime.jointUsableCount
+      ||!close(runtime.jointCoverage,runtime.jointUsableCount/runtime.count)
+      ||!close(runtime.jointAccuracy,runtime.jointCorrectCount/runtime.jointUsableCount)
+      ||Object.values(runtime.heads).some(head=>head.acceptedCount+head.abstainedCount!==runtime.count
+        ||head.acceptedCount<runtime.jointUsableCount||!close(head.coverage,head.acceptedCount/runtime.count))
+      ||!close(evaluation.flipAccuracy,evaluation.flipChallenge.pairAccuracy)
+      ||evaluation.flipChallenge.pairCount!==evaluation.independentFlipPairCount
+      ||evaluation.flipChallenge.abstainedCount>evaluation.flipChallenge.pairCount*2)return null;
     for(const [name,allowed] of [['direction',['support','oppose','neutral']],['speaker',['journalist','source']],
       ['issue',[...Object.keys(VOICE_TOPICS[key as VoiceTopic].issues),'none']]] as const){
       const item=model[name];
@@ -114,15 +141,17 @@ function predict(model:VoiceModel['topics'][string],name:'direction'|'speaker'|'
     if(Object.hasOwn(model.vectorizer.vocabulary,term))counts.set(id,(counts.get(id)??0)+1);
   }
   const features=[...counts].map(([id,count])=>({id,value:(1+Math.log(count))*model.vectorizer.idf[id]}));
-  const norm=Math.sqrt(features.reduce((sum,item)=>sum+item.value**2,0));if(!norm)return null;
+  const norm=features.reduce((sum,item)=>Math.hypot(sum,item.value),0);if(!Number.isFinite(norm)||!norm||features.some(item=>!Number.isFinite(item.value)))return null;
   const classifier=model[name];
   const scores=classifier.classes.map((label,index)=>({label,value:features.reduce((sum,item)=>sum+item.value/norm*classifier.coefficients[index][item.id],classifier.intercepts[index])})).sort((a,b)=>b.value-a.value);
-  return scores.every(item=>Number.isFinite(item.value))&&scores[0].value-scores[1].value>=.15?scores[0].label:null;
+  return scores.every(item=>Number.isFinite(item.value))&&scores[0].value-scores[1].value>=VOICE_MARGIN_GAP?scores[0].label:null;
 }
 export function inferVoices(model:VoiceModel,body:string,topic:VoiceTopic):VoiceDocument|null{
   const weights=model.topics[topic];if(!weights)return null;
-  const labels=voiceSentences(body).map(unit=>{
-    const direction=predict(weights,'direction',unit.text),speaker=predict(weights,'speaker',unit.text),issue=predict(weights,'issue',unit.text);
+  const units=voiceSentences(body);
+  const labels=units.map((unit,index)=>{
+    const text=voiceContextText(unit.text,units[index-1]?.text,units[index+1]?.text);
+    const direction=predict(weights,'direction',text),speaker=predict(weights,'speaker',text),issue=predict(weights,'issue',text);
     return {sentenceId:unit.sentenceId,issue:issue??'unknown',direction:direction??'uncertain',speaker:speaker??'unknown'} as VoiceLabel;
   });
   return validateVoiceDocument(body,{version:VOICE_VERSION,segmenter:SEGMENTER,scopeCharacters:VOICE_SCOPE,topic,method:'svm',modelVersion:model.version,labels});

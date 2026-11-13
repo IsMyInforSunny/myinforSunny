@@ -19,6 +19,7 @@ import {reviewCitedSources} from '../cited-sources';
 import {canonicalPublisherHost} from '../source-reliability';
 import {actorHash} from './budget';
 import {assertResearchBatch,researchWaitReasons,waitReasonText} from './score-workflow';
+import {analyzeArticleVoices} from './voice-analysis';
 
 type PlanData={planId:string;inputDigest:string;queries:ResearchQuery[];expiresAt:string};
 type EvidenceData={planId:string;inputDigest:string;claimId:string;references:RetrievedEvidence[];attempts:ResearchAttempt[];expiresAt:string};
@@ -93,6 +94,10 @@ export function researchExcerpt(text:string,claim:string,limit=1500){
 }
 /** Keep complete-document model checks identical for search and direct URL intake. */
 async function evidenceSource(fetched:NonNullable<Awaited<ReturnType<typeof retrieve>>>,url:string,title:string,publisherDomain:string,input:ResearchInput,claimText:string,fallbackVersion:string):Promise<RetrievedEvidence>{
+ if(!fetched.truncated){
+  const voices=await analyzeArticleVoices(fetched.text,{url,title:fetched.title||title,publishedAt:fetched.publishedAt});
+  if(voices)fetched.voiceCoordinates=voices.coordinates;
+ }
  const biasModel=releasedBiasModel;
  const group=input.proposition??claimText;
  if(biasModel&&!fetched.truncated&&modelAcceptsComparison(biasModel,group)

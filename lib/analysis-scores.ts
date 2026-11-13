@@ -3,6 +3,7 @@ import type {BiasAnalysisResult} from './bias-analysis';
 import {expressionSummary,naturalSentences} from './domain';
 import {reviewCitedSources} from './cited-sources';
 import {assessWeightedClaimEvidence,type EvidenceObservation,type PublisherWeightSet} from './source-reliability';
+import type {VoiceAssessment} from './voice-model-adapter';
 
 export const ANALYSIS_SCORES_VERSION='descriptive-scores-2.0';
 export type Score={
@@ -23,7 +24,7 @@ const percent=(numerator:number,denominator:number)=>Math.round(numerator/denomi
 const empty=(label:string,note:string,status:Score['status']='pending'):Score=>({label,value:null,status,scale:100,numerator:null,denominator:null,note});
 
 /** Descriptive 0–100 indices with visible denominators; no calibrated truth probabilities. */
-export function buildAnalysisScores(analysis:Analysis|null,bias?:BiasAnalysisResult|null,evidence?:ScoreEvidence):AnalysisScores{
+export function buildAnalysisScores(analysis:Analysis|null,bias?:BiasAnalysisResult|null,evidence?:ScoreEvidence,voice?:VoiceAssessment):AnalysisScores{
   const scores:AnalysisScores={version:ANALYSIS_SCORES_VERSION,
     bias:empty('편향 점수','검증된 기사 좌표와 비교 매체 중심의 거리(0–2)를 0–100점으로 환산합니다. 모델·같은 명제의 비교 표본이 준비되어야 산출합니다.'),
     stimulation:empty('자극 표현 점수','본문과 댓글의 전체 자연 문장 중 자극·공격 표현이 검출된 문장 비율입니다. 표현의 심각도나 사실성을 나타내지 않습니다.'),
@@ -31,7 +32,13 @@ export function buildAnalysisScores(analysis:Analysis|null,bias?:BiasAnalysisRes
     attribution:empty('근거 출처 명시 점수','전체 사실 주장 중 이름 있는 근거 출처가 연결된 주장 비율입니다. 출처의 실재·정확성·주장의 참일 확률은 별도 확인이 필요합니다. 신뢰 점수와 구분하는 보조 정보입니다.'),
   };
   if(!analysis)return scores;
-  if(bias?.status==='ready'&&bias.gaugePercent!==null&&Number.isFinite(bias.gaugePercent)&&bias.gaugePercent>=0&&bias.gaugePercent<=100){
+  if(analysis.sentenceVoices?.method==='svm'){
+    scores.bias=voice?.status==='ready'&&voice.score!==null
+      ?{...scores.bias,status:'ready',value:voice.score,numerator:voice.magnitude,denominator:2,
+        note:`동일 사건·하위 쟁점의 문장 SVM 좌표와 매체 동일가중 중간값 거리/2×100입니다. 비교 ${voice.count}건·${voice.publisherCount}개 매체. 찬반 발언 구성 차이이며 정치 성향·진실 확률이 아닙니다.`}
+      :empty('편향 점수','문장 SVM 비교에는 미확정 없는 같은 사건·하위 쟁점 기사, 매체마다 3건 이상·2개 매체 이상이 필요합니다. 학습 원본·동일 본문은 제외합니다.');
+  }
+  if(analysis.sentenceVoices?.method!=='svm'&&bias?.status==='ready'&&bias.gaugePercent!==null&&Number.isFinite(bias.gaugePercent)&&bias.gaugePercent>=0&&bias.gaugePercent<=100){
     scores.bias={...scores.bias,status:'ready',value:Math.round(bias.gaugePercent),numerator:bias.magnitude,denominator:2};
   }
   const expression=expressionSummary(analysis);
