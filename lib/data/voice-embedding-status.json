@@ -19,7 +19,18 @@
   "runtimeParityMismatches": 0,
   "browserVerified": false,
   "usageReviewed": false,
+  "articleAggregation": {
+    "evaluatedArticles": 7,
+    "fullyEmbeddedArticles": 6,
+    "articlesWithoutUnresolvedSentences": 0,
+    "primaryCoordinateAvailable": 0,
+    "missingInputSentences": 1,
+    "overlappingTrainingSentencesExcluded": 1,
+    "articlesWithObservedIssueCoordinate": 2,
+    "ready": false
+  },
   "blockers": [
+    "article_aggregation_not_ready",
     "usage_review_pending",
     "browser_verification_pending"
   ]

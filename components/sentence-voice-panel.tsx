@@ -8,10 +8,11 @@ export default function SentenceVoicePanel({analysis,researchResults=[]}:{analys
   const body=analysis.sources.find(source=>source.kind==='body')?.text??'';
   const summary=analysis.sentenceVoices?summarizeVoices(body,analysis.sentenceVoices):null;
   if(!summary)return <div className="studio-relative">
-    <p><strong>{analysis.warnings.some(warning=>warning.code==='VOICE_MODEL_UNAVAILABLE')?'문장 SVM 분석 미완료':semanticStatus.performanceChecksPassed?'학습 모델 자동 점검 통과 · 적용 대기':'문장 SVM 학습·검증 중'}</strong></p>
+    <p><strong>{analysis.warnings.some(warning=>warning.code==='VOICE_MODEL_UNAVAILABLE')?'문장 SVM 분석 미완료':semanticStatus.performanceChecksPassed?'문장 분류 기준 통과 · 기사 점수 검증 미완료':'문장 SVM 학습·검증 중'}</strong></p>
     <p>실제 기사 AI 라벨 {trainingStatus.annotatedArticleCount}건 · 학습 가능 {trainingStatus.usableSentenceCount}문장 · 사람 정확도 평가 {trainingStatus.humanEvaluationCount}건</p>
     <p>현재 학습 범위 · {Object.keys(trainingStatus.topics).map(topic=>VOICE_TOPICS[topic as keyof typeof VOICE_TOPICS]?.label??topic).join(' · ')}</p>
     {semanticStatus.performanceChecksPassed&&<p>별도 평가 {semanticStatus.evaluationSentenceCount}문장 · AI 라벨 재현 지표 {(semanticStatus.runtimeMacroF1*100).toFixed(1)}% · 반전 쌍 {Math.round(semanticStatus.flipPairAccuracy*semanticStatus.flipPairCount)}/{semanticStatus.flipPairCount}개 · 데이터 이용 검토와 실제 화면 확인 대기</p>}
+    {!semanticStatus.articleAggregation.ready&&<p>기사 단위 검사 {semanticStatus.articleAggregation.evaluatedArticles}건 중 현재 조건으로 대표 좌표를 산출한 기사는 {semanticStatus.articleAggregation.primaryCoordinateAvailable}건입니다. 미확정 문장과 비교 표본을 해결하기 전에는 편향 점수를 표시할 수 없습니다.</p>}
     <p>{analysis.versions.voiceModel?'이 기사에 적용할 문장 SVM 결과를 확인하지 못했습니다. 지원 범위와 연결 상태를 확인해 주세요.':'현재 활성화된 문장 SVM은 없습니다. 판별 성능·독립 사건 평가·학습 및 모델 배포 이용 검토를 통과한 모델만 연결합니다.'}</p>
   </div>;
   const units=voiceSentences(body);
@@ -19,9 +20,10 @@ export default function SentenceVoicePanel({analysis,researchResults=[]}:{analys
   const references=researchResults.flatMap(result=>result.references);
   return <details className="studio-relative" open><summary>기사에 실린 목소리 · {summary.method==='svm'?'문장 SVM':'AI 임시 집계'}</summary>
     <p>본문 앞 2,000자 · {summary.total}문장 · 광고·해시태그·저작권 표시 제외 {summary.excluded}문장 · 미확정 {summary.unresolved}문장 · {summary.modelVersion}</p>
-    {summary.issues.filter(issue=>issue.directional||issue.unresolved).map(issue=><div key={issue.issue}>
+    {summary.issues.filter(issue=>issue.directional||issue.evidence.unresolved).map(issue=><div key={issue.issue}>
       <p><strong>{issue.proposition}</strong></p>
-      <p>찬성 {issue.support} / 반대 {issue.oppose} · 좌표 {issue.coordinate===null?'입장이 드러나지 않음(방향 문장 3개 미만)':issue.coordinate.toFixed(2)}{issue.unresolved?` · 유보 ${issue.unresolved}문장`:''}</p>
+      <p>찬성 {issue.support} / 반대 {issue.oppose} · 분류된 문장의 좌표 {issue.coordinate===null?'산출 보류(방향 문장 3개 미만)':issue.coordinate.toFixed(2)}{issue.unresolved?` · 쟁점 내 유보 ${issue.unresolved}문장`:''}</p>
+      {issue.evidence.unresolved>0&&<p>이 쟁점에 영향을 줄 수 있는 미확정 {issue.evidence.unresolved}문장을 포함하면 가능한 좌표 범위는 {issue.evidence.lower!.toFixed(2)} ~ {issue.evidence.upper!.toFixed(2)}입니다. 쟁점이 불명확한 문장도 포함하며, 이 범위는 정확도 확률이나 최종 편향 점수가 아닙니다.</p>}
       <p>기자 찬성 {issue.journalist.support} / 반대 {issue.journalist.oppose} · 취재원 찬성 {issue.source.support} / 반대 {issue.source.oppose}</p>
     </div>)}
     {!summary.issues.some(issue=>issue.directional)&&<p>명확한 방향 문장이 없습니다. 정책의 발표·시행 사실을 찬성으로 세지 않습니다.</p>}

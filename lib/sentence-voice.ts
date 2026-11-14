@@ -57,6 +57,19 @@ const balance=(labels:VoiceLabel[])=>{
   const directional=support+oppose;
   return {support,oppose,directional,coordinate:directional>=3?(support-oppose)/directional:null};
 };
+/** Deterministic bounds, not a confidence interval or a final relative bias
+ * score. Each unresolved sentence may be neutral, support or oppose this
+ * proposition. A lack of evidence is never assigned coordinate zero. */
+export function voiceEvidenceBounds(support:number,oppose:number,unresolved:number){
+  if([support,oppose,unresolved].some(value=>!Number.isSafeInteger(value)||value<0)
+    ||!Number.isSafeInteger(support+oppose+unresolved))throw new RangeError('Invalid voice evidence counts');
+  const directional=support+oppose,possible=directional+unresolved;
+  return {version:'voice-evidence-bounds-1.0' as const,support,oppose,directional,unresolved,
+    observedCoordinate:directional>=3?(support-oppose)/directional:null,
+    lower:possible?(support-oppose-unresolved)/possible:null,
+    upper:possible?(support-oppose+unresolved)/possible:null,
+    state:directional<3?'insufficient' as const:unresolved?'partial' as const:'resolved' as const};
+}
 export function summarizeVoices(body:string,document:VoiceDocument){
   const valid=validateVoiceDocument(body,document);if(!valid)return null;
   const content=valid.labels.filter(label=>!label.excluded);
@@ -67,7 +80,12 @@ export function summarizeVoices(body:string,document:VoiceDocument){
       const labels=content.filter(label=>label.issue===issue);
       // Unknown speakers cannot be assigned to either population or the overall coordinate.
       const known=labels.filter(label=>label.speaker==='journalist'||label.speaker==='source');
-      return {issue,proposition,...balance(known),journalist:balance(known.filter(label=>label.speaker==='journalist')),
+      const counts=balance(known);
+      // Unknown-issue sentences could belong to any proposition, so they
+      // contribute to every issue's bounds without receiving a new label.
+      const possibleUnresolved=content.filter(label=>(label.issue===issue||label.issue==='unknown')
+        &&(label.direction==='uncertain'||label.speaker==='unknown')).length;
+      return {issue,proposition,...counts,evidence:voiceEvidenceBounds(counts.support,counts.oppose,possibleUnresolved),journalist:balance(known.filter(label=>label.speaker==='journalist')),
         source:balance(known.filter(label=>label.speaker==='source')),
         unresolved:labels.filter(label=>label.direction==='uncertain'||label.speaker==='unknown').length};
     })};
