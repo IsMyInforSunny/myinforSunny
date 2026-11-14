@@ -1,3 +1,4 @@
+import {selectArticleVoiceIssue} from '../voice-article-issue';
 import {searchLanguagePrompt} from './search-language';
 import { Analysis, BodyTopicAssignment, RawAnalysis, RUBRIC, ANALYSIS_PROMPT_VERSION, TextRequest, analysisModelSchema, analysisResponseSchema, bodyPositionCandidateSchema, Expression, Span, searchQuerySchema } from '../contracts';
 import { assertAnalysis, indicators, locate, makeSources, naturalSentenceCount, SEGMENTER } from '../domain';
@@ -97,7 +98,7 @@ export async function analyze(req:TextRequest,config:RuntimeConfig,requestId:str
   const sources=makeSources(req);if(!sources[0].sentences.length)throw new AppError(422,'VALIDATION_ERROR','분석할 수 있는 본문 문장을 입력해 주세요.');
   const voiceTopic=classifyRelativeTopic(req.body);
   const voiceModel=releasedVoiceModel;
-  const localVoices=voiceModel&&voiceTopic?inferVoices(voiceModel,req.body,voiceTopic):null;
+  const localVoices=voiceModel&&voiceTopic?inferVoices(voiceModel,req.body,voiceTopic,selectArticleVoiceIssue(req.body,voiceTopic,req.proposition)):null;
   // Research annotations remain offline until the sentence model passes release gates.
   const reportedFact=/\d+(?:\.\d+)?\s*(?:%|명|건|원|일|년)[\s\S]{0,100}(?:밝혔다|발표했다|집계됐다|조사됐다)/.test(req.body);
   const claimsRequired=!!context.article||reportedFact;
@@ -123,7 +124,7 @@ export async function analyze(req:TextRequest,config:RuntimeConfig,requestId:str
   const voiceVersion=releasedEmbeddingVoiceModel?.version??releasedVoiceModel?.version;
   if(voiceVersion)result.versions.voiceModel=voiceVersion;
   if(releasedEmbeddingVoiceModel&&voiceTopic&&releasedEmbeddingVoiceModel.topics[voiceTopic]){
-    try{result.sentenceVoices=await inferEmbeddingVoices(req.body,voiceTopic,config,signal,context.articleUrl?`public:${context.articleUrl}`:`request:${requestId}`)??undefined;}
+    try{result.sentenceVoices=await inferEmbeddingVoices(req.body,voiceTopic,config,signal,context.articleUrl?`public:${context.articleUrl}`:`request:${requestId}`,undefined,selectArticleVoiceIssue(req.body,voiceTopic,req.proposition??result.bodyPosition?.proposition))??undefined;}
     catch(error){if(signal.aborted)throw error;delete result.sentenceVoices;result.status='partial';result.warnings.push({code:'VOICE_MODEL_UNAVAILABLE',message:'편향 SVM 분석에 연결하지 못했습니다. 표시된 본문 검토와 편향 점수의 완료 여부를 구분해 주세요.'});}
   }
   if(!result.sentenceVoices){

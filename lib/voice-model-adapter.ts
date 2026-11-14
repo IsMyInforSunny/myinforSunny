@@ -9,13 +9,16 @@ import {compareVoiceCoordinates,mainVoiceIssue,type VoiceCoordinate} from './voi
  * Model weights stay on the server; these records contain aggregates only. */
 export function voiceAssessmentFromResearch(analysis:Analysis|null,results:readonly ResearchVerification[]){
   const empty={status:'model_unavailable' as string,score:null as number|null,magnitude:null as number|null,baseline:null as number|null,
-    count:0,publisherCount:0,similar:[] as VoiceCoordinate[],opposing:[] as VoiceCoordinate[],issue:null as string|null};
+    scoreBounds:null as {lower:number;upper:number}|null,direction:null as 'support'|'oppose'|'center'|'undetermined'|null,
+    count:0,publisherCount:0,rangeCount:0,distributionCount:0,similar:[] as VoiceCoordinate[],opposing:[] as VoiceCoordinate[],issue:null as string|null};
   if(!analysis||analysis.mode!=='live'||analysis.sentenceVoices?.method!=='svm')return empty;
   const body=analysis.sources.find(source=>source.kind==='body')?.text??'';
   const primary=mainVoiceIssue(body,analysis.sentenceVoices);
   if(!primary)return {...empty,status:'no_single_issue'};
   const input=analysis.voiceCoordinates?.find(item=>item.issue===primary.issue&&item.topic===primary.topic
-    &&item.modelVersion===primary.modelVersion&&item.method==='svm'&&item.decisionPolicy===primary.decisionPolicy);
+    &&item.modelVersion===primary.modelVersion&&item.method==='svm'&&item.decisionPolicy===primary.decisionPolicy
+    &&item.issuePolicy===primary.issuePolicy
+    &&(item.axis==='source'||item.axis===undefined&&primary.issuePolicy===undefined&&primary.journalist.directional===0));
   if(!input)return {...empty,status:'no_coordinate',issue:primary.issue};
   if(!input.eventId)return {...empty,status:'event_missing',issue:primary.issue};
   const current=currentResearch(analysis,results);

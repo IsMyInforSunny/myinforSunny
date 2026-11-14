@@ -33,10 +33,20 @@ export function buildAnalysisScores(analysis:Analysis|null,bias?:BiasAnalysisRes
   };
   if(!analysis)return scores;
   if(analysis.sentenceVoices?.method==='svm'){
-    scores.bias=voice?.status==='ready'&&voice.score!==null
-      ?{...scores.bias,status:'ready',value:voice.score,numerator:voice.magnitude,denominator:2,
-        note:`동일 사건·하위 쟁점의 문장 SVM 좌표와 매체 동일가중 중간값 거리/2×100입니다. 비교 ${voice.count}건·${voice.publisherCount}개 매체. 찬반 발언 구성 차이이며 정치 성향·진실 확률이 아닙니다.`}
-      :empty('편향 점수','문장 SVM 비교에는 미확정 없는 같은 사건·하위 쟁점 기사, 매체마다 3건 이상·2개 매체 이상이 필요합니다. 학습 원본·동일 본문은 제외합니다.');
+    const quarter=analysis.issueQuarterComparison;
+    const currentQuarter=quarter?.parentAnalysisId===analysis.analysisId&&quarter.modelVersion===analysis.sentenceVoices.modelVersion
+      &&quarter.status==='ready'?quarter:null;
+    const bounds=voice?.status==='ready'?voice.scoreBounds:currentQuarter?.scoreRange;
+    const point=voice?.status==='ready'?voice.score:currentQuarter?.score;
+    const note=voice?.status==='ready'
+      ?`같은 사건·쟁점의 취재원 인용 균형을 매체 동일가중 중앙값과 비교합니다. ${voice.count}건·${voice.publisherCount}개 매체.`
+      :currentQuarter?`${currentQuarter.comparisonLabel}. ${currentQuarter.fallbackReason??''}`
+        :'같은 쟁점·발행 분기의 비교 기사와 검증된 모델이 필요합니다. 분기 표본이 부족하면 반기·전체 기간 순으로 확인합니다. 매체당 고유 기사 3건·2매체 이상을 사용합니다.';
+    scores.bias=bounds
+      ?{...scores.bias,status:point==null?'partial':'ready',value:point??null,
+        numerator:point==null?null:point/50,denominator:2,lowerBound:bounds.lower,upperBound:bounds.upper,
+        note:`${note} 기준선 거리/2×100이며 범위는 하한·상한으로 표시합니다.`}
+      :empty('편향 점수',note);
   }
   if(analysis.sentenceVoices?.method!=='svm'&&bias?.status==='ready'&&bias.gaugePercent!==null&&Number.isFinite(bias.gaugePercent)&&bias.gaugePercent>=0&&bias.gaugePercent<=100){
     scores.bias={...scores.bias,status:'ready',value:Math.round(bias.gaugePercent),numerator:bias.magnitude,denominator:2};

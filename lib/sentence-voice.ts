@@ -19,9 +19,11 @@ export type VoiceLabel=z.infer<typeof voiceLabelSchema>;
 /** Explicit opt-in contract. An absent policy retains the released joint-head
  * semantics; older results must never silently change their meaning. */
 export const VOICE_INDEPENDENT_NEUTRAL='voice-neutral-independent-1.0' as const;
+export const VOICE_ARTICLE_ISSUE='voice-article-issue-1.0' as const;
 export type VoiceDocument={version:string;segmenter:string;scopeCharacters:number;topic:VoiceTopic;
   method:'ai'|'svm';modelVersion:string;labels:VoiceLabel[];
-  decisionPolicy?:typeof VOICE_INDEPENDENT_NEUTRAL};
+  decisionPolicy?:typeof VOICE_INDEPENDENT_NEUTRAL;
+  articleIssue?:string;issuePolicy?:typeof VOICE_ARTICLE_ISSUE};
 
 /** Neutral is a direction decision, not a claim that issue/speaker is known.
  * Directional evidence continues to require both dependent classifications. */
@@ -51,7 +53,10 @@ export const VOICE_INSTRUCTIONS=`voiceLabels는 기자의 찬반이 아니라 �
 export function validateVoiceDocument(body:string,document:VoiceDocument){
   const topic=VOICE_TOPICS[document.topic];
   if(!topic||document.version!==VOICE_VERSION||document.segmenter!==SEGMENTER||document.scopeCharacters!==VOICE_SCOPE
-    ||document.decisionPolicy!==undefined&&document.decisionPolicy!==VOICE_INDEPENDENT_NEUTRAL)return null;
+    ||document.decisionPolicy!==undefined&&document.decisionPolicy!==VOICE_INDEPENDENT_NEUTRAL
+    ||document.issuePolicy!==undefined&&document.issuePolicy!==VOICE_ARTICLE_ISSUE
+    ||document.issuePolicy===VOICE_ARTICLE_ISSUE&&(!document.articleIssue||!Object.hasOwn(topic.issues,document.articleIssue))
+    ||document.articleIssue!==undefined&&document.issuePolicy!==VOICE_ARTICLE_ISSUE)return null;
   const units=voiceSentences(body),ids=new Set(units.map(unit=>unit.sentenceId));
   if(document.labels.some(label=>!ids.has(label.sentenceId)))return null;
   const labels=units.map(unit=>{
@@ -94,6 +99,7 @@ export function summarizeVoices(body:string,document:VoiceDocument){
   const unresolved=(label:VoiceLabel)=>voiceUncertainty(label,valid.decisionPolicy).affectsCoordinate;
   return {version:VOICE_VERSION,method:valid.method,modelVersion:valid.modelVersion,topic:valid.topic,
     decisionPolicy:valid.decisionPolicy??'voice-joint-1.0',
+    articleIssue:valid.articleIssue,issuePolicy:valid.issuePolicy,
     uncertainty:{direction:content.filter(label=>voiceUncertainty(label,valid.decisionPolicy).direction).length,
       issue:content.filter(label=>voiceUncertainty(label,valid.decisionPolicy).issue).length,
       speaker:content.filter(label=>voiceUncertainty(label,valid.decisionPolicy).speaker).length},
@@ -108,8 +114,15 @@ export function summarizeVoices(body:string,document:VoiceDocument){
       // contribute to every issue's bounds without receiving a new label.
       const possibleUnresolved=content.filter(label=>(label.issue===issue||label.issue==='unknown')
         &&unresolved(label)).length;
-      return {issue,proposition,...counts,evidence:voiceEvidenceBounds(counts.support,counts.oppose,possibleUnresolved),journalist:balance(known.filter(label=>label.speaker==='journalist')),
-        source:balance(known.filter(label=>label.speaker==='source')),
+      const axis=(speaker:'journalist'|'source')=>{
+        const counted=balance(known.filter(label=>label.speaker===speaker));
+        const uncertain=content.filter(label=>(label.issue===issue||label.issue==='unknown')&&unresolved(label)
+          &&(label.speaker===speaker||label.speaker==='unknown'||label.speaker==='mixed')).length;
+        return {...counted,coordinate:uncertain?null:counted.coordinate,unresolved:uncertain,
+          evidence:voiceEvidenceBounds(counted.support,counted.oppose,uncertain)};
+      };
+      return {issue,proposition,...counts,evidence:voiceEvidenceBounds(counts.support,counts.oppose,possibleUnresolved),journalist:axis('journalist'),
+        source:axis('source'),
         unresolved:labels.filter(unresolved).length};
     })};
 }
@@ -202,17 +215,20 @@ function predict(model:VoiceModel['topics'][string],name:'directionality'|'polar
   const scores=classifier.classes.map((label,index)=>({label,value:features.reduce((sum,item)=>sum+item.value*classifier.coefficients[index][item.id],classifier.intercepts[index])})).sort((a,b)=>b.value-a.value);
   return scores.every(item=>Number.isFinite(item.value))&&scores[0].value-scores[1].value>=VOICE_MARGIN_GAP?scores[0].label:null;
 }
-export function inferVoices(model:VoiceModel,body:string,topic:VoiceTopic):VoiceDocument|null{
+export function inferVoices(model:VoiceModel,body:string,topic:VoiceTopic,selectedArticleIssue?:string|null):VoiceDocument|null{
   const weights=model.topics[topic];if(!weights)return null;
+  if(selectedArticleIssue===null||selectedArticleIssue!==undefined&&!Object.hasOwn(VOICE_TOPICS[topic].issues,selectedArticleIssue))return null;
   const units=voiceSentences(body);
   const labels=units.map(unit=>{
     if(isVoiceBoilerplate(unit.text))return {sentenceId:unit.sentenceId,issue:'none',direction:'neutral' as const,speaker:'unknown' as const,excluded:true as const};
     const features=voiceFeatures(weights,unit.text),gate=predict(weights,'directionality',features);
     const direction=gate==='neutral'?'neutral':gate==='directional'?predict(weights,'polarity',features):null;
-    const speaker=predict(weights,'speaker',features),issue=predict(weights,'issue',features);
+    const speaker=predict(weights,'speaker',features),predictedIssue=predict(weights,'issue',features);
+    const issue=selectedArticleIssue===undefined?predictedIssue:predictedIssue===null?'unknown':predictedIssue===selectedArticleIssue?selectedArticleIssue:'none';
     return {sentenceId:unit.sentenceId,issue:issue??'unknown',direction:direction??'uncertain',speaker:speaker??'unknown'} as VoiceLabel;
   });
-  return validateVoiceDocument(body,{version:VOICE_VERSION,segmenter:SEGMENTER,scopeCharacters:VOICE_SCOPE,topic,method:'svm',modelVersion:model.version,labels});
+  return validateVoiceDocument(body,{version:VOICE_VERSION,segmenter:SEGMENTER,scopeCharacters:VOICE_SCOPE,topic,method:'svm',modelVersion:model.version,labels,
+    ...(selectedArticleIssue===undefined?{}:{articleIssue:selectedArticleIssue,issuePolicy:VOICE_ARTICLE_ISSUE,decisionPolicy:VOICE_INDEPENDENT_NEUTRAL})});
 }
 export async function voiceArticleHash(body:string){
   const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(normalizeBiasText(articleTextPrefix(body,VOICE_SCOPE))));

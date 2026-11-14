@@ -49,6 +49,7 @@ export type Analysis = {
   bodyPosition?:BodyPosition;
   sentenceVoices?:import('./sentence-voice').VoiceDocument;
   voiceCoordinates?:import('./voice-comparison').VoiceCoordinate[];
+  issueQuarterComparison?:import('./server/issue-quarter-comparison').IssueQuarterComparison;
   articleContextToken?:string;
   expressions:Expression[]; claims:Claim[]; perspectiveQuestions:{text:string;basis:Span[]}[];
   counterArguments?:CounterArgument[];searchSuggestions?:SearchSuggestion[];
@@ -67,6 +68,7 @@ export type Reference = { id:string;provenance:'provided_text'|'web_fetched';tex
   contentDigest?:string;retrievedTextLength?:number;retrievedTruncated?:boolean;
   voiceAnalysisStatus?:'complete'|'unavailable'|'off_scope';
   voiceCoordinates?:import('./voice-comparison').VoiceCoordinate[];
+  issueQuarterComparison?:import('./server/issue-quarter-comparison').IssueQuarterComparison;
   /** Server-generated prediction over retrieved text before excerpting. */
   biasPrediction?:import('./bias-model').CompactBiasPrediction };
 export const outcomeSchema = z.enum(['supported','contradicted','conflicting','insufficient','unchecked','inaccessible','not_applicable']);

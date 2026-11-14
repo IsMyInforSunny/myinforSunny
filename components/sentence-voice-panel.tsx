@@ -1,42 +1,60 @@
-import type {Analysis} from '@/lib/contracts';
+﻿import type {Analysis} from '@/lib/contracts';
 import {summarizeVoices,voiceSentences,VOICE_TOPICS} from '@/lib/sentence-voice';
 import type {ResearchVerification} from '@/lib/research-contract';
 import {voiceAssessmentFromResearch} from '@/lib/voice-model-adapter';
 import trainingStatus from '@/lib/data/voice-model-status.json';
 import semanticStatus from '@/lib/data/voice-embedding-status.json';
+
+type Bounds={lower:number|null;upper:number|null};
+function coordinateText(evidence:Bounds){
+  if(evidence.lower===null||evidence.upper===null)return '방향 근거 부족';
+  return evidence.lower===evidence.upper?evidence.lower.toFixed(2):`${evidence.lower.toFixed(2)} ~ ${evidence.upper.toFixed(2)}`;
+}
+function scoreText(point:number|null,bounds:Bounds|null){
+  return point!==null?`${point}점`:bounds?`${bounds.lower} ~ ${bounds.upper}점`:'비교 기사 부족';
+}
+
 export default function SentenceVoicePanel({analysis,researchResults=[]}:{analysis:Analysis;researchResults?:ResearchVerification[]}){
   const body=analysis.sources.find(source=>source.kind==='body')?.text??'';
   const summary=analysis.sentenceVoices?summarizeVoices(body,analysis.sentenceVoices):null;
   if(!summary)return <div className="studio-relative">
-    <p><strong>{analysis.warnings.some(warning=>warning.code==='VOICE_MODEL_UNAVAILABLE')?'문장 SVM 분석 미완료':semanticStatus.performanceChecksPassed?'문장 분류 기준 통과 · 기사 점수 검증 미완료':'문장 SVM 학습·검증 중'}</strong></p>
-    <p>실제 기사 AI 라벨 {trainingStatus.annotatedArticleCount}건 · 학습 가능 {trainingStatus.usableSentenceCount}문장 · 사람 정확도 평가 {trainingStatus.humanEvaluationCount}건</p>
-    <p>현재 학습 범위 · {Object.keys(trainingStatus.topics).map(topic=>VOICE_TOPICS[topic as keyof typeof VOICE_TOPICS]?.label??topic).join(' · ')}</p>
-    {semanticStatus.performanceChecksPassed&&<p>별도 평가 {semanticStatus.evaluationSentenceCount}문장 · AI 라벨 재현 지표 {(semanticStatus.runtimeMacroF1*100).toFixed(1)}% · 반전 쌍 {Math.round(semanticStatus.flipPairAccuracy*semanticStatus.flipPairCount)}/{semanticStatus.flipPairCount}개 · 데이터 이용 검토와 실제 화면 확인 대기</p>}
-    {!semanticStatus.articleAggregation.ready&&<p>기사 단위 검사 {semanticStatus.articleAggregation.evaluatedArticles}건 중 현재 조건으로 대표 좌표를 산출한 기사는 {semanticStatus.articleAggregation.primaryCoordinateAvailable}건입니다. 미확정 문장과 비교 표본을 해결하기 전에는 편향 점수를 표시할 수 없습니다.</p>}
-    <p>{analysis.versions.voiceModel?'이 기사에 적용할 문장 SVM 결과를 확인하지 못했습니다. 지원 범위와 연결 상태를 확인해 주세요.':'현재 활성화된 문장 SVM은 없습니다. 판별 성능·독립 사건 평가·학습 및 모델 배포 이용 검토를 통과한 모델만 연결합니다.'}</p>
+    <p><strong>문장 SVM 분석 준비 중</strong></p>
+    <p>실제 기사 AI 라벨 {trainingStatus.annotatedArticleCount}건 · 사람 평가 {trainingStatus.humanEvaluationCount}건</p>
+    <p>학습 범위 · {Object.keys(trainingStatus.topics).map(topic=>VOICE_TOPICS[topic as keyof typeof VOICE_TOPICS]?.label??topic).join(' · ')}</p>
+    {semanticStatus.performanceChecksPassed&&<p>문장 분류 검사 후 기사 좌표와 같은 쟁점·분기 비교 분포를 로컬에서 검증하고 있습니다.</p>}
+    <p>이용 검토와 모델 배포 준비 상태를 확인한 뒤 실제 모델 결과를 연결합니다.</p>
   </div>;
   const units=voiceSentences(body);
-  const comparison=voiceAssessmentFromResearch(analysis,researchResults);
+  const event=voiceAssessmentFromResearch(analysis,researchResults);
+  const quarter=analysis.issueQuarterComparison;
+  const currentQuarter=quarter?.parentAnalysisId===analysis.analysisId&&quarter.modelVersion===summary.modelVersion?quarter:null;
   const references=researchResults.flatMap(result=>result.references);
-  return <details className="studio-relative" open><summary>기사에 실린 목소리 · {summary.method==='svm'?'문장 SVM':'AI 임시 집계'}</summary>
-    <p>본문 앞 2,000자 · {summary.total}문장 · 광고·해시태그·저작권 표시 제외 {summary.excluded}문장 · 미확정 {summary.unresolved}문장 · {summary.modelVersion}</p>
-    {summary.decisionPolicy==='voice-neutral-independent-1.0'&&<p>방향 미확정 {summary.uncertainty.direction} · 쟁점 미확정 {summary.uncertainty.issue} · 화자 미확정 {summary.uncertainty.speaker}문장. 확정 중립의 쟁점·화자 유보는 찬반 좌표에 포함하지 않습니다.</p>}
-    {summary.issues.filter(issue=>issue.directional||issue.evidence.unresolved).map(issue=><div key={issue.issue}>
+  const issues=summary.issues.filter(issue=>analysis.sentenceVoices?.articleIssue
+    ?issue.issue===analysis.sentenceVoices.articleIssue:issue.directional||issue.evidence.unresolved);
+  return <details className="studio-relative" open><summary>취재원 인용 균형과 기자 서술 방향</summary>
+    <p>본문 앞 2,000자 · {summary.total}문장 · 본문 외 표시 제외 {summary.excluded}문장</p>
+    {issues.map(issue=><section key={issue.issue} aria-label={issue.proposition}>
       <p><strong>{issue.proposition}</strong></p>
-      <p>찬성 {issue.support} / 반대 {issue.oppose} · 분류된 문장의 좌표 {issue.coordinate===null?'산출 보류(방향 문장 3개 미만)':issue.coordinate.toFixed(2)}{issue.unresolved?` · 쟁점 내 유보 ${issue.unresolved}문장`:''}</p>
-      {issue.evidence.unresolved>0&&<p>이 쟁점에 영향을 줄 수 있는 미확정 {issue.evidence.unresolved}문장을 포함하면 가능한 좌표 범위는 {issue.evidence.lower!.toFixed(2)} ~ {issue.evidence.upper!.toFixed(2)}입니다. 쟁점이 불명확한 문장도 포함하며, 이 범위는 정확도 확률이나 최종 편향 점수가 아닙니다.</p>}
-      <p>기자 찬성 {issue.journalist.support} / 반대 {issue.journalist.oppose} · 취재원 찬성 {issue.source.support} / 반대 {issue.source.oppose}</p>
-    </div>)}
-    {!summary.issues.some(issue=>issue.directional)&&<p>명확한 방향 문장이 없습니다. 정책의 발표·시행 사실을 찬성으로 세지 않습니다.</p>}
-    <p>좌표 = (찬성 − 반대) ÷ 방향 문장 수. 기사에 실린 발언 비중이며 기자의 이념·사회 여론·정확도 확률이 아닙니다. 쟁점별 방향을 섞지 않으며 불명확한 문장은 유보합니다.</p>
-    {comparison.status==='ready'?<section aria-label="SVM 좌표로 비교한 기사">
-      <p>같은 사건·쟁점 {comparison.count}건 · {comparison.publisherCount}개 매체 · 상대 점수 {comparison.score}점</p>
-      {([['similar','가까운 발언 구성'],['opposing','기준선 반대쪽 발언 구성']] as const).map(([key,label])=><div key={key}>
+      <p>취재원 인용 균형 · 찬성 {issue.source.support} / 반대 {issue.source.oppose}문장 · 가능한 좌표 {coordinateText(issue.source.evidence)}</p>
+      <p>기자 서술 방향 · 찬성 {issue.journalist.support} / 반대 {issue.journalist.oppose}문장 · 가능한 좌표 {coordinateText(issue.journalist.evidence)}</p>
+      <p>취재원 미확정 {issue.source.evidence.unresolved} · 기자 미확정 {issue.journalist.evidence.unresolved}문장. 방향 문장 3개 이상, 범위 폭 0.5 이하일 때 상대 비교에 사용합니다.</p>
+    </section>)}
+    {!issues.length&&<p>기사의 주 쟁점을 하나로 확인할 근거가 부족합니다.</p>}
+    {event.status==='ready'&&<section aria-label="같은 사건 비교">
+      <p>같은 사건·쟁점 {event.count}건 · {event.publisherCount}개 매체 · 기준선 거리 {scoreText(event.score,event.scoreBounds)}</p>
+      {event.direction==='undetermined'&&<p>좌표 범위가 기준선을 걸쳐 방향을 유보합니다.</p>}
+      {([['similar','같은 편 인용 구성'],['opposing','반대편 인용 구성']] as const).map(([key,label])=><div key={key}>
         <strong>{label}</strong>
-        {comparison[key].slice(0,3).map(item=><p key={item.id}><a href={item.url} target="_blank" rel="noopener noreferrer">{references.find(ref=>ref.voiceCoordinates?.some(coordinate=>coordinate.id===item.id))?.title??item.publisher}</a> · 좌표 {item.coordinate.toFixed(2)}</p>)}
-        {!comparison[key].length&&<p>해당 조건의 비교 기사가 없습니다.</p>}
+        {event[key].slice(0,3).map(item=><p key={item.id}><a href={item.url} target="_blank" rel="noopener noreferrer">{references.find(ref=>ref.voiceCoordinates?.some(coordinate=>coordinate.id===item.id))?.title??item.publisher}</a></p>)}
       </div>)}
-    </section>:<p>상대 점수·추천 대기 · 같은 사건·쟁점에서 매체별 3건 이상, 2개 매체의 미확정 없는 비교 기사가 필요합니다. 학습 원본과 중복은 제외합니다.</p>}
+    </section>}
+    {currentQuarter?.status==='ready'?<section aria-label="같은 쟁점 분기 비교">
+      <p>{currentQuarter.comparisonLabel}</p>
+      {currentQuarter.fallbackReason&&<p>{currentQuarter.fallbackReason}</p>}
+      <p>중앙값 거리 {scoreText(currentQuarter.score,currentQuarter.scoreRange)} · {currentQuarter.topPercentile&&`찬성 좌표 기준 상위 ${currentQuarter.topPercentile.lower} ~ ${currentQuarter.topPercentile.upper}%`}</p>
+      <p>분포에 사용한 점 좌표 {currentQuarter.pointCount}건 · 범위만 확인된 기사 {currentQuarter.rangeCount}건</p>
+      {currentQuarter.direction==='undetermined'&&<p>좌표 범위가 기준선을 걸쳐 방향을 유보합니다.</p>}
+    </section>:<p>같은 쟁점·분기의 비교 분포 대기. 매체당 고유 기사 3건·2매체를 확인하며 표본이 부족하면 반기·전체 기간 순으로 비교합니다.</p>}
     <details><summary>문장별 분류 근거</summary><ol>{analysis.sentenceVoices!.labels.map(label=><li key={label.sentenceId}>
       {units.find(unit=>unit.sentenceId===label.sentenceId)?.text} <small>· {label.excluded?'본문 외 표시 · 집계 제외':`${label.issue} · ${label.direction} · ${label.speaker}`}</small>
     </li>)}</ol></details>

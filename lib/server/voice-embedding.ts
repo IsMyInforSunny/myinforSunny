@@ -1,7 +1,8 @@
+import {relatedVoiceIssue, VOICE_ARTICLE_ISSUE_POLICY} from '../voice-article-issue';
 import artifact from '../data/voice-embedding-model.json';
 import {parseEmbeddingVoiceModel} from '../voice-embedding-model';
 import {denseVoiceInputText,inferDenseVoiceHeads} from '../voice-dense';
-import {isVoiceBoilerplate,voiceSentences,validateVoiceDocument,VOICE_VERSION,VOICE_SCOPE,type VoiceTopic,type VoiceLabel} from '../sentence-voice';
+import {isVoiceBoilerplate,voiceSentences,validateVoiceDocument,VOICE_VERSION,VOICE_SCOPE,VOICE_TOPICS,type VoiceTopic,type VoiceLabel} from '../sentence-voice';
 import {SEGMENTER} from '../segmentation';
 import {provider,type RuntimeConfig} from './config';
 import {AppError,providerFailure} from './errors';
@@ -55,11 +56,13 @@ async function embedBatch(records:{key:string;text:string}[],model:Model,config:
 
 /** Public URL bodies use short-lived memory reuse; pasted text must pass a
  * request-specific scope, so private inputs cannot share a cross-user cache. */
-export async function inferEmbeddingVoices(body:string,topic:VoiceTopic,config:RuntimeConfig,signal:AbortSignal,cacheScope:string,model:Model|null=releasedEmbeddingVoiceModel){
+export async function inferEmbeddingVoices(body:string,topic:VoiceTopic,config:RuntimeConfig,signal:AbortSignal,cacheScope:string,model:Model|null=releasedEmbeddingVoiceModel,selectedArticleIssue?:string|null){
   signal.throwIfAborted();
   if(!model||!model.topics[topic])return null;
   if(provider(config)!=='nvidia'||!config.NVIDIA_API_KEY||!config.onDispatch||!cacheScope)
     throw new AppError(503,'FEATURE_UNAVAILABLE','편향 모델의 서버 연결을 확인해 주세요.');
+  const articleIssue=selectedArticleIssue;
+  if(articleIssue===null||(articleIssue!==undefined&&!Object.hasOwn(VOICE_TOPICS[topic].issues,articleIssue)))return null;
   const units=voiceSentences(body),records=new Map<string,{key:string;text:string}>(),keys=new Map<string,string>(),resolved=new Map<string,number[]>();
   const now=Date.now();for(const [key,entry] of vectors)if(entry.expiresAt<=now)vectors.delete(key);
   for(const unit of units){
@@ -89,7 +92,7 @@ export async function inferEmbeddingVoices(body:string,topic:VoiceTopic,config:R
     if(isVoiceBoilerplate(unit.text))return {sentenceId:unit.sentenceId,issue:'none',direction:'neutral' as const,speaker:'unknown' as const,excluded:true as const};
     const value=resolved.get(keys.get(unit.sentenceId)??'');
     const result=value?inferDenseVoiceHeads(model.topics[topic].heads,value):null;
-    return {sentenceId:unit.sentenceId,issue:result?.issue??'unknown',direction:result?.direction??'uncertain',speaker:result?.speaker??'unknown'};
+    return {sentenceId:unit.sentenceId,issue:articleIssue===undefined?result?.issue??'unknown':relatedVoiceIssue(result?.margins.issue,articleIssue),direction:result?.direction??'uncertain',speaker:result?.speaker??'unknown'};
   });
-  return validateVoiceDocument(body,{version:VOICE_VERSION,segmenter:SEGMENTER,scopeCharacters:VOICE_SCOPE,topic,method:'svm',modelVersion:model.version,labels,decisionPolicy:model.decisionPolicy});
+  return validateVoiceDocument(body,{version:VOICE_VERSION,segmenter:SEGMENTER,scopeCharacters:VOICE_SCOPE,topic,method:'svm',modelVersion:model.version,labels,decisionPolicy:model.decisionPolicy,...(articleIssue===undefined?{}:{articleIssue,issuePolicy:VOICE_ARTICLE_ISSUE_POLICY})});
 }

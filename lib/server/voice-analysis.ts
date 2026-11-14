@@ -1,3 +1,5 @@
+import {attachIssueQuarterComparison} from './issue-quarter-comparison';
+import {selectArticleVoiceIssue} from '../voice-article-issue';
 import artifact from '../data/voice-model.json';
 import type {Analysis} from '../contracts';
 import {classifyRelativeTopic} from '../relative-metrics';
@@ -21,13 +23,14 @@ type Article={url?:string;title?:string;publishedAt?:string};
  * model requires the provider lease and never silently uses another model. */
 export async function analyzeArticleVoices(body:string,article:Article={},model:VoiceModel|null=releasedVoiceModel,anchor?:VoiceArticleContext&{body:string},runtime?:{config:RuntimeConfig;signal:AbortSignal}){
   const topic=classifyRelativeTopic(body,article.title);
+  const articleIssue=topic?selectArticleVoiceIssue(body,topic,undefined,article.title):null;
   if(releasedEmbeddingVoiceModel&&topic&&releasedEmbeddingVoiceModel.topics[topic]){
     if(!runtime)throw new AppError(503,'FEATURE_UNAVAILABLE','편향 모델의 서버 연결을 확인해 주세요.');
-    const document=await inferEmbeddingVoices(body,topic,runtime.config,runtime.signal,`public:${article.url??''}`);
+    const document=await inferEmbeddingVoices(body,topic,runtime.config,runtime.signal,`public:${article.url??''}`,undefined,articleIssue);
     return document?{document,coordinates:await articleVoiceCoordinates(body,document,article,releasedEmbeddingVoiceModel.trainingArticleHashes,anchor)}:null;
   }
   if(!model||!topic||!model.topics[topic])return null;
-  const document=inferVoices(model,body,topic);
+  const document=inferVoices(model,body,topic,articleIssue);
   return document?{document,coordinates:await articleVoiceCoordinates(body,document,article,model.trainingArticleHashes,anchor)}:null;
 }
 
@@ -48,12 +51,20 @@ export async function articleVoiceCoordinates(body:string,document:VoiceDocument
       parsed.hash='';publisher=canonicalPublisherHost(parsed.hostname);parsed.hostname=publisher;url=parsed.href;
     }catch{return [];}
   }
-  return summary.issues.flatMap(issue=>issue.coordinate===null?[]:[{
-    id:url||bodyHash,url,publisher,bodyHash,eventId,topic:document.topic,issue:issue.issue,publishedAt:article.publishedAt,
-    method:document.method,modelVersion:document.modelVersion,version:document.version,decisionPolicy:document.decisionPolicy,
-    coordinate:issue.coordinate,directional:issue.directional,unresolved:summary.unresolved,
-    trainingOriginal:trainingHashes.includes(bodyHash),
-  }]);
+  return summary.issues.filter(issue=>!document.articleIssue||issue.issue===document.articleIssue).flatMap(issue=>{
+    const axes=document.articleIssue?(['source','journalist'] as const):(['combined'] as const);
+    return axes.flatMap(axis=>{
+      const counts=axis==='combined'?issue:issue[axis];
+      const evidence=counts.evidence;
+      if(counts.directional<3||evidence.lower===null||evidence.upper===null||evidence.upper-evidence.lower>.5+1e-12)return [];
+      const point=evidence.lower===evidence.upper;
+      return [{id:url||bodyHash,url,publisher,bodyHash,eventId,topic:document.topic,issue:issue.issue,publishedAt:article.publishedAt,
+        method:document.method,modelVersion:document.modelVersion,version:document.version,decisionPolicy:document.decisionPolicy,
+        issuePolicy:document.issuePolicy,...(axis!=='combined'?{axis}:{}),articleIssue:document.articleIssue,
+        coordinate:point?evidence.lower:null,bounds:{lower:evidence.lower,upper:evidence.upper},
+        directional:counts.directional,unresolved:evidence.unresolved,trainingOriginal:trainingHashes.includes(bodyHash)}];
+    });
+  });
 }
 
 /** URL import adds publication metadata after core analysis without another inference. */
@@ -64,5 +75,5 @@ export async function attachVoiceCoordinates(analysis:Analysis,model?:{trainingA
     analysis.voiceCoordinates=await articleVoiceCoordinates(body,analysis.sentenceVoices,analysis.article??{},selected.trainingArticleHashes);
   if(analysis.article?.url&&analysis.article.publishedAt&&Number.isFinite(Date.parse(analysis.article.publishedAt)))
     analysis.voiceCoordinates=analysis.voiceCoordinates?.map(item=>({...item,eventId:liveVoiceEventId(item.bodyHash),publishedAt:analysis.article!.publishedAt}));
-  return analysis;
+  return attachIssueQuarterComparison(analysis);
 }

@@ -35,7 +35,7 @@ print(json.dumps({'model':m,'body':body,'coordinate':expected}))
 `;
 
 describe('portable SVM encoder and release boundaries',()=>{
- const data=JSON.parse(execFileSync(process.platform==='win32'?'py':'python3',['-c',program],{
+ const data=JSON.parse(execFileSync(process.env.PYTHON_EXECUTABLE??(process.platform==='win32'?'py':'python3'),['-c',program],{
    cwd:resolve('.'),encoding:'utf8',env:{...process.env,PYTHONIOENCODING:'utf-8'},timeout:30_000}));
  it('matches Python char TF-IDF margins rather than categorical LLM positions',()=>{
    const model=parseStanceModel(data.model);expect(model).not.toBeNull();

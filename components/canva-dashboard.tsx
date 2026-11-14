@@ -75,15 +75,16 @@ export default function CanvaDashboard({analysis, researchResults, researchStage
   const politicalReady = bias.status === 'ready' && bias.selectedCoordinate !== null && bias.classifierAxisSign !== null;
   const voiceBody=analysis?.sources.find(source=>source.kind==='body')?.text??'';
   const voiceIssue=analysis?.sentenceVoices?mainVoiceIssue(voiceBody,analysis.sentenceVoices):null;
-  const voiceReady=voiceIssue?.coordinate!=null;
+  const voiceReady=voiceIssue?.eligible===true;
   const positionReady = !!position && ['support', 'oppose', 'mixed'].includes(position.label);
   const marker = axisMode === 'political'
     ? politicalReady ? (bias.selectedCoordinate! + 1) * 50 : null
-    : analysis?.sentenceVoices ? voiceReady ? (voiceIssue!.coordinate!+1)*50 : null : positionReady ? position!.label === 'support' ? 83 : position!.label === 'oppose' ? 17 : 50 : null;
-  const biasLabel = axisMode === 'political' ? politicalReady ? bias.directionLabel ?? '기준선 부근' : '비교 모델 준비 중' : analysis?.sentenceVoices ? voiceReady ? `목소리 좌표 ${voiceIssue!.coordinate!.toFixed(2)}` : '방향 문장 부족·쟁점별 확인' : position ? stanceLabels[position.label] : unexpressed ? '입장 표현 없음' : analysis ? '본문 입장 분석 대기' : '분석 대기';
+    : analysis?.sentenceVoices ? voiceReady&&voiceIssue!.coordinate!==null ? (voiceIssue!.coordinate!+1)*50 : null : positionReady ? position!.label === 'support' ? 83 : position!.label === 'oppose' ? 17 : 50 : null;
+  const voiceRange=axisMode==='argument'&&voiceReady&&voiceIssue?.coordinate===null?voiceIssue.bounds:null;
+  const biasLabel = axisMode === 'political' ? politicalReady ? bias.directionLabel ?? '기준선 부근' : '비교 모델 준비 중' : analysis?.sentenceVoices ? voiceReady ? voiceRange?`인용 균형 ${voiceRange.lower.toFixed(2)} ~ ${voiceRange.upper.toFixed(2)}`:`인용 균형 ${voiceIssue!.coordinate!.toFixed(2)}` : '인용 방향 근거 부족' : position ? stanceLabels[position.label] : unexpressed ? '입장 표현 없음' : analysis ? '본문 입장 분석 대기' : '분석 대기';
   const biasNote = axisMode === 'political'
     ? politicalReady ? `검증된 비교 기준선과의 거리 ${bias.magnitude?.toFixed(2)} · ${bias.eligiblePublisherCount}개 매체` : '좌우 위치는 검증된 매체 좌표 모델과 비교 표본이 준비되어야 표시합니다.'
-    : analysis?.sentenceVoices ? `${voiceIssue?.proposition??'하위 쟁점별로 아래에서 확인합니다.'} · ${analysis.sentenceVoices.method==='svm'?'문장 SVM':'AI 임시 집계'} · 기자와 취재원 목소리를 집계합니다. 상대 점수는 같은 사건·쟁점의 적격 비교 표본이 필요합니다.`
+    : analysis?.sentenceVoices ? `${voiceIssue?.proposition??'기사의 주 쟁점을 확인합니다.'} · 취재원 인용 균형을 같은 쟁점·분기와 비교하며 기자 서술 방향은 별도로 표시합니다.`
     : position ? `비교 명제 · ${proposition} · 본문 입장 방향 표시입니다. 편향 강도 점수는 검증된 동일 논점 SVM이 준비되면 산출합니다.`
       : unexpressed ? '본문에서 비교 명제에 대한 작성자 입장이 드러나지 않았습니다. 편향 강도 점수는 산출하지 않습니다.'
         : analysis ? '본문 입장 근거를 확인하지 못했습니다. 편향 강도 점수는 산출하지 않습니다.'
@@ -111,13 +112,14 @@ export default function CanvaDashboard({analysis, researchResults, researchStage
           <div className="studio-section-heading"><h2 id={`${id}-metrics`}>기사의 세 가지 성분</h2><span>분석 기준과 근거를 함께 확인하세요</span></div>
           <div className="studio-metric studio-bias">
             <div className="studio-metric-heading"><h3>편향 <small>관점의 방향</small></h3><select aria-label="편향 축 선택" value={axisMode} onChange={event => setAxisMode(event.target.value as 'argument' | 'political')}><option value="argument">논점 관점</option><option value="political">정치 좌우</option></select><strong>{biasLabel}</strong></div>
-            <div className={`studio-bipolar${marker === null ? ' is-pending' : ''}`} role="img" aria-label={`${axisMode === 'political' ? '좌익부터 우익' : '반대부터 찬성'} · ${biasLabel}`}>
+            <div className={`studio-bipolar${marker === null&&!voiceRange ? ' is-pending' : ''}`} role="img" aria-label={`${axisMode === 'political' ? '좌익부터 우익' : '반대부터 찬성'} · ${biasLabel}`}>
               <span className="studio-axis-center" />{marker !== null && <span className="studio-axis-marker" style={{left: `${Math.max(0, Math.min(100, marker))}%`}} />}
+              {voiceRange&&<span className="studio-axis-range" style={{position:'absolute',top:0,bottom:0,left:`${(voiceRange.lower+1)*50}%`,width:`${(voiceRange.upper-voiceRange.lower)*50}%`,background:'#323c2680',border:'2px solid #323c26'}}/>}
             </div>
             <div className="studio-axis-labels"><span>{axisMode === 'political' ? '좌익' : '반대 관점'}</span><span>{axisMode === 'political' ? '기준선' : '복합 관점'}</span><span>{axisMode === 'political' ? '우익' : '찬성 관점'}</span></div>
             <p className="studio-metric-note">{biasNote}</p>
             {analysis&&axisMode==='argument'&&<div className="studio-viewpoint-comparison" aria-label="같은 논점의 관점 비교">
-              <p><strong>편향 강도 · {scores.bias.value===null?'같은 사건·쟁점 비교 표본 대기':`${scores.bias.value}점`}</strong></p>
+              <p><strong>편향 강도 · {scores.bias.status==='partial'?`${scores.bias.lowerBound} ~ ${scores.bias.upperBound}점`:scores.bias.value===null?'같은 쟁점·분기 비교 표본 대기':`${scores.bias.value}점`}</strong></p>
               {analysis.sentenceVoices?.method==='svm'&&<p>{scores.bias.note}</p>}
               <p>{viewpoints?.status==='ready'
                 ? `인용 확인된 비교 기사 ${viewpoints.total}건 · ${viewpoints.publisherCount}개 매체 · 명제 찬성 ${viewpoints.support}건 / 반대 ${viewpoints.oppose}건`
