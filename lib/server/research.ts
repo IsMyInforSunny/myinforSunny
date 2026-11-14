@@ -171,7 +171,7 @@ export async function discoverEvidence(request:Request,input:ResearchInput,planT
  const position=comparisonTarget(input);const claim=[...input.claims,...(position?[position]:[])].find(c=>c.id===query.claimId);
  if(!claim)throw new AppError(422,'VALIDATION_ERROR','조사할 주장이나 비교 명제를 찾을 수 없습니다.');
  const attempts:ResearchAttempt[]=[];const references:RetrievedEvidence[]=[];
- let result=searchIndexedNews(query.query,config,true);
+ let result=searchIndexedNews(query.query,config,true,exclusions.data);
  if(!result){
   const reservationId=await digest({planId:plan.planId,queryIndex});
   await reserveSearch(request,config,reservationId);

@@ -5,13 +5,13 @@ import type {RuntimeConfig} from './config';
 import {searchArticleIndex, articleIndexHosts, articleIndexStatus} from './article-search-index';
 
 /** Metadata candidates can be listed before a publisher is enabled for body retrieval. */
-export function searchIndexedNews(query: string, config: RuntimeConfig, requireRetrievable = false): NewsResult | null {
+export function searchIndexedNews(query: string, config: RuntimeConfig, requireRetrievable = false, excludeUrls:readonly string[]=[]): NewsResult | null {
   const parsed = searchQuerySchema.safeParse(query);
   if (!parsed.success || containsContactInfo(parsed.data)) return null;
   const hosts = requireRetrievable
     ? (config.ALLOWED_RETRIEVAL_HOSTS ?? '').split(',').map(host => host.trim()).filter(Boolean)
     : articleIndexHosts();
-  const articles = searchArticleIndex(parsed.data, hosts);
+  const articles = searchArticleIndex(parsed.data, hosts,{excludeUrls});
   if (!articles.length) return null;
   const status = articleIndexStatus();
   return {provider:'local_index',query:parsed.data,status:'success',articles,searchedAt:new Date().toISOString(),

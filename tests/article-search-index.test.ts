@@ -14,6 +14,12 @@ const index = (articles: IndexedArticle[]): ArticleSearchIndex => ({
 });
 
 describe('collected article search index', () => {
+  it('excludes already fetched identities before publisher and result limits so later queries can find new articles',()=>{
+    const data=index([row('a'),row('b'),row('c'),row('d')]);
+    const options={now,index:data,excludeUrls:[row('a').url+'?utm_source=test',row('b').url]};
+    expect(searchArticleIndex('원전',['news.example.com'],options).map(article=>article.id)).toEqual(['c','d']);
+    expect(searchArticleIndex('원전',['news.example.com'],{...options,excludeUrls:data.articles.map(article=>article.url)})).toEqual([]);
+  });
   it('finds candidates locally with unchanged unverified provenance', () => {
     const result = searchArticleIndex('원전 전력', ['news.example.com'], {now, index: index([row('one')])});
     expect(result).toHaveLength(1);
