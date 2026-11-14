@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {voiceAnnotationInput,validateVoiceDocument,summarizeVoices,parseVoiceModel,VOICE_VERSION,VOICE_TOPICS,type VoiceDocument} from '../lib/sentence-voice';
+import {voiceAnnotationInput,validateVoiceDocument,summarizeVoices,parseVoiceModel,voiceModelText,isVoiceBoilerplate,VOICE_VERSION,VOICE_TOPICS,type VoiceDocument} from '../lib/sentence-voice';
 import {compareVoiceCoordinates,type VoiceCoordinate} from '../lib/voice-comparison';
 
 describe('문장 목소리 연구 모델의 집계 경계',()=>{
@@ -27,6 +27,26 @@ describe('문장 목소리 연구 모델의 집계 경계',()=>{
  it('미등록·미검토 모델을 활성화하지 않는다',()=>{
   expect(parseVoiceModel(null)).toBeNull();expect(parseVoiceModel({status:'ready',topics:{}})).toBeNull();
  });
+ it('metadata is explicitly excluded without turning real unresolved content into neutral',()=>{
+  const metadataBody=body+'\nAD\n#원전\nⓒ취재원';
+  const scope=voiceAnnotationInput(metadataBody,'nuclear_energy');
+  const labels=scope.sentences.map(unit=>({sentenceId:unit.sentenceId,issue,direction:'support' as const,speaker:'source' as const}));
+  const result=validateVoiceDocument(metadataBody,{...document,labels})!;
+  const summary=summarizeVoices(metadataBody,result)!;
+  expect(summary.excluded).toBe(3);expect(summary.unresolved).toBe(0);
+  expect(summary.issues[0].coordinate).toBe(1);
+  const spoof=validateVoiceDocument(body,{...document,labels:document.labels.map(label=>({...label,excluded:true}))})!;
+  expect(summarizeVoices(body,spoof)!.excluded).toBe(0);
+  expect(spoof.labels.every(label=>label.direction==='uncertain')).toBe(true);
+ });
+ it('shared feature rules unify synonyms and numbers without rewriting evidence',()=>{
+  expect(voiceModelText('핵 발전소 12기')).toBe('원전 0기');
+  expect(voiceModelText('원자력발전소 99기')).toBe('원전 0기');
+  expect(isVoiceBoilerplate('무단 전재 및 재배포 금지')).toBe(true);
+  expect(isVoiceBoilerplate('원전 확대에 반대한다.')).toBe(false);
+  expect(isVoiceBoilerplate('Copyright law reform needs public discussion.')).toBe(false);
+  expect(isVoiceBoilerplate('무단 전재를 막기 위한 법 개정이 논의된다.')).toBe(false);
+ });
  const item=(id:string,publisher:string,coordinate:number):VoiceCoordinate=>({id,url:`https://example.com/${id}`,publisher,bodyHash:id,eventId:'same-event',topic:'nuclear_energy',issue,method:'svm',modelVersion:'test',version:VOICE_VERSION,coordinate,directional:3,unresolved:0,trainingOriginal:false});
  it('매체마다 3건·매체 2곳과 학습 원본 제외를 유지한다',()=>{
   const article=item('input','input',1),population=[-1,-1,-1].map((n,i)=>item(`a${i}`,'a',n)).concat([0,0,0].map((n,i)=>item(`b${i}`,'b',n)));
@@ -39,5 +59,9 @@ describe('문장 목소리 연구 모델의 집계 경계',()=>{
   const centered=compareVoiceCoordinates({...article,coordinate:-.5},population);
   expect(centered.score).toBe(0);expect(centered.opposing).toHaveLength(0);
   expect(centered.similar).toHaveLength(6);
+  const live={...article,eventId:'live:'+ 'a'.repeat(64),publishedAt:'2026-11-04T00:00:00Z'};
+  const livePopulation=population.map((row,i)=>({...row,eventId:live.eventId,publishedAt:i<3?'2026-11-01T00:00:00Z':'2026-11-07T00:00:00Z'}));
+  expect(compareVoiceCoordinates(live,livePopulation).status).toBe('inconsistent_period');
+  expect(compareVoiceCoordinates(live,livePopulation.map(row=>({...row,publishedAt:'2026-11-04T00:00:00Z'}))).status).toBe('ready');
  });
 });

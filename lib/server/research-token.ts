@@ -2,7 +2,7 @@ import type {RuntimeConfig} from './config';
 import {AppError} from './errors';
 import {actorHash} from './budget';
 
-export type ResearchTokenKind='plan'|'evidence';
+export type ResearchTokenKind='plan'|'evidence'|'article_context';
 type Envelope<T>={v:1;kind:ResearchTokenKind;actor:string;issuedAt:number;expiresAt:number;data:T};
 const encoder=new TextEncoder();
 function encode(bytes:Uint8Array){let s='';for(const b of bytes)s+=String.fromCharCode(b);return btoa(s).replaceAll('+','-').replaceAll('/','_').replace(/=+$/,'');}

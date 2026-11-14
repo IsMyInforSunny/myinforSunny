@@ -2,14 +2,20 @@ import type {Analysis,Capabilities,Check,Reference} from './contracts';
 import type {Recommendation,ResearchStage,ResearchVerification,ReliabilityReview} from './research-contract';
 import {canonicalArticleUrl} from './media-position';
 import {validSpan} from './domain';
+import {mainVoiceIssue} from './voice-comparison';
 
-type ResearchPositionSource=Partial<Pick<Analysis,'proposition'|'bodyPosition'|'sources'>>;
+type ResearchPositionSource=Partial<Pick<Analysis,'proposition'|'bodyPosition'|'sources'|'sentenceVoices'>>;
 
 /** A user-selected proposition takes priority. Automatic targets need evidence
  * from this analysis's body, never a comment's stance or an unbound quote. */
 export function researchProposition(analysis:ResearchPositionSource):string|undefined{
  const explicit=analysis.proposition?.trim();
  if(explicit)return explicit;
+ if(analysis.sentenceVoices?.method==='svm'){
+  const body=analysis.sources?.find(source=>source.kind==='body');
+  const primary=body?mainVoiceIssue(body.text,analysis.sentenceVoices):null;
+  if(primary?.coordinate!==null&&primary?.coordinate!==undefined)return primary.proposition;
+ }
  const candidate=analysis.bodyPosition;
  const proposition=candidate?.proposition.trim();
  if(!candidate||!proposition||proposition.length>160||!candidate.evidence.length||!analysis.sources)return undefined;

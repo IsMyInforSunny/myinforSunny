@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "voice-embedding-status-1.0",
+  "ready": false,
+  "performanceChecksPassed": true,
+  "candidateVersion": "be2b3b35dd956060b43ebb30",
+  "annotatedArticleCount": 46,
+  "trainingSentenceCount": 218,
+  "evaluationSentenceCount": 149,
+  "humanEvaluationCount": 0,
+  "topics": [
+    "nuclear_energy"
+  ],
+  "rawMacroF1": 0.8076005644849076,
+  "runtimeMacroF1": 0.7696071512585275,
+  "supportRecall": 0.75,
+  "opposeRecall": 0.8888888888888888,
+  "flipPairAccuracy": 0.8,
+  "flipPairCount": 10,
+  "runtimeParityMismatches": 0,
+  "browserVerified": false,
+  "usageReviewed": false,
+  "blockers": [
+    "usage_review_pending",
+    "browser_verification_pending"
+  ]
+}

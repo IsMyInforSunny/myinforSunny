@@ -13,30 +13,24 @@ from pathlib import Path
 import re
 
 from train_stance import ROOT, digest, normalize, read_rows
+from voice_features import FEATURES, FEATURES_VERSION, model_text, is_boilerplate
+from voice_challenge import ground_challenge
 
 DEFINITION = json.loads((ROOT / 'lib/data/voice-issues.json').read_text(encoding='utf-8'))
 VERSION = DEFINITION['version']
 CLASSES = ['neutral', 'oppose', 'support']
-TRAINER_VERSION = 'sentence-voice-trainer-1.2'
+TRAINER_VERSION = 'sentence-voice-trainer-1.3'
 TRAINING_CONFIG = {'analyzer': 'char', 'ngramRange': [2, 4], 'lowercase': False,
                    'sublinearTf': True, 'norm': 'l2', 'maxFeatures': 12000,
                    'C': 1., 'classWeight': 'balanced', 'maxIterations': 20000,
                    'minimumMarginGap': .15, 'minimumIndependentFlipPairs': 10,
-                   'encoderVersion': 'voice-context-1.0', 'contextSentences': 1, 'currentRepeats': 2}
-
-
-def model_text(text):
-    return normalize(re.sub(r'데일리안|뉴데일리|오마이뉴스|프레시안|(?:www\.)?(?:dailian|newdaily|ohmynews|pressian)\.(?:co\.kr|com)', '', text, flags=re.I))
+                   'encoderVersion': 'voice-current-1.0', 'contextSentences': 0, 'currentRepeats': 1,
+                   'directionStrategy': 'hierarchical', 'featuresVersion': FEATURES_VERSION}
 
 
 def feature_text(text, previous='', following=''):
-    """Fixed context, chosen for attribution/antecedents, never by heldout tuning.
-
-    The label still belongs to the current sentence. No neighbouring labels
-    are used and the window never crosses an article or the 2000-char scope.
-    """
-    return model_text('[PREVIOUS] ' + previous + '\n[CURRENT] ' + text
-                      + '\n[CURRENT] ' + text + '\n[NEXT] ' + following)
+    """Current-only candidate preselected using inner group CV, not outer tuning."""
+    return model_text(text)
 
 
 def utf16_slice(text, start, end):
@@ -90,6 +84,8 @@ def validate(corpus, annotations):
                 raise ValueError('Invalid voice label')
             if label['direction'] in ['support', 'oppose'] and label['issue'] in ['none', 'unknown']:
                 raise ValueError('Direction needs a single defined sub-issue')
+            if is_boilerplate(unit['text']):
+                continue
             if label['direction'] == 'uncertain' or label['speaker'] in ['mixed', 'unknown'] or label['issue'] == 'unknown':
                 continue
             rows.append({'article': article, 'hash': article_hash, 'text': unit['text'],
@@ -159,11 +155,22 @@ def selective_predict(head, features, minimum_gap=TRAINING_CONFIG['minimumMargin
     return predictions
 
 
+def selective_predictions(heads, features):
+    """Compose hierarchical gates; an uncertain gate never becomes neutral."""
+    if 'direction' in heads:
+        return {name: selective_predict(heads[name], features) for name in ['direction', 'speaker', 'issue']}
+    gates = selective_predict(heads['directionality'], features)
+    polarity = selective_predict(heads['polarity'], features)
+    direction = [None if gate is None else 'neutral' if gate == 'neutral' else value
+                 for gate, value in zip(gates, polarity)]
+    return {'direction': direction, **{name: selective_predict(heads[name], features) for name in ['speaker', 'issue']}}
+
+
 def runtime_evaluation(rows, heads, features):
     """Count abstentions as missed labels; also report coverage of usable triples."""
     from sklearn.metrics import f1_score, recall_score
     names = ['direction', 'speaker', 'issue']
-    predictions = {name: selective_predict(heads[name], features) for name in names}
+    predictions = selective_predictions(heads, features)
     usable = [all(predictions[name][i] is not None for name in names)
               and not (predictions['direction'][i] in ['support', 'oppose']
                        and predictions['issue'][i] == 'none') for i in range(len(rows))]
@@ -173,7 +180,7 @@ def runtime_evaluation(rows, heads, features):
         target = [row[name] for row in rows]
         actual = [value if value is not None else '__unresolved__' for value in predictions[name]]
         joint = [value if usable[i] else '__unresolved__' for i, value in enumerate(actual)]
-        classes = heads[name]['classes']
+        classes = CLASSES if name == 'direction' else heads[name]['classes']
         accepted = sum(value is not None for value in predictions[name])
         result['heads'][name] = {'acceptedCount': accepted, 'abstainedCount': len(rows) - accepted,
             'coverage': accepted / len(rows),
@@ -210,7 +217,13 @@ def independent_flip_pairs(challenge, topic, excluded_texts):
 
 def flip_evaluation(head, features):
     """Each adjacent support/opposition pair must have BOTH answers correct."""
-    prediction = selective_predict(head, features)
+    if 'directionality' in head:
+        gates = selective_predict(head['directionality'], features)
+        polarity = selective_predict(head['polarity'], features)
+        prediction = [None if gate is None else 'neutral' if gate == 'neutral' else value
+                      for gate, value in zip(gates, polarity)]
+    else:
+        prediction = selective_predict(head, features)
     if not prediction or len(prediction) % 2:
         raise ValueError('Flip challenge needs complete support/opposition pairs')
     correct = [prediction[i] == 'support' and prediction[i + 1] == 'oppose'
@@ -221,16 +234,86 @@ def flip_evaluation(head, features):
             'abstainedCount': sum(value is None for value in prediction)}
 
 
-def train(corpus, annotations, seed=42, event_groups=None, challenge=None):
+def choose_split(rows, groups, seed=42, split_manifest=None):
+    """Keep registered evaluation articles fixed when new reviewed data arrive.
+
+    Any non-evaluation rows connected to a frozen evaluation group are withheld,
+    including old training rows if new duplicates bridge an original group.
+    No evaluation article can move into training to improve a metric.
+    """
+    import numpy as np
+    from sklearn.model_selection import GroupShuffleSplit
+    diagnostics = {}
+    if split_manifest is not None:
+        if not isinstance(split_manifest, dict) or split_manifest.get('schemaVersion') != 'voice-split-1.0':
+            raise ValueError('Invalid frozen split manifest')
+        ids = {}
+        for name in ['trainingArticleIds', 'evaluationArticleIds']:
+            values = split_manifest.get(name)
+            if (not isinstance(values, list) or not values or any(not isinstance(value, str) or not value for value in values)
+                    or len(set(values)) != len(values)):
+                raise ValueError('Frozen split requires unique nonempty training/evaluation IDs')
+            ids[name] = set(values)
+        evaluation_ids, original_training_ids = ids['evaluationArticleIds'], ids['trainingArticleIds']
+        if evaluation_ids & original_training_ids:
+            raise ValueError('Frozen training/evaluation IDs overlap')
+        present = {row['article']['id'] for row in rows}
+        if evaluation_ids - present:
+            raise ValueError('Frozen evaluation articles must have usable labeled rows')
+        evaluation = np.array([i for i, row in enumerate(rows) if row['article']['id'] in evaluation_ids], dtype=int)
+        evaluation_groups = {groups[i] for i in evaluation}
+        excluded = [i for i, row in enumerate(rows) if row['article']['id'] not in evaluation_ids and groups[i] in evaluation_groups]
+        training = np.array([i for i, row in enumerate(rows) if row['article']['id'] not in evaluation_ids and groups[i] not in evaluation_groups], dtype=int)
+        diagnostics = {'splitManifestDigest': digest(split_manifest), 'frozenEvaluationArticleCount': len(evaluation_ids),
+            'excludedConnectedTrainingSentences': len(excluded),
+            'excludedConnectedTrainingArticleCount': len({rows[i]['article']['id'] for i in excluded}),
+            'excludedNewTrainingSentences': sum(rows[i]['article']['id'] not in original_training_ids for i in excluded),
+            'excludedOriginalTrainingSentences': sum(rows[i]['article']['id'] in original_training_ids for i in excluded)}
+        splits = [(training, evaluation)]
+    else:
+        if len(set(groups)) < 2:
+            return None, diagnostics
+        splits = GroupShuffleSplit(n_splits=64, test_size=.3, random_state=seed).split(rows, groups=groups)
+    for training, evaluation in splits:
+        if all(set(rows[i][name] for i in training) == set(rows[i][name] for i in evaluation)
+               and len(set(rows[i][name] for i in training)) >= 2 for name in ['direction', 'speaker', 'issue']):
+            return (training, evaluation), diagnostics
+    return None, diagnostics
+
+
+def train(corpus, annotations, seed=42, event_groups=None, challenge=None, split_manifest=None):
     import numpy as np
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.metrics import f1_score, recall_score
-    from sklearn.model_selection import GroupShuffleSplit
     from sklearn.svm import LinearSVC
     accepted, teacher = validate(corpus, annotations)
+    if split_manifest is not None:
+        if not isinstance(split_manifest, dict) or split_manifest.get('schemaVersion') != 'voice-split-1.0':
+            raise ValueError('Invalid frozen split manifest')
+        registered = []
+        for name in ['trainingArticleIds', 'evaluationArticleIds']:
+            values = split_manifest.get(name)
+            if not isinstance(values, list) or any(not isinstance(value, str) for value in values):
+                raise ValueError('Invalid registered article IDs')
+            registered.extend(values)
+        corpus_by_id = {article['id']: article for article in corpus}
+        if set(registered) - set(corpus_by_id):
+            raise ValueError('Frozen split contains unknown corpus article IDs')
+        hashes = split_manifest.get('articleHashes')
+        if hashes is not None:
+            if not isinstance(hashes, dict) or any(hashes.get(article_id) != hashlib.sha256(
+                    normalize(corpus_by_id[article_id]['text']).encode()).hexdigest() for article_id in registered):
+                raise ValueError('Frozen article body hash changed or is missing')
+    annotated_ids = {annotation['articleId'] for annotation in annotations}
+    grounded = ground_challenge(challenge, corpus, excluded_article_ids=annotated_ids, events=event_groups)
+    filtered_challenge = {**(challenge or {}), 'pairs': grounded['pairs']}
     report = {'schemaVersion': 'sentence-voice-report-1.0', 'version': VERSION,
               'teacher': list(teacher) if teacher else None, 'humanEvaluationCount': 0,
               'annotatedArticles': len(annotations), 'usableSentences': len(accepted),
+              'excludedBoilerplateSentenceCount': sum(is_boilerplate(unit['text']) for article in corpus
+                  if article['id'] in annotated_ids for unit in article['sentences']),
+              'challengeGrounding': {'candidatePairCount': grounded['candidatePairCount'],
+                  'groundedPairCount': len(grounded['pairs']), 'rejectedCounts': grounded['rejectedCounts']},
               'ready': False, 'blockers': [], 'topics': {}}
     models, training_hashes = {}, set()
     for topic in sorted({article['topicId'] for article in corpus}):
@@ -251,16 +334,16 @@ def train(corpus, annotations, seed=42, event_groups=None, challenge=None):
         if any(counts[label] < 2 for label in CLASSES):
             continue
         target = np.array([row['direction'] for row in rows])
-        split = None
-        if len(set(groups)) < 2:
-            result['blockers'].append('independent_group_split_unavailable')
-            continue
-        for training, evaluation in GroupShuffleSplit(n_splits=64, test_size=.3, random_state=seed).split(rows, target, groups):
-            # Choose by coverage alone, never pick the best-scoring split.
-            if all(set(rows[i][name] for i in training) == set(rows[i][name] for i in evaluation)
-                   and len(set(rows[i][name] for i in training)) >= 2 for name in ['direction', 'speaker', 'issue']):
-                split = training, evaluation
-                break
+        topic_manifest = split_manifest
+        if split_manifest is not None:
+            # A shared manifest may cover several topics; no topic borrows
+            # another topic's evaluation article IDs.
+            topic_ids = {article['id'] for article in corpus if article['topicId'] == topic}
+            topic_manifest = {**split_manifest,
+                'trainingArticleIds': [value for value in split_manifest.get('trainingArticleIds', []) if value in topic_ids],
+                'evaluationArticleIds': [value for value in split_manifest.get('evaluationArticleIds', []) if value in topic_ids]}
+        split, split_diagnostics = choose_split(rows, groups, seed, topic_manifest)
+        result.update(split_diagnostics)
         if split is None:
             result['blockers'].append('independent_group_split_unavailable')
             continue
@@ -272,14 +355,23 @@ def train(corpus, annotations, seed=42, event_groups=None, challenge=None):
         test_text = [feature_text(rows[i]['text'], rows[i]['previous'], rows[i]['following']) for i in evaluation]
         train_x, test_x = vectorizer.fit_transform(train_text), vectorizer.transform(test_text)
         classifiers, heads = {}, {}
-        for name in ['direction', 'speaker', 'issue']:
+        for name in ['speaker', 'issue', 'directionality', 'polarity']:
             classifier = LinearSVC(C=TRAINING_CONFIG['C'], class_weight=TRAINING_CONFIG['classWeight'],
                                    random_state=seed, max_iter=TRAINING_CONFIG['maxIterations'])
-            classifier.fit(train_x, [rows[i][name] for i in training])
+            if name == 'directionality':
+                classifier.fit(train_x, ['neutral' if rows[i]['direction'] == 'neutral' else 'directional' for i in training])
+            elif name == 'polarity':
+                mask = np.array([rows[i]['direction'] != 'neutral' for i in training])
+                classifier.fit(train_x[mask], [rows[i]['direction'] for i in training if rows[i]['direction'] != 'neutral'])
+            else:
+                classifier.fit(train_x, [rows[i][name] for i in training])
             classifiers[name] = classifier
             heads[name] = serialize_head(classifier)
-        classifier = classifiers['direction']
-        prediction = classifier.predict(test_x)
+        def raw_direction(features):
+            gates = classifiers['directionality'].predict(features)
+            polarity = classifiers['polarity'].predict(features)
+            return np.array(['neutral' if gate == 'neutral' else value for gate, value in zip(gates, polarity)])
+        prediction = raw_direction(test_x)
         macro = float(f1_score(target[evaluation], prediction, labels=CLASSES, average='macro', zero_division=0))
         recalls = recall_score(target[evaluation], prediction, labels=CLASSES, average=None, zero_division=0)
         majority = Counter(target[training]).most_common(1)[0][0]
@@ -289,15 +381,15 @@ def train(corpus, annotations, seed=42, event_groups=None, challenge=None):
         runtime = runtime_evaluation([rows[i] for i in evaluation], heads, test_x)
         # Replace source names in held-out sentences; the transform must remove them.
         masked_x = vectorizer.transform([model_text('데일리안 ' + text + ' 프레시안') for text in test_text])
-        masking = float(np.mean(classifier.predict(masked_x) == prediction))
+        masking = float(np.mean(raw_direction(masked_x) == prediction))
         flip_accuracy = None
         flip_result = None
         # Independent, exact opposite pairs are supplied, not inferred from swapping a substring.
         # Held-out examples cannot also be counted as an independent challenge.
-        valid_flips = independent_flip_pairs(challenge, topic, [model_text(row['text']) for row in rows])
+        valid_flips = independent_flip_pairs(filtered_challenge, topic, [model_text(row['text']) for row in rows])
         if len(valid_flips) >= TRAINING_CONFIG['minimumIndependentFlipPairs']:
             flip_text = [feature_text(pair[label]) for pair in valid_flips for label in ['support', 'oppose']]
-            flip_result = flip_evaluation(heads['direction'], vectorizer.transform(flip_text))
+            flip_result = flip_evaluation(heads, vectorizer.transform(flip_text))
             flip_accuracy = flip_result['pairAccuracy']
         evaluation_report = {'ready': False, 'groupOverlap': len(set(groups[i] for i in training) & set(groups[i] for i in evaluation)),
             'heldoutArticleCount': len({rows[i]['article']['id'] for i in evaluation}),
@@ -305,7 +397,8 @@ def train(corpus, annotations, seed=42, event_groups=None, challenge=None):
             'supportRecall': float(recalls[CLASSES.index('support')]), 'opposeRecall': float(recalls[CLASSES.index('oppose')]),
             'speakerMacroF1': other['speaker'], 'issueMacroF1': other['issue'],
             'maskingAgreement': masking, 'flipAccuracy': flip_accuracy, 'flipChallenge': flip_result,
-            'independentFlipPairCount': len(valid_flips), 'runtime': runtime, 'classCounts': dict(counts)}
+            'independentFlipPairCount': len(valid_flips), 'runtime': runtime, 'classCounts': dict(counts),
+            'challengeGrounding': report['challengeGrounding']}
         if macro < .6 or macro <= majority_macro:
             result['blockers'].append('teacher_agreement_below_threshold')
         if min(evaluation_report['supportRecall'], evaluation_report['opposeRecall']) < .5:
@@ -340,11 +433,13 @@ def train(corpus, annotations, seed=42, event_groups=None, challenge=None):
     if not models:
         report['blockers'].append('no_trainable_topic')
     report['ready'] = bool(models) and not report['blockers']
-    model = {'schemaVersion': 'sentence-voice-svm-1.0', 'version': digest({'corpus': corpus, 'labels': annotations,
+    model = {'schemaVersion': 'sentence-voice-svm-1.1', 'version': digest({'corpus': corpus, 'labels': annotations,
              'events': event_groups, 'challenge': challenge, 'seed': seed, 'trainerVersion': TRAINER_VERSION,
-             'trainingConfig': TRAINING_CONFIG, 'definition': DEFINITION,
+             'trainingConfig': TRAINING_CONFIG, 'definition': DEFINITION, 'features': FEATURES, 'splitManifest': split_manifest,
+             'featuresCodeDigest': hashlib.sha256((ROOT / 'research/voice_features.py').read_text(encoding='utf-8').encode()).hexdigest(),
+             'challengeCodeDigest': hashlib.sha256((ROOT / 'research/voice_challenge.py').read_text(encoding='utf-8').encode()).hexdigest(),
              'trainerCodeDigest': hashlib.sha256(Path(__file__).read_text(encoding='utf-8').encode()).hexdigest()})[:24],
-             'trainerVersion': TRAINER_VERSION, 'trainingConfig': TRAINING_CONFIG,
+             'trainerVersion': TRAINER_VERSION, 'trainingConfig': TRAINING_CONFIG, 'featureRules': FEATURES,
              'status': 'ready' if report['ready'] else 'research', 'definitionVersion': VERSION,
              'segmenter': 'sentence-3.1', 'scopeCharacters': 2000, 'topics': models,
              'trainingArticleHashes': sorted(training_hashes)}
@@ -357,6 +452,7 @@ def main():
         parser.add_argument('--' + name, required=True)
     parser.add_argument('--event-groups')
     parser.add_argument('--challenge')
+    parser.add_argument('--split-manifest', help='Keep registered evaluation articles fixed while adding reviewed training rows')
     parser.add_argument('--status-output', help='Write aggregate readiness only; never release weights')
     args = parser.parse_args()
     paths = [Path(args.output).resolve(), Path(args.report).resolve()]
@@ -366,7 +462,8 @@ def main():
     events = load(args.event_groups)
     if events and 'articleGroups' in events:
         events = events['articleGroups']
-    model, report = train(read_rows(args.corpus), read_rows(args.labels), event_groups=events, challenge=load(args.challenge))
+    model, report = train(read_rows(args.corpus), read_rows(args.labels), event_groups=events,
+                          challenge=load(args.challenge), split_manifest=load(args.split_manifest))
     for path, value in zip(paths, [model, report]):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(value, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')

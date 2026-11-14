@@ -1,19 +1,22 @@
 import {summarizeVoices,type VoiceDocument,type VoiceTopic,VOICE_VERSION} from './sentence-voice';
 
 export type VoiceCoordinate={id:string;url:string;publisher:string;bodyHash:string;eventId:string;topic:VoiceTopic;issue:string;
-  method:'ai'|'svm';modelVersion:string;version:string;coordinate:number;directional:number;unresolved:number;trainingOriginal:boolean};
+  method:'ai'|'svm';modelVersion:string;version:string;coordinate:number;directional:number;unresolved:number;trainingOriginal:boolean;publishedAt?:string};
 /** Same sub-issue, event, encoder/version and scope. Equal weight per publisher; never publisher rankings. */
 export function compareVoiceCoordinates(input:VoiceCoordinate,articles:VoiceCoordinate[],trainingHashes:readonly string[]=[]){
-  const empty={status:'insufficient' as 'insufficient'|'ready'|'input_unresolved',score:null as number|null,
+  const empty={status:'insufficient' as 'insufficient'|'ready'|'input_unresolved'|'inconsistent_period',score:null as number|null,
     magnitude:null as number|null,
     baseline:null as number|null,opposing:[] as VoiceCoordinate[],similar:[] as VoiceCoordinate[],count:0,publisherCount:0};
   const eligible=(item:VoiceCoordinate)=>Number.isFinite(item.coordinate)&&Math.abs(item.coordinate)<=1&&item.directional>=3
     &&item.unresolved===0&&!item.trainingOriginal&&!trainingHashes.includes(item.bodyHash)&&!!item.bodyHash&&!!item.eventId&&item.version===VOICE_VERSION;
   if(!eligible(input))return {...empty,status:'input_unresolved' as const};
+  const live=input.eventId.startsWith('live:'),inputTime=input.publishedAt?Date.parse(input.publishedAt):NaN;
+  if(live&&!Number.isFinite(inputTime))return {...empty,status:'input_unresolved' as const};
   const seen=new Set([input.bodyHash]),urls=new Set([input.url]);
   const candidates=articles.filter(item=>{
     if(item.id===input.id||!eligible(item)||item.eventId!==input.eventId||item.topic!==input.topic||item.issue!==input.issue
-      ||item.method!==input.method||item.modelVersion!==input.modelVersion||item.version!==input.version||seen.has(item.bodyHash)||urls.has(item.url))return false;
+      ||item.method!==input.method||item.modelVersion!==input.modelVersion||item.version!==input.version||seen.has(item.bodyHash)||urls.has(item.url)
+      ||live&&(!item.publishedAt||!Number.isFinite(Date.parse(item.publishedAt))||Math.abs(Date.parse(item.publishedAt)-inputTime)>3*86400000))return false;
     seen.add(item.bodyHash);urls.add(item.url);return true;
   });
   const groups=new Map<string,VoiceCoordinate[]>();
@@ -21,6 +24,8 @@ export function compareVoiceCoordinates(input:VoiceCoordinate,articles:VoiceCoor
   // Preserve repository's stricter comparison gate: >=3 unique articles per eligible publisher, >=2 publishers.
   const publishers=[...groups.values()].filter(items=>items.length>=3),population=publishers.flat();
   if(publishers.length<2)return {...empty,count:population.length,publisherCount:publishers.length};
+  if(live){const times=[inputTime,...population.map(item=>Date.parse(item.publishedAt!))];
+    if(Math.max(...times)-Math.min(...times)>3*86400000)return {...empty,status:'inconsistent_period' as const,count:population.length,publisherCount:publishers.length};}
   const weighted=publishers.flatMap(items=>items.map(item=>({item,weight:1/publishers.length/items.length}))).sort((a,b)=>a.item.coordinate-b.item.coordinate);
   let sum=0,baseline=weighted[weighted.length-1].item.coordinate;
   for(let i=0;i<weighted.length;i++){

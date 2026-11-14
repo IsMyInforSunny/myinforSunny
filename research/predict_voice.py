@@ -6,7 +6,8 @@ import argparse
 import json
 from pathlib import Path
 from train_stance import read_rows
-from train_voice import feature_text, selective_predict
+from train_voice import feature_text, selective_predictions
+from voice_features import is_boilerplate
 
 
 def predict(model, corpus):
@@ -29,9 +30,13 @@ def predict(model, corpus):
         norms = np.sqrt(np.asarray(features.multiply(features).sum(axis=1)).ravel())
         inverse = np.divide(1., norms, out=np.zeros_like(norms), where=norms != 0)
         features = csr_matrix(features.multiply(inverse[:, None]))
-        heads = {name: selective_predict(weights[name], features) for name in ['direction', 'speaker', 'issue']}
+        heads = selective_predictions(weights, features)
         labels = []
         for index, unit in enumerate(units):
+            if is_boilerplate(unit['text']):
+                labels.append({'sentenceId': unit['sentenceId'], 'direction': 'neutral', 'speaker': 'unknown',
+                               'issue': 'none', 'excluded': True})
+                continue
             direction = heads['direction'][index] or 'uncertain'
             speaker = heads['speaker'][index] or 'unknown'
             issue = heads['issue'][index] or 'unknown'

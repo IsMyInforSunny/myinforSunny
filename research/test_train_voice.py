@@ -7,7 +7,9 @@ from scipy.sparse import csr_matrix
 
 from train_voice import (VERSION, connected_groups, flip_evaluation,
                          independent_flip_pairs, runtime_evaluation,
-                         selective_predict, serialize_head)
+                         selective_predict, selective_predictions, serialize_head,
+                         feature_text, choose_split, validate)
+from voice_features import is_boilerplate, model_text, FEATURES_VERSION
 
 
 def test_binary_export_gap_is_twice_sklearn_signed_decision():
@@ -120,3 +122,106 @@ def test_empty_publisher_masked_sentence_does_not_join_unrelated_articles():
     for row in rows:
         row['article']['sourceGroupId'] = 'shared-original'
     assert len(set(connected_groups(rows))) == 1
+
+
+def hierarchical_heads():
+    result = heads()
+    result.pop('direction')
+    result['directionality'] = {'classes': ['directional', 'neutral'],
+        'coefficients': [[1., 0.], [-1., 0.]], 'intercepts': [0., 0.]}
+    result['polarity'] = {'classes': ['oppose', 'support'],
+        'coefficients': [[0., -1.], [0., 1.]], 'intercepts': [0., 0.]}
+    return result
+
+
+def test_hierarchy_neutral_gate_does_not_require_polarity_but_uncertain_gate_abstains():
+    result = selective_predictions(hierarchical_heads(), csr_matrix([
+        [1., 1.], [1., -1.], [-1., 0.], [.01, 1.], [1., .01]]))
+    assert result['direction'] == ['support', 'oppose', 'neutral', None, None]
+
+
+def test_hierarchical_flip_requires_both_directionality_and_polarity_to_pass():
+    result = flip_evaluation(hierarchical_heads(), csr_matrix([[1., 1.], [1., -1.]]))
+    assert result['pairAccuracy'] == 1.
+    # Both polarity labels are confident, but the first directionality gate is not.
+    result = flip_evaluation(hierarchical_heads(), csr_matrix([[.01, 1.], [1., -1.]]))
+    assert result['pairAccuracy'] == 0.
+    assert result['abstainedCount'] == 1
+
+
+def test_current_only_feature_encoder_ignores_neighboring_sentence_polarity():
+    assert feature_text('current sentence', 'support demand', 'opposition demand') == 'current sentence'
+    assert feature_text('current sentence') == feature_text('current sentence', 'opposition demand', 'support demand')
+    assert FEATURES_VERSION == 'voice-features-1.0'
+
+
+def test_shared_boilerplate_rules_do_not_drop_prose_containing_ad_or_a_hashtag():
+    assert is_boilerplate('AD')
+    assert is_boilerplate('#AD119')
+    assert is_boilerplate(' #tag #other ')
+    assert is_boilerplate('ⓒ publisher')
+    assert not is_boilerplate('AD business policy was discussed.')
+    assert not is_boilerplate('Policy #tag was debated.')
+    assert model_text('데일리안 nuclear 123') == 'nuclear 0'
+
+
+def test_boilerplate_excluded_from_training_still_requires_complete_valid_annotations():
+    import hashlib
+    body = 'AD'
+    article = {'id': 'boilerplate-test-only', 'text': body, 'topicId': 'nuclear_energy',
+        'voiceVersion': VERSION, 'segmenter': 'sentence-3.1', 'scopeCharacters': 2000,
+        'sentences': [{'sentenceId': 'body_s0', 'start': 0, 'end': 2, 'text': body}]}
+    annotation = {'articleId': article['id'], 'articleHash': hashlib.sha256(body.encode()).hexdigest(),
+        'topic': 'nuclear_energy', 'version': VERSION, 'segmenter': 'sentence-3.1', 'scopeCharacters': 2000,
+        'annotator': {'kind': 'ai', 'model': 'fixture-only', 'version': 'fixture-only'},
+        'labels': [{'sentenceId': 'body_s0', 'issue': 'none', 'direction': 'neutral', 'speaker': 'journalist'}]}
+    assert validate([article], [annotation])[0] == []
+    with pytest.raises(ValueError, match='cover every'):
+        validate([article], [{**annotation, 'labels': []}])
+    with pytest.raises(ValueError, match='Invalid voice label'):
+        validate([article], [{**annotation, 'labels': [{**annotation['labels'][0], 'direction': 'bad'}]}])
+
+
+def split_rows():
+    values = [('neutral', 'journalist', 'none'), ('support', 'source', 'expansion'),
+              ('oppose', 'journalist', 'expansion')]
+    rows = []
+    for population in ['training', 'evaluation']:
+        rows.extend({'article': {'id': f'{population}-{i}'}, 'direction': direction,
+                     'speaker': speaker, 'issue': issue} for i, (direction, speaker, issue) in enumerate(values))
+    manifest = {'schemaVersion': 'voice-split-1.0',
+        'trainingArticleIds': [f'training-{i}' for i in range(3)],
+        'evaluationArticleIds': [f'evaluation-{i}' for i in range(3)]}
+    return rows, manifest
+
+
+def test_frozen_split_holds_out_new_connected_rows_without_moving_evaluation():
+    rows, manifest = split_rows()
+    rows.extend([{**rows[0], 'article': {'id': 'new-linked'}}, {**rows[1], 'article': {'id': 'new-independent'}}])
+    split, diagnostics = choose_split(rows, [0, 1, 2, 3, 4, 5, 3, 7], split_manifest=manifest)
+    training, evaluation = split
+    assert evaluation.tolist() == [3, 4, 5]
+    assert training.tolist() == [0, 1, 2, 7]
+    assert diagnostics['excludedNewTrainingSentences'] == 1
+    assert diagnostics['excludedOriginalTrainingSentences'] == 0
+
+
+def test_new_duplicate_bridge_cannot_leak_old_training_rows_into_frozen_evaluation():
+    rows, manifest = split_rows()
+    rows.append({**rows[0], 'article': {'id': 'new-independent-neutral'}})
+    split, diagnostics = choose_split(rows, [3, 1, 2, 3, 4, 5, 7], split_manifest=manifest)
+    training, evaluation = split
+    assert 0 not in training
+    assert evaluation.tolist() == [3, 4, 5]
+    assert diagnostics['excludedOriginalTrainingSentences'] == 1
+
+
+def test_frozen_manifest_rejects_overlap_duplicates_missing_evaluation_and_bad_version():
+    rows, manifest = split_rows()
+    bad = [{**manifest, 'schemaVersion': 'old'},
+           {**manifest, 'evaluationArticleIds': ['evaluation-0', 'evaluation-0']},
+           {**manifest, 'evaluationArticleIds': ['evaluation-0', 'training-0']},
+           {**manifest, 'evaluationArticleIds': ['evaluation-0', 'missing']}]
+    for value in bad:
+        with pytest.raises(ValueError):
+            choose_split(rows, list(range(6)), split_manifest=value)

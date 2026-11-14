@@ -44,11 +44,12 @@ export type SearchSuggestion={label:string;query:string};
 export type Analysis = {
   article?:{url:string;title?:string;publishedAt?:string;fetchedAt:string;fullTextLength:number;analyzedCharacters:number;truncated:boolean};
   schemaVersion:'2.1'; analysisId:string; requestId:string; mode:'demo'|'live'; status:'success'|'partial';
-  versions:{rubric:string;prompt:string;model:string;segmenter:string};
+  versions:{rubric:string;prompt:string;model:string;segmenter:string;voiceModel?:string};
   sources:InputSource[]; proposition?:string; topics:Topic[]; topicAssignments:TopicAssignment[]; bodyTopicAssignments?:BodyTopicAssignment[]; stances?:Stance[];
   bodyPosition?:BodyPosition;
   sentenceVoices?:import('./sentence-voice').VoiceDocument;
   voiceCoordinates?:import('./voice-comparison').VoiceCoordinate[];
+  articleContextToken?:string;
   expressions:Expression[]; claims:Claim[]; perspectiveQuestions:{text:string;basis:Span[]}[];
   counterArguments?:CounterArgument[];searchSuggestions?:SearchSuggestion[];
   indicators:{topics:{topicId:string;coverage:Ratio}[];expression:Ratio;expressionUndetermined:number;evidenceSupport:Ratio;verificationProgress:Ratio};
@@ -64,6 +65,7 @@ export type VerifyTextRequest = Omit<Extract<z.infer<typeof verifyRequestSchema>
 export type Reference = { id:string;provenance:'provided_text'|'web_fetched';text:string;url?:string;title?:string;publishedAt?:string;fetchedAt?:string;truncated:boolean;publisherGroup?:string;fullTextLength?:number;extractionVersion?:string;
  /** Server-owned digest of retrieved text before excerpting (not a digest of the displayed quote). */
   contentDigest?:string;retrievedTextLength?:number;retrievedTruncated?:boolean;
+  voiceAnalysisStatus?:'complete'|'unavailable'|'off_scope';
   voiceCoordinates?:import('./voice-comparison').VoiceCoordinate[];
   /** Server-generated prediction over retrieved text before excerpting. */
   biasPrediction?:import('./bias-model').CompactBiasPrediction };

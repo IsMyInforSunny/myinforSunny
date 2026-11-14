@@ -19,7 +19,9 @@ import {reviewCitedSources} from '../cited-sources';
 import {canonicalPublisherHost} from '../source-reliability';
 import {actorHash} from './budget';
 import {assertResearchBatch,researchWaitReasons,waitReasonText} from './score-workflow';
-import {analyzeArticleVoices} from './voice-analysis';
+import {analyzeArticleVoices,releasedVoiceModel,releasedEmbeddingVoiceModel,releasedVoiceTopics} from './voice-analysis';
+import {readVoiceArticleContext,type VoiceArticleContext} from './voice-article-context';
+import {VOICE_TOPICS,type VoiceTopic} from '../sentence-voice';
 
 type PlanData={planId:string;inputDigest:string;queries:ResearchQuery[];expiresAt:string};
 type EvidenceData={planId:string;inputDigest:string;claimId:string;references:RetrievedEvidence[];attempts:ResearchAttempt[];expiresAt:string};
@@ -34,9 +36,10 @@ export function validateResearch(input:ResearchInput){
  if(input.position){if(input.position.kind!=='opinion'||input.claims.some(c=>c.id===input.position!.id))throw new AppError(422,'VALIDATION_ERROR','다른 관점의 탐색 대상은 별도로 추출한 의견이어야 합니다.');validateVerifyInput({kind:'text',sources:input.sources,claims:[input.position],references:[],useWebSearch:false});}
  if(input.proposition!==undefined&&(!input.proposition.trim()||input.proposition.length>160))throw new AppError(422,'VALIDATION_ERROR','비교 명제를 160자 이내로 입력해 주세요.');
  if(!input.claims.length&&!input.position&&!input.proposition)throw new AppError(422,'VALIDATION_ERROR','조사할 주장·의견이나 비교 명제가 없습니다.');
- if(containsContactInfo(JSON.stringify(input)))throw new AppError(422,'PRIVACY_INPUT_REJECTED','개인 연락처를 지우고 다시 분석해 주세요.');
+ const {articleContextToken,...content}=input;
+ if(containsContactInfo(JSON.stringify(content)))throw new AppError(422,'PRIVACY_INPUT_REJECTED','개인 연락처를 지우고 다시 분석해 주세요.');
 }
-const inputHash=(input:ResearchInput)=>digest({sources:input.sources,claims:input.claims,position:input.position??null,proposition:input.proposition??null});
+const inputHash=(input:ResearchInput)=>digest({sources:input.sources,claims:input.claims,position:input.position??null,proposition:input.proposition??null,...(input.articleContextToken?{articleContextToken:input.articleContextToken}:{})});
 /** A user-selected comparison dimension is not an extracted factual claim.
  * Its query ID must not shadow an actual claim ID, and it has no invented origin quote.
  */
@@ -50,7 +53,8 @@ function comparisonTarget(input:ResearchInput){
 }
 /** Spend the existing plan call on one bounded bias baseline, when a released
  * model supports it. Explicit comparison targets take precedence over facts. */
-export function researchQueryRequirements(input:ResearchInput,acceptsComparison:(text:string)=>boolean=text=>!!releasedBiasModel&&modelAcceptsComparison(releasedBiasModel,text)){
+export function researchQueryRequirements(input:ResearchInput,acceptsComparison:(text:string)=>boolean=text=>
+  !!releasedBiasModel&&modelAcceptsComparison(releasedBiasModel,text)||releasedVoiceTopics.some(topic=>Object.values(VOICE_TOPICS[topic as VoiceTopic].issues).includes(text))){
  const position=comparisonTarget(input);
  const selected=position?(acceptsComparison(position.text)?position.id:null):input.claims.find(claim=>acceptsComparison(claim.text))?.id??null;
  const targets=[...input.claims.map(claim=>({id:claim.id,purpose:'fact_check' as const})),...(position?[{id:position.id,purpose:'perspective' as const}]:[])];
@@ -60,6 +64,7 @@ export function researchQueryRequirements(input:ResearchInput,acceptsComparison:
 /** One bounded planning call; no raw input or results are persisted in D1. */
 export async function planResearch(request:Request,input:ResearchInput,config:RuntimeConfig,signal:AbortSignal):Promise<ResearchPlan>{
  requireResearch(config);validateResearch(input);
+ await readVoiceArticleContext(request,config,input);
  const position=comparisonTarget(input);const targets=[...input.claims,...(position?[position]:[])];const claimId=z.enum(targets.map(c=>c.id) as [string,...string[]]);
  const requirements=researchQueryRequirements(input),queryCount=requirements.targets.reduce((sum,target)=>sum+target.count,0);
  const schema=z.object({queries:z.array(researchQuerySchema.extend({claimId})).length(queryCount).max(8)}).strict();
@@ -82,7 +87,9 @@ export async function planResearch(request:Request,input:ResearchInput,config:Ru
  const expiresAt=new Date(Date.now()+30*60000).toISOString();const planId=crypto.randomUUID();
  const queries=out.queries.map(query=>({...query,query:query.query.normalize('NFC')}));
  const data:PlanData={planId,inputDigest:await inputHash(input),queries,expiresAt};
- return {schemaVersion:'research-1.0',planId,queries:data.queries,claimCount:input.claims.length,expiresAt,token:await signResearchToken(request,config,'plan',data),nextModelCallAt:new Date(Date.now()+(['nvidia','deepseek'].includes(provider(config))?0:61000)).toISOString()};
+ const evidenceUsesModel=!!releasedEmbeddingVoiceModel&&provider(config)==='nvidia';
+ const minimumModelIntervalMs=evidenceUsesModel?20100:['nvidia','deepseek'].includes(provider(config))?0:61000;
+ return {schemaVersion:'research-1.0',planId,queries:data.queries,claimCount:input.claims.length,expiresAt,token:await signResearchToken(request,config,'plan',data),nextModelCallAt:new Date(Date.now()+minimumModelIntervalMs).toISOString(),evidenceUsesModel,minimumModelIntervalMs};
 }
 /** Pick a bounded excerpt around overlapping terms, retaining offsets in the extracted text. */
 export function researchExcerpt(text:string,claim:string,limit=1500){
@@ -93,10 +100,13 @@ export function researchExcerpt(text:string,claim:string,limit=1500){
  return {text:text.slice(best,end),start:best,end};
 }
 /** Keep complete-document model checks identical for search and direct URL intake. */
-async function evidenceSource(fetched:NonNullable<Awaited<ReturnType<typeof retrieve>>>,url:string,title:string,publisherDomain:string,input:ResearchInput,claimText:string,fallbackVersion:string):Promise<RetrievedEvidence>{
+async function evidenceSource(fetched:NonNullable<Awaited<ReturnType<typeof retrieve>>>,url:string,title:string,publisherDomain:string,input:ResearchInput,claimText:string,fallbackVersion:string,anchor:VoiceArticleContext|null|undefined,config:RuntimeConfig,signal:AbortSignal):Promise<RetrievedEvidence>{
  if(!fetched.truncated){
-  const voices=await analyzeArticleVoices(fetched.text,{url,title:fetched.title||title,publishedAt:fetched.publishedAt});
-  if(voices)fetched.voiceCoordinates=voices.coordinates;
+  try{
+   const voices=await analyzeArticleVoices(fetched.text,{url,title:fetched.title||title,publishedAt:fetched.publishedAt},releasedVoiceModel,
+     anchor?{...anchor,body:input.sources.find(source=>source.kind==='body')!.text}:undefined,{config,signal});
+   if(voices){fetched.voiceCoordinates=voices.coordinates;fetched.voiceAnalysisStatus='complete';}else fetched.voiceAnalysisStatus='off_scope';
+  }catch(error){if(signal.aborted)throw error;fetched.voiceAnalysisStatus='unavailable';}
  }
  const biasModel=releasedBiasModel;
  const group=input.proposition??claimText;
@@ -111,6 +121,7 @@ async function evidenceSource(fetched:NonNullable<Awaited<ReturnType<typeof retr
 /** User-selected URLs use the same signed evidence path without a search/model call. */
 export async function importEvidence(request:Request,input:ResearchInput,claimId:string,urls:string[],config:RuntimeConfig,signal:AbortSignal):Promise<EvidenceBundle>{
  requireEvidence(config);validateResearch(input);
+ const anchor=await readVoiceArticleContext(request,config,input);
  if(config.ENABLE_DIRECT_FETCH!=='true'||config.NEWS_TERMS_APPROVED!=='true')throw new AppError(503,'RESEARCH_UNAVAILABLE','직접 기사 연결은 아직 준비 중입니다.');
  const position=comparisonTarget(input);const claim=[...input.claims,...(position?[position]:[])].find(c=>c.id===claimId);
  if(!claim||!Array.isArray(urls)||urls.length<1||urls.length>2)throw new AppError(422,'VALIDATION_ERROR','조사할 주장과 최대 두 개의 기사 주소를 확인해 주세요.');
@@ -135,7 +146,7 @@ export async function importEvidence(request:Request,input:ResearchInput,claimId
   try{
    const fetched=await retrieve(target.url,`direct_${fullSources.length}_${seen.size}`,config,signal);
    if(!fetched){attempts.push({stage:'fetch',url:target.url,status:'inaccessible',reason:'공개 본문을 취득하지 못했습니다.'});continue;}
-   fullSources.push(await evidenceSource(fetched,target.url,'공개 기사',target.host,input,claim.text,'allowlisted-text-1.0'));
+   fullSources.push(await evidenceSource(fetched,target.url,'공개 기사',target.host,input,claim.text,'allowlisted-text-1.0',anchor,config,signal));
    attempts.push({stage:'fetch',url:target.url,status:'completed'});
   }catch{if(signal.aborted)throw new AppError(408,'REQUEST_ABORTED','조사를 취소했거나 제한 시간이 지났습니다.');attempts.push({stage:'fetch',url:target.url,status:'failed',reason:'자료 본문에 연결하지 못했습니다.'});}
  }
@@ -149,6 +160,7 @@ export async function importEvidence(request:Request,input:ResearchInput,claimId
 /** Only signed plan queries can reach the fixed search endpoint. Publisher fetches remain allowlisted. */
 export async function discoverEvidence(request:Request,input:ResearchInput,planToken:string,queryIndex:number,config:RuntimeConfig,signal:AbortSignal,excludeUrls:string[]=[]):Promise<EvidenceBundle>{
  requireResearch(config);validateResearch(input);
+ const anchor=await readVoiceArticleContext(request,config,input);
  const exclusions=researchExcludedUrlsSchema.safeParse(excludeUrls);
  if(!exclusions.success)throw new AppError(422,'VALIDATION_ERROR','이미 취득한 HTTPS 기사 주소를 최대 24개까지 지정해 주세요.');
  const urlIdentity=(value:string)=>{const normalized=normalizeSourceUrl(value),identity=new URL(normalized.url??value);identity.hostname=canonicalPublisherHost(normalized.host??identity.hostname);return identity.href;};
@@ -191,7 +203,7 @@ export async function discoverEvidence(request:Request,input:ResearchInput,planT
   try{
    const fetched=await retrieve(article.url,`web_${queryIndex}_${fetches++}`,config,signal);
    if(!fetched){attempts.push({stage:'fetch',url:article.url,status:'inaccessible',reason:'공개 본문을 취득하지 못했습니다.'});continue;}
-   fullSources.push(await evidenceSource(fetched,article.url,article.title,article.publisherDomain,input,claim.text,result.provider==='firecrawl'?'firecrawl-markdown-1.0':'allowlisted-text-1.0'));
+   fullSources.push(await evidenceSource(fetched,article.url,article.title,article.publisherDomain,input,claim.text,result.provider==='firecrawl'?'firecrawl-markdown-1.0':'allowlisted-text-1.0',anchor,config,signal));
    attempts.push({stage:'fetch',url:article.url,status:'completed'});
   }catch{if(signal.aborted)throw new AppError(408,'REQUEST_ABORTED','조사를 취소했거나 제한 시간이 지났습니다.');attempts.push({stage:'fetch',url:article.url,status:'failed',reason:'자료 본문에 연결하지 못했습니다.'});}
  }

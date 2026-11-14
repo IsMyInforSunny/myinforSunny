@@ -21,7 +21,7 @@ export async function analyzeUrl(req:Extract<import('zod/v4').infer<typeof analy
  if(containsContactInfo([body,req.proposition??'',...req.comments.map(c=>c.text)].join('\n')))throw new AppError(422,'PRIVACY_INPUT_REJECTED','기사나 댓글에서 전화번호·이메일 등 개인정보가 발견되어 분석을 중단했습니다.');
  const input=analyzeRequestSchema.safeParse({kind:'text',body,comments:req.comments,proposition:req.proposition,transmissionConsent:true});
  if(!input.success||input.data.kind!=='text')throw new AppError(422,'ARTICLE_BODY_UNAVAILABLE','분석할 기사 본문을 확인하지 못했습니다.');
- const result=await analyze(input.data,config,requestId,signal,{article:true});
+ const result=await analyze(input.data,config,requestId,signal,{article:true,articleUrl:ref.url??url.href});
  result.article={url:ref.url??url.href,title:ref.title,...(ref.publishedAt?{publishedAt:ref.publishedAt}:{}),fetchedAt:ref.fetchedAt??new Date().toISOString(),fullTextLength:ref.fullTextLength??ref.text.length,analyzedCharacters:body.length,truncated:!!ref.truncated||body.length<ref.text.length};
  if(result.article.truncated)result.warnings.push({code:'ARTICLE_TRUNCATED',message:'긴 기사에서 처음 8,000자 이내만 분석했습니다. 기사 전체에 대한 결과가 아닙니다.'});
  return attachVoiceCoordinates(result);

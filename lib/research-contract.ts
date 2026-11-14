@@ -3,14 +3,14 @@ import {claimSchema,sourceSchema,searchQuerySchema} from './contracts';
 import type {Check,Reference,Verification} from './contracts';
 
 export type ResearchStage='not_started'|'planning'|'searching'|'fetching'|'waiting'|'comparing'|'completed'|'partial'|'unavailable'|'failed'|'cancelled';
-export const researchInputSchema=z.object({sources:z.array(sourceSchema).min(1).max(6),claims:z.array(claimSchema).max(5),position:claimSchema.optional(),proposition:z.string().trim().min(1).max(160).optional(),transmissionConsent:z.literal(true),researchConsent:z.literal(true)}).strict().refine(v=>v.claims.length>0||v.position?.kind==='opinion'||!!v.proposition,'조사할 사실 주장·의견이나 비교 명제가 필요합니다.');
+export const researchInputSchema=z.object({sources:z.array(sourceSchema).min(1).max(6),claims:z.array(claimSchema).max(5),position:claimSchema.optional(),proposition:z.string().trim().min(1).max(160).optional(),articleContextToken:z.string().min(1).max(8000).optional(),transmissionConsent:z.literal(true),researchConsent:z.literal(true)}).strict().refine(v=>v.claims.length>0||v.position?.kind==='opinion'||!!v.proposition,'조사할 사실 주장·의견이나 비교 명제가 필요합니다.');
 export type ResearchInput=z.infer<typeof researchInputSchema>;
 export const researchQuerySchema=z.object({claimId:z.string().min(1).max(64),label:z.string().min(1).max(100),query:searchQuerySchema,purpose:z.enum(['fact_check','perspective'])}).strict();
 export type ResearchQuery=z.infer<typeof researchQuerySchema>;
 export const researchExcludedUrlsSchema=z.array(z.string().url().max(2048).refine(value=>{
  try{const url=new URL(value);return url.protocol==='https:'&&!url.username&&!url.password;}catch{return false;}
 },'공개 HTTPS 기사 주소만 제외 목록에 넣을 수 있습니다.')).max(24);
-export type ResearchPlan={schemaVersion:'research-1.0';planId:string;token:string;queries:ResearchQuery[];claimCount:number;expiresAt:string;nextModelCallAt:string};
+export type ResearchPlan={schemaVersion:'research-1.0';planId:string;token:string;queries:ResearchQuery[];claimCount:number;expiresAt:string;nextModelCallAt:string;evidenceUsesModel?:boolean;minimumModelIntervalMs?:number};
 export type RetrievedEvidence=Reference&{provenance:'web_fetched';url:string;title:string;fetchedAt:string;publisherDomain:string;contentDigest:string;retrievedTextLength:number;retrievedTruncated:boolean;excerptStart:number;excerptEnd:number;fullTextLength:number;extractionVersion:string};
 export type ResearchAttempt={url?:string;query?:string;stage:'search'|'fetch';status:'completed'|'empty'|'failed'|'disallowed'|'inaccessible';reason?:string};
 export type EvidenceBundle={schemaVersion:'evidence-1.0';planId:string;claimId:string;token:string;references:RetrievedEvidence[];attempts:ResearchAttempt[];expiresAt:string};

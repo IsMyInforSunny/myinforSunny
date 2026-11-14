@@ -2,9 +2,9 @@
   "schemaVersion": "sentence-voice-training-status-1.0",
   "ready": false,
   "candidateReady": false,
-  "version": "bb524038c69e615c47451c12",
-  "annotatedArticleCount": 29,
-  "usableSentenceCount": 582,
+  "version": "411cf10ffea62d839c598cc4",
+  "annotatedArticleCount": 46,
+  "usableSentenceCount": 889,
   "humanEvaluationCount": 0,
   "teacher": [
     "ai",
@@ -25,9 +25,9 @@
     "nuclear_energy": {
       "ready": false,
       "classCounts": {
-        "neutral": 479,
-        "support": 40,
-        "oppose": 63
+        "neutral": 759,
+        "support": 63,
+        "oppose": 67
       },
       "blockers": [
         "teacher_agreement_below_threshold",
@@ -42,105 +42,121 @@
       "labelCoverage": {
         "direction": {
           "neutral": {
-            "sentences": 479,
-            "articles": 29,
-            "groups": 18
+            "sentences": 759,
+            "articles": 46,
+            "groups": 29
           },
           "oppose": {
-            "sentences": 63,
-            "articles": 15,
-            "groups": 7
+            "sentences": 67,
+            "articles": 17,
+            "groups": 11
           },
           "support": {
-            "sentences": 40,
-            "articles": 9,
-            "groups": 8
+            "sentences": 63,
+            "articles": 19,
+            "groups": 15
           }
         },
         "speaker": {
           "journalist": {
-            "sentences": 336,
-            "articles": 28,
-            "groups": 17
+            "sentences": 549,
+            "articles": 45,
+            "groups": 28
           },
           "source": {
-            "sentences": 246,
-            "articles": 29,
-            "groups": 18
+            "sentences": 340,
+            "articles": 46,
+            "groups": 29
           }
         },
         "issue": {
           "expansion": {
-            "sentences": 208,
-            "articles": 21,
-            "groups": 14
+            "sentences": 301,
+            "articles": 30,
+            "groups": 21
           },
           "lifetime": {
-            "sentences": 83,
-            "articles": 9,
-            "groups": 6
+            "sentences": 96,
+            "articles": 12,
+            "groups": 7
           },
           "none": {
-            "sentences": 240,
-            "articles": 28,
-            "groups": 17
+            "sentences": 393,
+            "articles": 44,
+            "groups": 28
           },
           "public_support": {
-            "sentences": 51,
-            "articles": 8,
-            "groups": 8
+            "sentences": 99,
+            "articles": 17,
+            "groups": 14
           }
         }
       },
+      "splitManifestDigest": "89b51551dabebb95a079f287c7b33df3de5463b7ffc2c87f29c98218c4d9ca81",
+      "frozenEvaluationArticleCount": 7,
+      "excludedConnectedTrainingSentences": 0,
+      "excludedConnectedTrainingArticleCount": 0,
+      "excludedNewTrainingSentences": 0,
+      "excludedOriginalTrainingSentences": 0,
       "groupOverlap": 0,
       "heldoutArticleCount": 7,
-      "macroF1": 0.37584541062801935,
+      "macroF1": 0.5259968102073365,
       "majorityMacroF1": 0.30806257521058966,
-      "supportRecall": 0.0,
-      "opposeRecall": 0.1111111111111111,
-      "speakerMacroF1": 0.7240740740740741,
-      "issueMacroF1": 0.566661874640598,
+      "supportRecall": 0.08333333333333333,
+      "opposeRecall": 0.4444444444444444,
+      "speakerMacroF1": 0.9016801177605198,
+      "issueMacroF1": 0.532890635194502,
       "maskingAgreement": 1.0,
-      "flipAccuracy": null,
-      "flipChallenge": null,
-      "independentFlipPairCount": 0,
+      "flipAccuracy": 0.1,
+      "flipChallenge": {
+        "pairAccuracy": 0.1,
+        "pairCount": 10,
+        "itemAccuracy": 0.5,
+        "abstainedCount": 2
+      },
+      "independentFlipPairCount": 10,
       "runtime": {
         "minimumMarginGap": 0.15,
         "count": 149,
-        "jointUsableCount": 96,
-        "jointCoverage": 0.6442953020134228,
+        "jointUsableCount": 105,
+        "jointCoverage": 0.7046979865771812,
         "heads": {
           "direction": {
-            "acceptedCount": 147,
-            "abstainedCount": 2,
-            "coverage": 0.9865771812080537,
-            "macroF1": 0.3103030303030303,
-            "jointMacroF1": 0.25
+            "acceptedCount": 143,
+            "abstainedCount": 6,
+            "coverage": 0.959731543624161,
+            "macroF1": 0.5133763527592928,
+            "jointMacroF1": 0.4233038348082596
           },
           "speaker": {
-            "acceptedCount": 121,
-            "abstainedCount": 28,
-            "coverage": 0.8120805369127517,
-            "macroF1": 0.7,
-            "jointMacroF1": 0.6040372670807453
+            "acceptedCount": 141,
+            "abstainedCount": 8,
+            "coverage": 0.9463087248322147,
+            "macroF1": 0.8879892037786774,
+            "jointMacroF1": 0.7568686219938628
           },
           "issue": {
             "acceptedCount": 118,
             "abstainedCount": 31,
             "coverage": 0.7919463087248322,
-            "macroF1": 0.5902255639097744,
-            "jointMacroF1": 0.5498136467889908
+            "macroF1": 0.46451048951048945,
+            "jointMacroF1": 0.4527096684313179
           }
         },
-        "macroF1": 0.25,
+        "macroF1": 0.4233038348082596,
         "supportRecall": 0.0,
-        "opposeRecall": 0.0,
-        "jointCorrectCount": 52,
-        "jointAccuracy": 0.5416666666666666
+        "opposeRecall": 0.3333333333333333,
+        "jointCorrectCount": 68,
+        "jointAccuracy": 0.6476190476190476
       },
-      "trainingSentences": 433,
+      "challengeGrounding": {
+        "candidatePairCount": 10,
+        "groundedPairCount": 10,
+        "rejectedCounts": {}
+      },
+      "trainingSentences": 740,
       "heldoutSentences": 149,
-      "splitId": "1523a013059900da37759163b720a17c3cdeb04f325b9207bd3c66610a705506"
+      "splitId": "28c6d4ef939df5a3b6a452dbe0c29e97e4ddfb70fd0e01e51c5f00117293a82d"
     }
   }
 }

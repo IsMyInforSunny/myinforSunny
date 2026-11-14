@@ -4,6 +4,25 @@ import {demoAnalysis,demoVerification} from '../lib/fixtures';
 import type {ResearchInput} from '../lib/research-contract';
 const input=():ResearchInput=>{const a=demoAnalysis('conflict');return {sources:a.sources,claims:a.claims.filter(c=>c.kind==='factual').slice(0,1),transmissionConsent:true,researchConsent:true};};
 describe('브라우저 자동 조사 실행 순서',()=>{
+ it('embedding을 사용하는 자료 취득도 모델 호출 간격에 포함한다',async()=>{
+  let time=0;const calls:{operation:string;at:number}[]=[];
+  await runResearch(input(),new AbortController().signal,{now:()=>time,modelIntervalMs:0,wait:async ms=>{time+=ms;},post:async<T,>(body:unknown)=>{
+   const {operation} = body as {operation:string};calls.push({operation,at:time});
+   if(operation==='plan')return {token:'p',queries:[{label:'자료1'},{label:'자료2'}],nextModelCallAt:new Date(20100).toISOString(),evidenceUsesModel:true,minimumModelIntervalMs:20100} as T;
+   if(operation==='discover')return {token:'e',references:[{text:'공개 자료'}]} as T;
+   return demoVerification('conflict') as T;
+  }},()=>{},()=>{});
+  expect(calls).toEqual([{operation:'plan',at:0},{operation:'discover',at:20100},{operation:'compare',at:40200},{operation:'discover',at:60300},{operation:'compare',at:80400}]);
+  for(const call of calls)expect(calls.filter(other=>other.at<=call.at&&other.at>call.at-60000).length).toBeLessThanOrEqual(3);
+ });
+ it('embedding 자료가 없어도 다음 자료 취득 전 호출 간격을 지킨다',async()=>{
+  let time=0;const at:number[]=[];
+  await runResearch(input(),new AbortController().signal,{now:()=>time,modelIntervalMs:0,wait:async ms=>{time+=ms;},post:async<T,>(body:unknown)=>{
+   if((body as {operation:string}).operation==='plan')return {token:'p',queries:[{label:'자료1'},{label:'자료2'}],nextModelCallAt:new Date(20100).toISOString(),evidenceUsesModel:true,minimumModelIntervalMs:20100} as T;
+   at.push(time);return {token:'e',references:[]} as T;
+  }},()=>{},()=>{});
+  expect(at).toEqual([20100,40200]);
+ });
  it('추천용 관점 검색을 사실 대조보다 먼저 실행하되 서명된 원래 검색 인덱스를 유지한다',async()=>{
   const indexes:number[]=[];let time=0;
   await runResearch(input(),new AbortController().signal,{now:()=>time,wait:async ms=>{time+=ms;},post:async<T,>(body:unknown)=>{

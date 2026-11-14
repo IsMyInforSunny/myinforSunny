@@ -11,6 +11,7 @@ import {observationsFromResearch} from './source-reliability-adapter';
 import {SOUTH_KOREA_PUBLIC_TRUST_PRIOR_2025} from './public-trust-prior';
 import {reviewedCitedSources} from './cited-source-confirmations';
 import {languageMetrics} from './language-metrics';
+import {voiceAssessmentFromResearch} from './voice-model-adapter';
 
 // Export completed review data only, never signed plans, evidence tokens or runtime settings.
 function reviewData(v: Verification) {
@@ -33,6 +34,8 @@ export function buildReviewExport({analysis, checks, feedback, includeRaw, inclu
   stale?: boolean;
 }) {
   const research = analysis ? currentResearch(analysis, researchResults) : [];
+  let exportedAnalysis=analysis;
+  if(analysis?.articleContextToken){const {articleContextToken,...publicAnalysis}=analysis;exportedAnalysis=publicAnalysis;}
   const manual = analysis ? currentResearch(analysis, verifications) : [];
   const expression = analysis ? expressionSummary(analysis) : null;
   const external = analysis ? reliabilityReview(analysis, research, researchStage) : null;
@@ -52,7 +55,7 @@ export function buildReviewExport({analysis, checks, feedback, includeRaw, inclu
     parentAnalysisId: analysis?.analysisId ?? null,
     stale: !!analysis && stale,
     inputState: !analysis ? 'no_analysis' : stale ? 'stale' : 'current',
-    scores: buildAnalysisScores(analysis,biasAssessment,{observations:analysis?observationsFromResearch(analysis,research):[],weightSet:SOUTH_KOREA_PUBLIC_TRUST_PRIOR_2025}),
+    scores: buildAnalysisScores(analysis,biasAssessment,{observations:analysis?observationsFromResearch(analysis,research):[],weightSet:SOUTH_KOREA_PUBLIC_TRUST_PRIOR_2025},voiceAssessmentFromResearch(stale?null:analysis,research)),
     articleOverview: analysis ? {
       version: 'article-overview-1.0',
       relativeComparison: compareRelativeBaseline(analysis.sources.find(source=>source.kind==='body')?.text??'',analysis.article?.title),
@@ -78,7 +81,7 @@ export function buildReviewExport({analysis, checks, feedback, includeRaw, inclu
       note: '취소·실패·부분 완료는 전체 조사 완료가 아닙니다. 자료·인용은 선택한 경우에만 포함됩니다.',
       ...(includeRefs ? {results: research.map(reviewData)} : {}),
     },
-    ...(includeRaw ? {analysis, citedSources: sourcing, citedSourceAssessment:exportedAssessment} : {}),
+    ...(includeRaw ? {analysis:exportedAnalysis, citedSources: sourcing, citedSourceAssessment:exportedAssessment} : {}),
     ...(includeRefs ? {verifications: manual.map(reviewData)} : {}),
     note: `${analysis&&stale?'입력이 수정되어 이전 입력의 분석 결과를 내보냅니다. 현재 입력의 점수가 아닙니다. ':''}사용자가 직접 내보낸 검토 기록입니다. 팀에 자동 접수되지 않습니다.`,
   };

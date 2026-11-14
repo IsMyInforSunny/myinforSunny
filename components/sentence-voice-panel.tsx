@@ -3,20 +3,22 @@ import {summarizeVoices,voiceSentences,VOICE_TOPICS} from '@/lib/sentence-voice'
 import type {ResearchVerification} from '@/lib/research-contract';
 import {voiceAssessmentFromResearch} from '@/lib/voice-model-adapter';
 import trainingStatus from '@/lib/data/voice-model-status.json';
+import semanticStatus from '@/lib/data/voice-embedding-status.json';
 export default function SentenceVoicePanel({analysis,researchResults=[]}:{analysis:Analysis;researchResults?:ResearchVerification[]}){
   const body=analysis.sources.find(source=>source.kind==='body')?.text??'';
   const summary=analysis.sentenceVoices?summarizeVoices(body,analysis.sentenceVoices):null;
   if(!summary)return <div className="studio-relative">
-    <p><strong>문장 SVM 학습·검증 중</strong></p>
+    <p><strong>{analysis.warnings.some(warning=>warning.code==='VOICE_MODEL_UNAVAILABLE')?'문장 SVM 분석 미완료':semanticStatus.performanceChecksPassed?'학습 모델 자동 점검 통과 · 적용 대기':'문장 SVM 학습·검증 중'}</strong></p>
     <p>실제 기사 AI 라벨 {trainingStatus.annotatedArticleCount}건 · 학습 가능 {trainingStatus.usableSentenceCount}문장 · 사람 정확도 평가 {trainingStatus.humanEvaluationCount}건</p>
     <p>현재 학습 범위 · {Object.keys(trainingStatus.topics).map(topic=>VOICE_TOPICS[topic as keyof typeof VOICE_TOPICS]?.label??topic).join(' · ')}</p>
-    <p>현재 활성화된 문장 SVM은 없습니다. 판별 성능·독립 사건 평가·학습 및 모델 배포 이용 검토를 통과한 모델만 연결합니다.</p>
+    {semanticStatus.performanceChecksPassed&&<p>별도 평가 {semanticStatus.evaluationSentenceCount}문장 · AI 라벨 재현 지표 {(semanticStatus.runtimeMacroF1*100).toFixed(1)}% · 반전 쌍 {Math.round(semanticStatus.flipPairAccuracy*semanticStatus.flipPairCount)}/{semanticStatus.flipPairCount}개 · 데이터 이용 검토와 실제 화면 확인 대기</p>}
+    <p>{analysis.versions.voiceModel?'이 기사에 적용할 문장 SVM 결과를 확인하지 못했습니다. 지원 범위와 연결 상태를 확인해 주세요.':'현재 활성화된 문장 SVM은 없습니다. 판별 성능·독립 사건 평가·학습 및 모델 배포 이용 검토를 통과한 모델만 연결합니다.'}</p>
   </div>;
   const units=voiceSentences(body);
   const comparison=voiceAssessmentFromResearch(analysis,researchResults);
   const references=researchResults.flatMap(result=>result.references);
   return <details className="studio-relative" open><summary>기사에 실린 목소리 · {summary.method==='svm'?'문장 SVM':'AI 임시 집계'}</summary>
-    <p>본문 앞 2,000자 · {summary.total}문장 · 미확정 {summary.unresolved}문장 · {summary.modelVersion}</p>
+    <p>본문 앞 2,000자 · {summary.total}문장 · 광고·해시태그·저작권 표시 제외 {summary.excluded}문장 · 미확정 {summary.unresolved}문장 · {summary.modelVersion}</p>
     {summary.issues.filter(issue=>issue.directional||issue.unresolved).map(issue=><div key={issue.issue}>
       <p><strong>{issue.proposition}</strong></p>
       <p>찬성 {issue.support} / 반대 {issue.oppose} · 좌표 {issue.coordinate===null?'입장이 드러나지 않음(방향 문장 3개 미만)':issue.coordinate.toFixed(2)}{issue.unresolved?` · 유보 ${issue.unresolved}문장`:''}</p>
@@ -33,7 +35,7 @@ export default function SentenceVoicePanel({analysis,researchResults=[]}:{analys
       </div>)}
     </section>:<p>상대 점수·추천 대기 · 같은 사건·쟁점에서 매체별 3건 이상, 2개 매체의 미확정 없는 비교 기사가 필요합니다. 학습 원본과 중복은 제외합니다.</p>}
     <details><summary>문장별 분류 근거</summary><ol>{analysis.sentenceVoices!.labels.map(label=><li key={label.sentenceId}>
-      {units.find(unit=>unit.sentenceId===label.sentenceId)?.text} <small>· {label.issue} · {label.direction} · {label.speaker}</small>
+      {units.find(unit=>unit.sentenceId===label.sentenceId)?.text} <small>· {label.excluded?'본문 외 표시 · 집계 제외':`${label.issue} · ${label.direction} · ${label.speaker}`}</small>
     </li>)}</ol></details>
   </details>;
 }

@@ -22,13 +22,13 @@ export function researchBatches(input:ResearchInput):ResearchInput[]{
 }
 export async function runResearch(input:ResearchInput,signal:AbortSignal,deps:Dependencies,onProgress:(p:ResearchProgress)=>void,onResult:(v:ResearchVerification)=>void){
  const ensureActive=()=>{if(signal.aborted)throw new DOMException('취소됨','AbortError');};
- const modelIntervalMs=deps.modelIntervalMs??61000;
+ let modelIntervalMs=deps.modelIntervalMs??61000;
  const batches=researchBatches(input);const coverage:Record<string,ClaimCoverage>={};
  for(const b of batches)for(const c of b.claims)coverage[c.id]='pending';
  const total=Object.keys(coverage).length;let completed=0,reviewed=0,plannedQueries=0,batchIndex=0;const completedIds=new Set<string>();
  let finished=false;const prefix=()=>batches.length>1&&!finished?`[묶음 ${batchIndex+1}/${batches.length}] `:'';
  const emit=(stage:ResearchStage,message:string)=>{ensureActive();onProgress({stage,completed,total,message:prefix()+message,batch:batchIndex+1,batches:batches.length,coverage:{...coverage}});};
- // Earliest time for the next model call (plan/compare). The first plan is not delayed.
+ // Earliest time for plan/compare and, when enabled, evidence embeddings.
  let next=Number.isFinite(deps.firstModelCallAt)?Math.max(0,deps.firstModelCallAt!):0;const searches:number[]=[];
  for(;batchIndex<batches.length;batchIndex++){
   const batch=batches[batchIndex];const batchIds=new Set(batch.claims.map(c=>c.id));
@@ -39,6 +39,7 @@ export async function runResearch(input:ResearchInput,signal:AbortSignal,deps:De
    ensureActive();
    emit('planning',batches.length>1?`주장 ${batch.claims.length}개의 공개 자료 조사 계획을 만들고 있어요. (전체 ${total}개 주장)`:'주장별 공개 자료 조사 계획을 만들고 있어요.');
    ensureActive();const plan=await deps.post<ResearchPlan>({operation:'plan',input:batch},signal);ensureActive();
+   if(Number.isFinite(plan.minimumModelIntervalMs)&&plan.minimumModelIntervalMs!>=0)modelIntervalMs=Math.max(modelIntervalMs,plan.minimumModelIntervalMs!);
    next=new Date(plan.nextModelCallAt).getTime();plannedQueries+=plan.queries.length;
    // Exclusions are only deduplication hints, never new fetch destinations.
    // A fresh plan starts a fresh set; at most 8 queries x 2 references = 16 URLs.
@@ -54,7 +55,12 @@ export async function runResearch(input:ResearchInput,signal:AbortSignal,deps:De
     if(searchAt>now){emit('waiting',`기사 검색 한도를 지키기 위해 약 ${Math.ceil((searchAt-now)/1000)}초 기다립니다.`);await deps.wait(searchAt-now,signal);}
     if(signal.aborted)throw new DOMException('취소됨','AbortError');
     emit('searching',`${ordinal+1}/${plan.queries.length} · ${plan.queries[index].label} 관련 자료를 찾고 있어요.`);
+    if(plan.evidenceUsesModel){
+     const remaining=Math.max(0,next-deps.now());
+     if(remaining){emit('waiting',`관련 기사 분석 요청 간격을 지키기 위해 약 ${Math.ceil(remaining/1000)}초 기다립니다.`);await deps.wait(remaining,signal);}
+    }
     ensureActive();searches.push(deps.now());const evidence=await deps.post<EvidenceBundle>({operation:'discover',input:batch,planToken:plan.token,queryIndex:index,...(fetchedUrls.size?{excludeUrls:[...fetchedUrls]}:{})},signal);ensureActive();
+    if(plan.evidenceUsesModel)next=deps.now()+modelIntervalMs;
     for(const reference of evidence.references){
      const normalized=normalizeSourceUrl(reference.url);
      if(normalized.status!=='ok'||!normalized.url)continue;

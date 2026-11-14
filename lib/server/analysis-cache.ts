@@ -5,7 +5,7 @@ import {RUBRIC,ANALYSIS_PROMPT_VERSION} from '../contracts';
 import {capabilities, modelName, type RuntimeConfig} from './config';
 import {actorHash} from './budget';
 import {allowedUrl} from './retrieval';
-import {releasedVoiceModel} from './voice-analysis';
+import {releasedVoiceModel,releasedEmbeddingVoiceModel} from './voice-analysis';
 
 type LiveRequest = Exclude<z.infer<typeof analyzeRequestSchema>, {kind:'demo'}>;
 type Entry = {expiresAt: number; analysis: Analysis};
@@ -35,7 +35,7 @@ export async function cachedAnalysis(
   const hosts = (config.ALLOWED_RETRIEVAL_HOSTS ?? '').split(',').map(host => host.trim()).filter(Boolean);
   const url = input.kind === 'url' ? allowedUrl(input.url, hosts) : null;
   if (input.kind === 'url' && !url) return {analysis:await action(),cache:'miss'};
-  const version = [CACHE_VERSION, ANALYSIS_PROMPT_VERSION, RUBRIC, SEGMENTER, config.AI_PROVIDER ?? 'groq', modelName(config),releasedVoiceModel?.version??null];
+  const version = [CACHE_VERSION, ANALYSIS_PROMPT_VERSION, RUBRIC, SEGMENTER, config.AI_PROVIDER ?? 'groq', modelName(config),releasedVoiceModel?.version??null,releasedEmbeddingVoiceModel?.version??null];
   const payload = {...input, ...(url ? {url:url.href} : {})};
   const key = await digest([version, hosts, await actorHash(request, config), payload]);
   const now = Date.now();
