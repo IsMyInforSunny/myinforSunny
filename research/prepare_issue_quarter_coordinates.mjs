@@ -13,7 +13,7 @@ const args=process.argv.slice(2),options={cacheInputs:[],cacheVectors:[]};
 for(let at=0;at<args.length;at++){
   const flag=args[at];
   if(flag==='--inventory-only'){options.inventoryOnly=true;continue;}
-  if(!['--corpus','--candidate','--split-manifest','--output','--ledger','--cache-input','--cache-vectors'].includes(flag)||!args[at+1])
+  if(!['--corpus','--candidate','--split-manifest','--output','--ledger','--cache-input','--cache-vectors','--budget'].includes(flag)||!args[at+1])
     throw Error('Use --corpus PATH --candidate PATH --output NEW_RUNTIME_DIRECTORY [--split-manifest PATH] [--ledger PATH] [--cache-input PATH --cache-vectors PATH] [--inventory-only]');
   const value=args[++at];
   if(flag==='--cache-input')options.cacheInputs.push(value);
@@ -42,13 +42,17 @@ if(options.cacheInputs.length!==options.cacheVectors.length)throw Error('Every c
 const corpusBytes=fs.readFileSync(corpusPath),candidateBytes=fs.readFileSync(candidatePath);
 const corpus=corpusBytes.toString('utf8').replace(/^\uFEFF/,'').split(/\r?\n/).filter(Boolean).map(line=>JSON.parse(line));
 const candidate=JSON.parse(candidateBytes.toString('utf8').replace(/^\uFEFF/,''));
-if(candidate.schemaVersion!=='voice-embedding-svm-research-1.0'||candidate.status!=='research'||!candidate.version
-  ||candidate.configuration?.embeddingModel!==MODEL||candidate.configuration?.dimensions!==2048||!candidate.heads)
+if(!['voice-embedding-svm-research-1.0','voice-multitopic-embedding-svm-research-1.0'].includes(candidate.schemaVersion)||candidate.status!=='research'||!candidate.version
+  ||candidate.configuration?.embeddingModel!==MODEL||candidate.configuration?.dimensions!==2048||!candidate.heads&&!candidate.topics)
   throw Error('Use the retained research embedding candidate');
 if(new Set(corpus.map(article=>article.id)).size!==corpus.length)throw Error('Duplicate corpus article IDs');
 const supportedTopics=Object.keys(candidate.topics??{});
 // The retained single-topic candidate records its scope in training data, never inferred from publisher identity.
 const cacheRecords=new Map(),vectors=new Map(),trainingIds=new Set(),trainingHashes=new Set(),digests=[];
+for(const hash of candidate.trainingArticleHashes??[]){
+  if(typeof hash!=='string'||!/^[a-f0-9]{64}$/.test(hash))throw Error('Invalid candidate training hash');
+  trainingHashes.add(hash);
+}
 let inferredTopic=null;
 for(let at=0;at<options.cacheInputs.length;at++){
   const inputBytes=fs.readFileSync(local(options.cacheInputs[at])),vectorBytes=fs.readFileSync(local(options.cacheVectors[at]));
@@ -103,7 +107,7 @@ try{
     const topic=relative.classifyRelativeTopic(body,article.title??'');
     const bodyHash=await voice.voiceArticleHash(body);
     const knownTopic=!!topic&&Object.hasOwn(voice.VOICE_TOPICS,topic);
-    const articleIssue=knownTopic&&issues?issues.selectArticleVoiceIssue(body,topic):null;
+    const articleIssue=knownTopic&&issues?issues.selectArticleVoiceIssue(body,topic,undefined,article.title??''):null;
     const units=voice.voiceSentences(body);
     let cached=0,missing=0,boilerplate=0;
     const labels=units.map(unit=>{
@@ -121,7 +125,8 @@ try{
           records.set(key,prepared);
         }
       }
-      const prediction=value&&knownTopic&&supportedTopics.includes(topic)&&articleIssue?dense.inferDenseVoiceHeads(candidate.heads,value):null;
+      const heads=candidate.topics?.[topic]?.heads??candidate.heads;
+      const prediction=value&&heads&&knownTopic&&supportedTopics.includes(topic)&&articleIssue?dense.inferDenseVoiceHeads(heads,value):null;
       const issue=prediction&&articleIssue?issues.relatedVoiceIssue(prediction.margins.issue,articleIssue):'unknown';
       return {sentenceId:unit.sentenceId,issue,direction:prediction?.direction??'uncertain',speaker:prediction?.speaker??'unknown'};
     });
@@ -173,19 +178,21 @@ try{
   const ledgerPath=options.ledger?local(options.ledger):path.join(runtime,'svm-improvement-20261114','embedding-day-budget.local.json');
   const ledger=fs.existsSync(ledgerPath)?load(ledgerPath):null;
   const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
-  const reserved=ledger?.days?.[day]?.reservedTokens??0,budget=ledger?.maximumDailyBudget??117000;
+  if(options.budget!==undefined&&options.budget!=='unlimited')throw Error('Use --budget unlimited to reflect the authorized NVIDIA reservation policy');
+  const unlimited=options.budget==='unlimited';
+  const reserved=ledger?.days?.[day]?.reservedTokens??0,budget=unlimited?null:ledger?.maximumDailyBudget??117000;
   const summary={schemaVersion:'issue-quarter-coordinate-preparation-1.0',generatedAt:new Date().toISOString(),researchOnly:true,
     modelVersion:candidate.version,embeddingModel:MODEL,supportedTopics,scopeCharacters:voice.VOICE_SCOPE,segmenter:'sentence-3.1',decisionPolicy:voice.VOICE_INDEPENDENT_NEUTRAL,
     issuePolicy:voice.VOICE_ARTICLE_ISSUE??'voice-article-issue-1.0',axis:'source',inventoryOnly:!!options.inventoryOnly,
     counts,topicCounts,articleIssues,missingByTopic,uniquePendingSentences:pending.length,apiCalls:0,
-    budget:{day,dailyReservationLimit:budget,alreadyReserved:reserved,remainingReservation:Math.max(0,budget-reserved),
+    budget:{day,budgetPolicy:unlimited?'user-authorized-unlimited':'bounded',dailyReservationLimit:budget,alreadyReserved:reserved,remainingReservation:unlimited?null:Math.max(0,budget-reserved),
       reservationPerCall:6500,plannedCalls:batches.length,requiredReservation:batches.length*6500,
-      availableCallsToday:Math.floor(Math.max(0,budget-reserved)/6500),fullBudgetDaysRequired:Math.ceil(batches.length/Math.floor(budget/6500))},
+      availableCallsToday:unlimited?null:Math.floor(Math.max(0,budget-reserved)/6500),fullBudgetDaysRequired:unlimited?null:Math.ceil(batches.length/Math.floor(budget/6500))},
     sourceDigests:{corpus:sha(corpusBytes),candidate:sha(candidateBytes),articleIssueRules:options.inventoryOnly?null:sha(fs.readFileSync(path.join(root,'lib/data/voice-article-issue-rules.json'))),caches:digests},
     meaning:'Retained actual article inference using a research candidate and cached vectors. Missing vectors and unsupported topic models stay unresolved. No API request or release approval.'};
   const prepared={schemaVersion:'voice-embedding-input-1.0',embedding:OPTIONS,records:pending,sets:{corpus:[]},pairs:[],
     preparation:{articles:counts.articles,uniqueTexts:pending.length,plannedCalls:batches.length,reservedTokensRequired:batches.length*6500,
-      dailyBudget:budget,callsPerFullBudgetDay:Math.floor(budget/6500)},humanEvaluationCount:0,sourceDigests:summary.sourceDigests};
+      dailyBudget:budget,budgetPolicy:unlimited?'user-authorized-unlimited':'bounded',callsPerFullBudgetDay:unlimited?null:Math.floor(budget/6500)},humanEvaluationCount:0,sourceDigests:summary.sourceDigests};
   prepared.inputDigest=digest(prepared);
   fs.mkdirSync(output,{recursive:true});
   fs.writeFileSync(path.join(output,'candidate.snapshot.local.json'),candidateBytes,{flag:'wx'});
