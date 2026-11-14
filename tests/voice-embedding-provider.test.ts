@@ -17,6 +17,16 @@ function response(input:RequestInfo|URL,init?:RequestInit){
 }
 afterEach(()=>vi.unstubAllGlobals());
 describe('embedding SVM provider boundaries',()=>{
+ it('uses the workerd-supported redirect mode and refuses a provider redirect without following it',async()=>{
+  const fetcher=vi.fn(async()=>new Response('',{status:307,headers:{Location:'https://other.test/embeddings'}}));vi.stubGlobal('fetch',fetcher);
+  await expect(inferEmbeddingVoices('원전 확대.','nuclear_energy',config(),new AbortController().signal,'request:redirect',model())).rejects.toMatchObject({code:'PROVIDER_UNAVAILABLE'});
+  expect(fetcher).toHaveBeenCalledTimes(1);expect(fetcher.mock.calls[0]).toBeDefined();
+  expect((fetcher.mock.calls as unknown[][])[0][1]).toMatchObject({redirect:'manual'});
+ });
+ it('reports malformed vector rows as an invalid model response',async()=>{
+  vi.stubGlobal('fetch',vi.fn(async()=>Response.json({model:'nvidia/nemotron-3.5-embed-1b',data:[null]})));
+  await expect(inferEmbeddingVoices('원전 확대.','nuclear_energy',config(),new AbortController().signal,'request:null-row',model())).rejects.toMatchObject({code:'INVALID_MODEL_OUTPUT'});
+ });
  it('does not use cached vectors or dispatch for a cancelled request',async()=>{
   const fetcher=vi.fn(response);vi.stubGlobal('fetch',fetcher);const selected=model(),active=config();
   await inferEmbeddingVoices('원전 확대가 필요하다.','nuclear_energy',active,new AbortController().signal,'public:cancel',selected);

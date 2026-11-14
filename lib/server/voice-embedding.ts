@@ -24,8 +24,14 @@ async function embedBatch(records:{key:string;text:string}[],model:Model,config:
   config.onDispatch?.();
   let response:Response;
   try{response=await fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${config.NVIDIA_API_KEY}`},
-    body,redirect:'error',signal:AbortSignal.any([signal,AbortSignal.timeout(60_000)])});}
-  catch{throw new AppError(503,'PROVIDER_UNAVAILABLE','편향 분석 서비스에 연결하지 못했습니다.',true);}
+    body,redirect:'manual',signal:AbortSignal.any([signal,AbortSignal.timeout(60_000)])});}
+  catch{signal.throwIfAborted();throw new AppError(503,'PROVIDER_UNAVAILABLE','편향 분석 서비스에 연결하지 못했습니다.',true);}
+  // workerd does not implement redirect:'error'. Refuse redirects explicitly;
+  // never forward the provider credential to a response-supplied destination.
+  if(response.type==='opaqueredirect'||response.status>=300&&response.status<400){
+    await response.body?.cancel().catch(()=>{});
+    throw new AppError(502,'PROVIDER_UNAVAILABLE','편향 분석 서비스의 연결 주소를 확인해 주세요.');
+  }
   if(!response.ok){
     if(response.status===429)await config.onRateLimit?.(retrySeconds(response.headers));
     await response.body?.cancel().catch(()=>{});throw providerFailure(response.status);
@@ -36,7 +42,7 @@ async function embedBatch(records:{key:string;text:string}[],model:Model,config:
   if(typeof usage==='number'&&Number.isFinite(usage)&&usage>=0)config.onUsage?.(usage);
   const seen=new Set<number>();
   if(data?.model!==model.encoder.model||!Array.isArray(data.data)||data.data.length!==records.length||data.data.some(row=>{
-    if(!Number.isInteger(row.index)||row.index<0||row.index>=records.length||seen.has(row.index))return true;
+    if(!row||typeof row!=='object'||!Number.isInteger(row.index)||row.index<0||row.index>=records.length||seen.has(row.index))return true;
     seen.add(row.index);
     return !Array.isArray(row.embedding)||row.embedding.length!==2048||row.embedding.some(value=>!Number.isFinite(value))
       ||!Number.isFinite(Math.hypot(...row.embedding))||Math.hypot(...row.embedding)===0;
