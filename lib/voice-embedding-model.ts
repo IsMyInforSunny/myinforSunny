@@ -1,5 +1,5 @@
 import {z} from 'zod/v4';
-import {VOICE_TOPICS,VOICE_VERSION,VOICE_SCOPE} from './sentence-voice';
+import {VOICE_TOPICS,VOICE_VERSION,VOICE_SCOPE,VOICE_INDEPENDENT_NEUTRAL} from './sentence-voice';
 import {DENSE_VOICE_DIMENSIONS,DENSE_VOICE_MARGIN_GAP} from './voice-dense';
 
 // No artifact import here: server code separately supplies a release candidate.
@@ -22,6 +22,7 @@ const evaluation=z.object({schemaVersion:z.literal('voice-embedding-evaluation-1
   configuration:z.object({embeddingModel:z.literal('nvidia/nemotron-3.5-embed-1b'),dimensions:z.literal(2048),
     normalization:z.literal('l2'),C:finite.positive(),classWeight:z.literal('balanced'),
     minimumMarginGap:z.literal(DENSE_VOICE_MARGIN_GAP),directionStrategy:z.literal('hierarchical'),
+    decisionPolicy:z.literal(VOICE_INDEPENDENT_NEUTRAL).optional(),
     selection:z.string().min(1)}).strict(),
   trainingCount:positive,heldoutCount:positive,trainingDirectionCounts:counts,heldoutDirectionCounts:counts,
   groupOverlap:z.literal(0),rawMacroF1:score.min(.6),majorityMacroF1:score,rawRecall:recalls,
@@ -30,11 +31,14 @@ const evaluation=z.object({schemaVersion:z.literal('voice-embedding-evaluation-1
   runtime:z.object({minimumMarginGap:z.literal(DENSE_VOICE_MARGIN_GAP),count:positive,
     jointUsableCount:positive,jointCoverage:score,jointCorrectCount:count,jointAccuracy:score,
     macroF1:score.min(.6),supportRecall:score.min(.5),opposeRecall:score.min(.5),
-    heads:z.object({direction:runtimeHead,speaker:runtimeHead,issue:runtimeHead}).strict()}).strict(),
+    heads:z.object({direction:runtimeHead,speaker:runtimeHead,issue:runtimeHead}).strict(),
+    directionDecision:z.object({policy:z.literal(VOICE_INDEPENDENT_NEUTRAL),acceptedCount:count,abstainedCount:count,
+      coverage:score,macroF1:score.min(.6),supportRecall:score.min(.5),opposeRecall:score.min(.5)}).strict().optional()}).strict(),
   flipChallenge:z.object({pairAccuracy:score.min(.5),pairCount:count.min(10),
     itemAccuracy:score.min(.5),abstainedCount:count}).strict(),meaning:z.string().min(1),
 }).strict();
-const bundle=z.object({schemaVersion:z.literal('sentence-voice-embedding-svm-1.0'),status:z.literal('ready'),
+const bundle=z.object({schemaVersion:z.enum(['sentence-voice-embedding-svm-1.0','sentence-voice-embedding-svm-1.1']),status:z.literal('ready'),
+  decisionPolicy:z.literal(VOICE_INDEPENDENT_NEUTRAL).optional(),
   version:z.string().trim().min(1),definitionVersion:z.literal(VOICE_VERSION),segmenter:z.literal('sentence-3.1'),
   scopeCharacters:z.literal(VOICE_SCOPE),encoder:z.object({version:z.literal('voice-semantic-1.0'),
     provider:z.literal('nvidia'),model:z.literal('nvidia/nemotron-3.5-embed-1b'),dimensions:z.literal(2048),
@@ -55,6 +59,7 @@ export function parseEmbeddingVoiceModel(value:unknown):EmbeddingVoiceModel|null
   const parsed=bundle.safeParse(value);
   if(!parsed.success)return null;
   const model=parsed.data;
+  if((model.schemaVersion==='sentence-voice-embedding-svm-1.1')!==!!model.decisionPolicy)return null;
   if(!Object.keys(model.topics).length||new Set(model.trainingArticleHashes).size!==model.trainingArticleHashes.length)return null;
   for(const [topic,item] of Object.entries(model.topics)) {
     if(!Object.hasOwn(VOICE_TOPICS,topic))return null;
@@ -67,6 +72,13 @@ export function parseEmbeddingVoiceModel(value:unknown):EmbeddingVoiceModel|null
         current.intercepts.length!==current.classes.length||!current.coefficients.some(row=>row.some(weight=>weight!==0)))return null;
     }
     const ev=item.evaluation,rt=ev.runtime,flip=ev.flipChallenge;
+    if(ev.configuration.decisionPolicy!==model.decisionPolicy||!!rt.directionDecision!==!!model.decisionPolicy)return null;
+    if(rt.directionDecision){
+      const decision=rt.directionDecision;
+      if(decision.policy!==model.decisionPolicy||decision.acceptedCount+decision.abstainedCount!==rt.count
+        ||decision.acceptedCount<rt.jointUsableCount||decision.acceptedCount>rt.heads.direction.acceptedCount
+        ||!close(decision.coverage,decision.acceptedCount/rt.count)||decision.macroF1<=ev.majorityMacroF1)return null;
+    }
     if(ev.inputDigest!==model.release.inputDigest||ev.rawMacroF1<=ev.majorityMacroF1||rt.macroF1<=ev.majorityMacroF1||
       rt.count!==ev.heldoutCount||Object.values(ev.trainingDirectionCounts).reduce((a,b)=>a+b,0)!==ev.trainingCount||
       Object.values(ev.heldoutDirectionCounts).reduce((a,b)=>a+b,0)!==ev.heldoutCount||

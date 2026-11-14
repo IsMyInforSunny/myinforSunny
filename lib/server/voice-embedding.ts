@@ -65,7 +65,7 @@ export async function inferEmbeddingVoices(body:string,topic:VoiceTopic,config:R
   for(const unit of units){
     if(isVoiceBoilerplate(unit.text))continue;
     const text=denseVoiceInputText(unit.text);if(!text)continue;
-    const key=await hash(JSON.stringify([model.version,model.encoder,cacheScope,text]));keys.set(unit.sentenceId,key);
+    const key=await hash(JSON.stringify([model.version,model.decisionPolicy??'voice-joint-1.0',model.encoder,cacheScope,text]));keys.set(unit.sentenceId,key);
     const cached=vectors.get(key);if(cached)resolved.set(key,cached.value);else records.set(key,{key,text});
   }
   let batch:{key:string;text:string}[]=[];
@@ -91,5 +91,5 @@ export async function inferEmbeddingVoices(body:string,topic:VoiceTopic,config:R
     const result=value?inferDenseVoiceHeads(model.topics[topic].heads,value):null;
     return {sentenceId:unit.sentenceId,issue:result?.issue??'unknown',direction:result?.direction??'uncertain',speaker:result?.speaker??'unknown'};
   });
-  return validateVoiceDocument(body,{version:VOICE_VERSION,segmenter:SEGMENTER,scopeCharacters:VOICE_SCOPE,topic,method:'svm',modelVersion:model.version,labels});
+  return validateVoiceDocument(body,{version:VOICE_VERSION,segmenter:SEGMENTER,scopeCharacters:VOICE_SCOPE,topic,method:'svm',modelVersion:model.version,labels,decisionPolicy:model.decisionPolicy});
 }

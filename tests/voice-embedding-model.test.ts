@@ -19,6 +19,21 @@ function fixture(){
     release:{schemaVersion:'voice-embedding-release-1.0',corpusDigest:hash,labelsDigest:hash,reviewDigest:hash,modelDigest:hash,vectorsDigest:hash,inputDigest:hash,trainingAllowed:true,modelDistributionAllowed:true}};
 }
 describe('embedding voice release parser',()=>{
+  it('requires versioned policy and matching measured decision evidence before accepting independent neutral releases',()=>{
+    const f:any=fixture(),policy='voice-neutral-independent-1.0';
+    f.schemaVersion='sentence-voice-embedding-svm-1.1';
+    expect(parseEmbeddingVoiceModel(f)).toBeNull();
+    f.decisionPolicy=policy;f.topics.nuclear_energy.evaluation.configuration.decisionPolicy=policy;
+    expect(parseEmbeddingVoiceModel(f)).toBeNull();
+    const decision={policy,acceptedCount:30,abstainedCount:0,coverage:1,macroF1:.8,supportRecall:.8,opposeRecall:.8};
+    f.topics.nuclear_energy.evaluation.runtime.directionDecision=decision;
+    expect(parseEmbeddingVoiceModel(f)?.decisionPolicy).toBe(policy);
+    for(const change of [{acceptedCount:31},{abstainedCount:1},{coverage:.9},{macroF1:.59},{supportRecall:.49},{policy:'unknown'}]){
+      const invalid=structuredClone(f);Object.assign(invalid.topics.nuclear_energy.evaluation.runtime.directionDecision,change);
+      expect(parseEmbeddingVoiceModel(invalid)).toBeNull();
+    }
+    f.schemaVersion='sentence-voice-embedding-svm-1.0';expect(parseEmbeddingVoiceModel(f)).toBeNull();
+  });
   it('accepts a structurally consistent release fixture',()=>{
     expect(parseEmbeddingVoiceModel(fixture())?.topics.nuclear_energy.heads.issue.classes).toHaveLength(4);
     const f=fixture();

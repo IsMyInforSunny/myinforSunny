@@ -73,7 +73,7 @@ def validate_usage_review(corpus, labels, prepared, review):
     return selected
 
 
-def _reproduce(corpus, labels, prepared, vectors, events, split_manifest, challenge):
+def _reproduce(corpus, labels, prepared, vectors, events, split_manifest, challenge, decision_policy=None):
     """Reuse the fixed preparer/evaluator, including frozen hashes and grounding.
 
     Re-evaluating this exact fixed candidate is release reproduction; no setting
@@ -105,7 +105,8 @@ def _reproduce(corpus, labels, prepared, vectors, events, split_manifest, challe
             if reproduced_input != prepared:
                 raise ValueError('Prepared partitions, grounding, labels or source digests failed exact reproduction')
             subprocess.run([sys.executable, '-X', 'utf8', str(ROOT / 'research/evaluate_voice_embeddings.py'),
-                '--input', prepared_path, '--vectors', vectors_path, '--candidate', candidate_path, '--report', report_path],
+                '--input', prepared_path, '--vectors', vectors_path, '--candidate', candidate_path, '--report', report_path,
+                *(['--decision-policy', decision_policy] if decision_policy else [])],
                 cwd=ROOT, capture_output=True, text=True, encoding='utf-8', check=True, timeout=120)
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
             raise ValueError('Offline input/model reproduction failed; no artifact was released') from None
@@ -138,6 +139,22 @@ def require_performance(report, prepared, masking):
         raise ValueError('Reproduced runtime direction recall is below threshold')
     if min(_fraction(runtime.get('heads', {}).get(name, {}).get('jointMacroF1'), name + ' joint F1') for name in ['speaker', 'issue']) < .6:
         raise ValueError('Reproduced runtime speaker/issue agreement is below threshold')
+    policy = report.get('configuration', {}).get('decisionPolicy')
+    if policy is not None:
+        decision = runtime.get('directionDecision', {})
+        if policy != 'voice-neutral-independent-1.0' or decision.get('policy') != policy:
+            raise ValueError('Decision policy mismatch')
+        accepted, abstained = decision.get('acceptedCount'), decision.get('abstainedCount')
+        if (type(accepted) is not int or type(abstained) is not int or min(accepted, abstained) < 0
+                or accepted + abstained != runtime['count']
+                or accepted < runtime.get('jointUsableCount', 0)
+                or accepted > runtime.get('heads', {}).get('direction', {}).get('acceptedCount', -1)
+                or abs(_fraction(decision.get('coverage'), 'direction decision coverage') - accepted / runtime['count']) > 1e-9):
+            raise ValueError('Inconsistent direction decision counts')
+        if (_fraction(decision.get('macroF1'), 'direction decision macroF1') < .6
+                or decision['macroF1'] <= majority
+                or min(_fraction(decision.get(label + 'Recall'), label + ' decision recall') for label in ['support', 'oppose']) < .5):
+            raise ValueError('Reproduced independent direction is below threshold')
     flips = report.get('flipChallenge', {})
     if flips.get('pairCount', 0) < 10 or _fraction(flips.get('pairAccuracy'), 'opposite-pair accuracy') < .5:
         raise ValueError('Reproduced independent opposite-pair challenge failed')
@@ -161,7 +178,10 @@ def checked_release(corpus, labels, prepared, vectors, candidate, usage_review,
     if prepared.get('inputDigest') != digest(payload) or candidate.get('inputDigest') != prepared['inputDigest']:
         raise ValueError('Prepared/candidate input digest mismatch')
     validate_usage_review(corpus, labels, prepared, usage_review)
-    reproduced, report = _reproduce(corpus, labels, prepared, vectors, events, split_manifest, challenge)
+    policy = candidate.get('configuration', {}).get('decisionPolicy')
+    if policy not in (None, 'voice-neutral-independent-1.0'):
+        raise ValueError('Unsupported decision policy')
+    reproduced, report = _reproduce(corpus, labels, prepared, vectors, events, split_manifest, challenge, policy)
     if reproduced != candidate:
         raise ValueError('Candidate weights, version, configuration or evaluation failed exact reproduction')
     masking = masking_summary(prepared)
@@ -182,6 +202,8 @@ def checked_release(corpus, labels, prepared, vectors, candidate, usage_review,
                     'labelsDigest': digest(labels), 'reviewDigest': digest(usage_review),
                     'modelDigest': digest(candidate), 'vectorsDigest': digest(vectors), 'inputDigest': prepared['inputDigest'],
                     'trainingAllowed': True, 'modelDistributionAllowed': True}}
+    if policy:
+        artifact.update(schemaVersion='sentence-voice-embedding-svm-1.1', decisionPolicy=policy)
     return artifact, evaluation
 
 

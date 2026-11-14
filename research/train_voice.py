@@ -166,7 +166,7 @@ def selective_predictions(heads, features):
     return {'direction': direction, **{name: selective_predict(heads[name], features) for name in ['speaker', 'issue']}}
 
 
-def runtime_evaluation(rows, heads, features):
+def runtime_evaluation(rows, heads, features, decision_policy=None):
     """Count abstentions as missed labels; also report coverage of usable triples."""
     from sklearn.metrics import f1_score, recall_score
     names = ['direction', 'speaker', 'issue']
@@ -194,6 +194,18 @@ def runtime_evaluation(rows, heads, features):
     correct = sum(usable[i] and all(predictions[name][i] == row[name] for name in names)
                   for i, row in enumerate(rows))
     result.update({'jointCorrectCount': correct, 'jointAccuracy': correct / sum(usable) if any(usable) else None})
+    if decision_policy is not None:
+        if decision_policy != 'voice-neutral-independent-1.0':
+            raise ValueError('Unknown voice decision policy')
+        accepted = [usable[i] or predictions['direction'][i] == 'neutral' for i in range(len(rows))]
+        target = [row['direction'] for row in rows]
+        final = [predictions['direction'][i] if accepted[i] else '__unresolved__' for i in range(len(rows))]
+        recalls = recall_score(target, final, labels=CLASSES, average=None, zero_division=0)
+        result['directionDecision'] = {'policy': decision_policy, 'acceptedCount': sum(accepted),
+            'abstainedCount': len(rows) - sum(accepted), 'coverage': sum(accepted) / len(rows),
+            'macroF1': float(f1_score(target, final, labels=CLASSES, average='macro', zero_division=0)),
+            'supportRecall': float(recalls[CLASSES.index('support')]),
+            'opposeRecall': float(recalls[CLASSES.index('oppose')])}
     return result
 
 

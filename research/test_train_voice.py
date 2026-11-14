@@ -67,6 +67,22 @@ def test_direction_with_none_issue_is_not_a_usable_classification():
     assert report['supportRecall'] == 0.
 
 
+def test_neutral_independent_evaluation_preserves_joint_metrics_and_reports_separate_decisions():
+    rows = [{'direction': 'support', 'speaker': 'journalist', 'issue': 'expansion'},
+            {'direction': 'oppose', 'speaker': 'source', 'issue': 'expansion'},
+            {'direction': 'neutral', 'speaker': 'journalist', 'issue': 'none'}]
+    features = csr_matrix([[1., 0.], [-1., 0.], [0., 1.]])
+    old = runtime_evaluation(rows, heads(), features)
+    new = runtime_evaluation(rows, heads(), features, 'voice-neutral-independent-1.0')
+    decision = new.pop('directionDecision')
+    assert new == old
+    assert decision['acceptedCount'] == 3
+    assert decision['abstainedCount'] == 0
+    assert decision['macroF1'] == decision['coverage'] == 1.
+    with pytest.raises(ValueError, match='Unknown voice decision policy'):
+        runtime_evaluation(rows, heads(), features, 'unknown')
+
+
 def challenge(pairs):
     return {'version': VERSION, 'pairs': pairs}
 

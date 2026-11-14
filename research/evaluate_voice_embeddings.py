@@ -27,6 +27,7 @@ def main():
     parser.add_argument('--vectors', default=str(base / 'embedding-vectors.local.json'))
     parser.add_argument('--report', default=str(base / 'embedding-evaluation.local.json'))
     parser.add_argument('--candidate', default=str(base / 'embedding-candidate.local.json'))
+    parser.add_argument('--decision-policy', choices=['voice-neutral-independent-1.0'])
     args = parser.parse_args()
     report_path, candidate_path = local_path(args.report), local_path(args.candidate)
     if report_path.exists() or candidate_path.exists():
@@ -86,7 +87,7 @@ def main():
     majority_macro = float(f1_score(actual, [majority] * len(actual), labels=classes, average='macro', zero_division=0))
     recalls = dict(zip(classes, map(float, recall_score(actual, raw, labels=classes, average=None, zero_division=0))))
     other = {name: float(f1_score([row[name] for row in evaluation], models[name].predict(outer_x), average='macro', zero_division=0)) for name in ['speaker', 'issue']}
-    runtime = runtime_evaluation(evaluation, heads, outer_x)
+    runtime = runtime_evaluation(evaluation, heads, outer_x, args.decision_policy)
     pair_x = np.vstack([matrix[pair[side + 'Key']] for pair in prepared['pairs'] for side in ['support', 'oppose']])
     flips = flip_evaluation(heads, pair_x)
     blockers = []
@@ -104,6 +105,10 @@ def main():
         blockers.append('runtime_speaker_or_issue_below_threshold')
     if flips['pairAccuracy'] < .5:
         blockers.append('flip_challenge_failed')
+    if args.decision_policy:
+        decision = runtime['directionDecision']
+        if decision['macroF1'] < .6 or decision['macroF1'] <= majority_macro or min(decision['supportRecall'], decision['opposeRecall']) < .5:
+            blockers.append('independent_direction_below_threshold')
     # Embedding experiment does not perform a publisher-masking API challenge,
     # legal review or human evaluation, and cannot satisfy release by itself.
     measured_blockers = list(blockers)
@@ -111,6 +116,9 @@ def main():
     config = {'embeddingModel': MODEL, 'dimensions': 2048, 'normalization': 'l2',
         'C': 1., 'classWeight': 'balanced', 'minimumMarginGap': .15, 'directionStrategy': 'hierarchical',
         'selection': 'Fixed before outer evaluation; no hyperparameter search'}
+    if args.decision_policy:
+        config.update(decisionPolicy=args.decision_policy,
+                      selection='Neutral-independent policy fixed by training-group CV; retained outer regression only, not new independent validation')
     report = {'schemaVersion': 'voice-embedding-evaluation-1.0', 'inputDigest': prepared['inputDigest'],
         'humanEvaluationCount': 0, 'ready': False, 'measuredPerformanceGatesPassed': not measured_blockers,
         'blockers': blockers, 'configuration': config, 'trainingCount': len(train), 'heldoutCount': len(evaluation),

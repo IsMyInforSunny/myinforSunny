@@ -17,6 +17,17 @@ function response(input:RequestInfo|URL,init?:RequestInit){
 }
 afterEach(()=>vi.unstubAllGlobals());
 describe('embedding SVM provider boundaries',()=>{
+ it('propagates a released decision policy without claiming unknown speaker/issue are known',async()=>{
+  vi.stubGlobal('fetch',vi.fn(response));const selected=model();selected.decisionPolicy='voice-neutral-independent-1.0';
+  const heads=selected.topics.nuclear_energy.heads;
+  heads.directionality.coefficients.reverse();
+  heads.speaker.intercepts=[0,2];heads.issue.intercepts=[0,2];
+  heads.speaker.coefficients.forEach(row=>row[0]=1);heads.speaker.intercepts=[0,0];
+  heads.issue.coefficients.forEach(row=>row[0]=1);heads.issue.intercepts=[0,0];
+  const result=await inferEmbeddingVoices('발표가 있었다.','nuclear_energy',config(),new AbortController().signal,'request:policy',selected);
+  expect(result?.decisionPolicy).toBe('voice-neutral-independent-1.0');
+  expect(result?.labels[0]).toMatchObject({direction:'neutral',speaker:'unknown',issue:'unknown'});
+ });
  it('uses the workerd-supported redirect mode and refuses a provider redirect without following it',async()=>{
   const fetcher=vi.fn(async()=>new Response('',{status:307,headers:{Location:'https://other.test/embeddings'}}));vi.stubGlobal('fetch',fetcher);
   await expect(inferEmbeddingVoices('원전 확대.','nuclear_energy',config(),new AbortController().signal,'request:redirect',model())).rejects.toMatchObject({code:'PROVIDER_UNAVAILABLE'});

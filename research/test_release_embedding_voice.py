@@ -99,6 +99,33 @@ class EmbeddingReleaseTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'insufficient samples'):
             require_performance(self.report, prepared, masking_summary(prepared))
 
+    def test_new_policy_needs_matching_measured_direction_evidence(self):
+        policy = 'voice-neutral-independent-1.0'
+        report = copy.deepcopy(self.report)
+        report['configuration'] = {'decisionPolicy': policy}
+        with self.assertRaises(ValueError):
+            require_performance(report, self.prepared, masking_summary(self.prepared))
+        report['runtime']['heads']['direction'] = {'acceptedCount': 2}
+        report['runtime']['directionDecision'] = {'policy': policy, 'macroF1': .8, 'supportRecall': .8, 'opposeRecall': .8,
+                                                  'acceptedCount': 2, 'abstainedCount': 0, 'coverage': 1.}
+        require_performance(report, self.prepared, masking_summary(self.prepared))
+        report['runtime']['directionDecision']['supportRecall'] = .49
+        with self.assertRaises(ValueError):
+            require_performance(report, self.prepared, masking_summary(self.prepared))
+
+    def test_policy_release_reproduction_receives_policy_and_versions_artifact(self):
+        policy = 'voice-neutral-independent-1.0'
+        self.candidate['configuration'] = {'decisionPolicy': policy}
+        self.report['configuration'] = {'decisionPolicy': policy}
+        self.report['runtime']['heads']['direction'] = {'acceptedCount': 2}
+        self.report['runtime']['directionDecision'] = {'policy': policy, 'macroF1': .8, 'supportRecall': .8, 'opposeRecall': .8,
+                                                       'acceptedCount': 2, 'abstainedCount': 0, 'coverage': 1.}
+        with patch('release_embedding_voice._reproduce', return_value=(self.candidate, self.report)) as reproduce:
+            artifact, _ = checked_release(self.corpus, self.labels, self.prepared, {}, self.candidate, self.review)
+        self.assertEqual(reproduce.call_args.args[-1], policy)
+        self.assertEqual(artifact['schemaVersion'], 'sentence-voice-embedding-svm-1.1')
+        self.assertEqual(artifact['decisionPolicy'], policy)
+
     def test_success_keeps_original_sources_review_identity_and_vectors_out_of_artifact(self):
         # Only export-boundary structure is tested. Reproduction is separately
         # exercised on the real retained experiment, never these fixtures.
