@@ -1,6 +1,6 @@
 import {describe,it,expect} from 'vitest';
 import {demoAnalysis,demoVerification} from '../lib/fixtures';
-import {voiceAnnotationInput,VOICE_VERSION,validateVoiceDocument,summarizeVoices} from '../lib/sentence-voice';
+import {voiceAnnotationInput,VOICE_VERSION,VOICE_INDEPENDENT_NEUTRAL,validateVoiceDocument,summarizeVoices} from '../lib/sentence-voice';
 import {voiceAssessmentFromResearch} from '../lib/voice-model-adapter';
 import {mainVoiceIssue,type VoiceCoordinate} from '../lib/voice-comparison';
 import {buildAnalysisScores} from '../lib/analysis-scores';
@@ -48,6 +48,15 @@ describe('server-classified voice records to scores',()=>{
   analysis.voiceCoordinates![0].eventId='event-fixture';
   result.references[0].url='https://other.test/ref0';
   expect(voiceAssessmentFromResearch(analysis,[result]).score).toBeNull();
+ });
+ it('does not reuse a coordinate from another decision contract even with the same model version',()=>{
+  const {analysis,result}=fixture();
+  analysis.sentenceVoices!.decisionPolicy=VOICE_INDEPENDENT_NEUTRAL;
+  expect(voiceAssessmentFromResearch(analysis,[result]).status).toBe('no_coordinate');
+  analysis.voiceCoordinates![0].decisionPolicy=VOICE_INDEPENDENT_NEUTRAL;
+  expect(voiceAssessmentFromResearch(analysis,[result]).score).toBeNull();
+  for(const reference of result.references)reference.voiceCoordinates![0].decisionPolicy=VOICE_INDEPENDENT_NEUTRAL;
+  expect(voiceAssessmentFromResearch(analysis,[result]).score).toBe(75);
  });
  it('unknown issues remain unresolved and cannot produce a confident headline coordinate',()=>{
   const {analysis}=fixture(),body=analysis.sources[0].text;

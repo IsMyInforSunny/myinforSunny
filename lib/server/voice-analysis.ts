@@ -50,7 +50,7 @@ export async function articleVoiceCoordinates(body:string,document:VoiceDocument
   }
   return summary.issues.flatMap(issue=>issue.coordinate===null?[]:[{
     id:url||bodyHash,url,publisher,bodyHash,eventId,topic:document.topic,issue:issue.issue,publishedAt:article.publishedAt,
-    method:document.method,modelVersion:document.modelVersion,version:document.version,
+    method:document.method,modelVersion:document.modelVersion,version:document.version,decisionPolicy:document.decisionPolicy,
     coordinate:issue.coordinate,directional:issue.directional,unresolved:summary.unresolved,
     trainingOriginal:trainingHashes.includes(bodyHash),
   }]);

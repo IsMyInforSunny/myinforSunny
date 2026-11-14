@@ -15,7 +15,7 @@ export function voiceAssessmentFromResearch(analysis:Analysis|null,results:reado
   const primary=mainVoiceIssue(body,analysis.sentenceVoices);
   if(!primary)return {...empty,status:'no_single_issue'};
   const input=analysis.voiceCoordinates?.find(item=>item.issue===primary.issue&&item.topic===primary.topic
-    &&item.modelVersion===primary.modelVersion&&item.method==='svm');
+    &&item.modelVersion===primary.modelVersion&&item.method==='svm'&&item.decisionPolicy===primary.decisionPolicy);
   if(!input)return {...empty,status:'no_coordinate',issue:primary.issue};
   if(!input.eventId)return {...empty,status:'event_missing',issue:primary.issue};
   const current=currentResearch(analysis,results);

@@ -12,7 +12,9 @@ function local(value){
  const real=fs.realpathSync(parent);if(real!==runtime&&!real.startsWith(runtime+path.sep))throw Error('Runtime path escaped');
  return target;
 }
-if(![7,9].includes(process.argv.length))throw Error('Use CORPUS PREPARED VECTORS CANDIDATE OUTPUT [SUPPLEMENT_INPUT SUPPLEMENT_VECTORS]');
+const independent=process.argv.includes('--neutral-independent');
+if(independent)process.argv.splice(process.argv.indexOf('--neutral-independent'),1);
+if(![7,9].includes(process.argv.length))throw Error('Use CORPUS PREPARED VECTORS CANDIDATE OUTPUT [SUPPLEMENT_INPUT SUPPLEMENT_VECTORS] [--neutral-independent]');
 const [corpusPath,inputPath,vectorsPath,candidatePath,outputPath,supplementPath,supplementVectorsPath]=process.argv.slice(2).map(local);
 if(new Set(process.argv.slice(2).map(local)).size!==process.argv.length-2||fs.existsSync(outputPath))throw Error('Preserve inputs/reports');
 const parse=text=>JSON.parse(text.replace(/^\uFEFF/,'')),load=file=>parse(fs.readFileSync(file,'utf8'));
@@ -46,7 +48,7 @@ if(supplement){
 const server=await createServer({root,configFile:false,server:{middlewareMode:true,hmr:false},optimizeDeps:{noDiscovery:true},appType:'custom'});
 try{
  const {inferDenseVoiceHeads,denseVoiceInputText}=await server.ssrLoadModule('/lib/voice-dense.ts');
- const {voiceSentences,validateVoiceDocument,summarizeVoices,isVoiceBoilerplate,VOICE_VERSION}=await server.ssrLoadModule('/lib/sentence-voice.ts');
+ const {voiceSentences,validateVoiceDocument,summarizeVoices,isVoiceBoilerplate,VOICE_VERSION,VOICE_INDEPENDENT_NEUTRAL}=await server.ssrLoadModule('/lib/sentence-voice.ts');
  const {mainVoiceIssue}=await server.ssrLoadModule('/lib/voice-comparison.ts');
  const articles=[];
  for(const article of corpus.filter(row=>heldout.has(row.id))){
@@ -63,15 +65,16 @@ try{
    const result=value?inferDenseVoiceHeads(candidate.heads,value):null;
    return {sentenceId:unit.sentenceId,issue:result?.issue??'unknown',direction:result?.direction??'uncertain',speaker:result?.speaker??'unknown'};
   });
-  const document=validateVoiceDocument(article.text,{version:VOICE_VERSION,segmenter:'sentence-3.1',scopeCharacters:2000,topic:'nuclear_energy',method:'svm',modelVersion:candidate.version,labels});
+  const document=validateVoiceDocument(article.text,{version:VOICE_VERSION,segmenter:'sentence-3.1',scopeCharacters:2000,topic:'nuclear_energy',method:'svm',modelVersion:candidate.version,labels,
+   ...(independent?{decisionPolicy:VOICE_INDEPENDENT_NEUTRAL}:{})});
   if(!document)throw Error('Invalid heldout document');
   const summary=summarizeVoices(article.text,document),primary=mainVoiceIssue(article.text,document);
   articles.push({articleId:article.id,total:summary.total,contentTotal:summary.contentTotal,excluded:summary.excluded,cached,missing,missingReasons,
-   unresolved:summary.unresolved,primaryIssue:primary?.issue??null,primaryCoordinate:primary?.coordinate??null,
+   unresolved:summary.unresolved,uncertainty:summary.uncertainty,primaryIssue:primary?.issue??null,primaryCoordinate:primary?.coordinate??null,
    issues:summary.issues.map(issue=>({issue:issue.issue,directional:issue.directional,unresolved:issue.unresolved,coordinate:issue.coordinate,evidence:issue.evidence})),
    meaning:missing?'Missing vectors treated as unresolved; not full article inference.':'All non-boilerplate sentence vectors available.'});
  }
- const summary={candidateVersion:candidate.version,evaluationArticles:articles.length,fullyCachedArticles:articles.filter(row=>row.missing===0).length,
+ const summary={candidateVersion:candidate.version,decisionPolicy:independent?VOICE_INDEPENDENT_NEUTRAL:'voice-joint-1.0',researchOnly:true,evaluationArticles:articles.length,fullyCachedArticles:articles.filter(row=>row.missing===0).length,
   unresolvedFreeArticles:articles.filter(row=>row.unresolved===0).length,primaryCoordinateAvailable:articles.filter(row=>row.primaryCoordinate!==null).length,
   totalMissingVectors:articles.reduce((sum,row)=>sum+row.missing,0),apiCalls:0,
   articlesWithObservedIssueCoordinate:articles.filter(row=>row.issues.some(issue=>issue.coordinate!==null)).length,

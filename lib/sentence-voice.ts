@@ -16,8 +16,24 @@ export const voiceLabelSchema=z.object({sentenceId:z.string(),issue:z.string(),
   direction:z.enum(['support','oppose','neutral','uncertain']),
   speaker:z.enum(['journalist','source','mixed','unknown']),excluded:z.literal(true).optional()}).strict();
 export type VoiceLabel=z.infer<typeof voiceLabelSchema>;
+/** Explicit opt-in contract. An absent policy retains the released joint-head
+ * semantics; older results must never silently change their meaning. */
+export const VOICE_INDEPENDENT_NEUTRAL='voice-neutral-independent-1.0' as const;
 export type VoiceDocument={version:string;segmenter:string;scopeCharacters:number;topic:VoiceTopic;
-  method:'ai'|'svm';modelVersion:string;labels:VoiceLabel[]};
+  method:'ai'|'svm';modelVersion:string;labels:VoiceLabel[];
+  decisionPolicy?:typeof VOICE_INDEPENDENT_NEUTRAL};
+
+/** Neutral is a direction decision, not a claim that issue/speaker is known.
+ * Directional evidence continues to require both dependent classifications. */
+export function voiceUncertainty(label:VoiceLabel,policy?:VoiceDocument['decisionPolicy']){
+  const independent=policy===VOICE_INDEPENDENT_NEUTRAL;
+  const issue=label.issue==='unknown',speaker=label.speaker==='mixed'||label.speaker==='unknown';
+  const directional=label.direction==='support'||label.direction==='oppose';
+  return {direction:label.direction==='uncertain',issue,speaker,
+    affectsCoordinate:!label.excluded&&(independent
+      ?label.direction==='uncertain'||directional&&(issue||label.issue==='none'||speaker)
+      :label.direction==='uncertain'||label.speaker==='unknown')};
+}
 
 export function voiceSentences(body:string){
   const text=articleTextPrefix(body,VOICE_SCOPE);
@@ -34,7 +50,8 @@ export const VOICE_INSTRUCTIONS=`voiceLabels는 기자의 찬반이 아니라 �
 /** Missing, duplicate, off-body and unknown-issue labels become unresolved, never neutral. */
 export function validateVoiceDocument(body:string,document:VoiceDocument){
   const topic=VOICE_TOPICS[document.topic];
-  if(!topic||document.version!==VOICE_VERSION||document.segmenter!==SEGMENTER||document.scopeCharacters!==VOICE_SCOPE)return null;
+  if(!topic||document.version!==VOICE_VERSION||document.segmenter!==SEGMENTER||document.scopeCharacters!==VOICE_SCOPE
+    ||document.decisionPolicy!==undefined&&document.decisionPolicy!==VOICE_INDEPENDENT_NEUTRAL)return null;
   const units=voiceSentences(body),ids=new Set(units.map(unit=>unit.sentenceId));
   if(document.labels.some(label=>!ids.has(label.sentenceId)))return null;
   const labels=units.map(unit=>{
@@ -44,6 +61,7 @@ export function validateVoiceDocument(body:string,document:VoiceDocument){
     if(!parsed?.success||parsed.data.excluded||(!Object.hasOwn(topic.issues,parsed.data.issue)&&!['none','unknown'].includes(parsed.data.issue)))
       return {sentenceId:unit.sentenceId,issue:'unknown',direction:'uncertain' as const,speaker:'unknown' as const};
     const label=parsed.data;
+    if(document.decisionPolicy===VOICE_INDEPENDENT_NEUTRAL&&label.direction==='neutral')return label;
     if(label.issue==='unknown'||(['support','oppose'].includes(label.direction)&&label.issue==='none')||label.speaker==='mixed'||label.speaker==='unknown')
       return {...label,direction:'uncertain' as const};
     return label;
@@ -73,9 +91,14 @@ export function voiceEvidenceBounds(support:number,oppose:number,unresolved:numb
 export function summarizeVoices(body:string,document:VoiceDocument){
   const valid=validateVoiceDocument(body,document);if(!valid)return null;
   const content=valid.labels.filter(label=>!label.excluded);
+  const unresolved=(label:VoiceLabel)=>voiceUncertainty(label,valid.decisionPolicy).affectsCoordinate;
   return {version:VOICE_VERSION,method:valid.method,modelVersion:valid.modelVersion,topic:valid.topic,
+    decisionPolicy:valid.decisionPolicy??'voice-joint-1.0',
+    uncertainty:{direction:content.filter(label=>voiceUncertainty(label,valid.decisionPolicy).direction).length,
+      issue:content.filter(label=>voiceUncertainty(label,valid.decisionPolicy).issue).length,
+      speaker:content.filter(label=>voiceUncertainty(label,valid.decisionPolicy).speaker).length},
     total:valid.labels.length,contentTotal:content.length,excluded:valid.labels.length-content.length,
-    unresolved:content.filter(label=>label.direction==='uncertain'||label.speaker==='unknown').length,
+    unresolved:content.filter(unresolved).length,
     issues:Object.entries(VOICE_TOPICS[valid.topic].issues).map(([issue,proposition])=>{
       const labels=content.filter(label=>label.issue===issue);
       // Unknown speakers cannot be assigned to either population or the overall coordinate.
@@ -84,10 +107,10 @@ export function summarizeVoices(body:string,document:VoiceDocument){
       // Unknown-issue sentences could belong to any proposition, so they
       // contribute to every issue's bounds without receiving a new label.
       const possibleUnresolved=content.filter(label=>(label.issue===issue||label.issue==='unknown')
-        &&(label.direction==='uncertain'||label.speaker==='unknown')).length;
+        &&unresolved(label)).length;
       return {issue,proposition,...counts,evidence:voiceEvidenceBounds(counts.support,counts.oppose,possibleUnresolved),journalist:balance(known.filter(label=>label.speaker==='journalist')),
         source:balance(known.filter(label=>label.speaker==='source')),
-        unresolved:labels.filter(label=>label.direction==='uncertain'||label.speaker==='unknown').length};
+        unresolved:labels.filter(unresolved).length};
     })};
 }
 

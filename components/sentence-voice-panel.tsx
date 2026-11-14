@@ -20,6 +20,7 @@ export default function SentenceVoicePanel({analysis,researchResults=[]}:{analys
   const references=researchResults.flatMap(result=>result.references);
   return <details className="studio-relative" open><summary>기사에 실린 목소리 · {summary.method==='svm'?'문장 SVM':'AI 임시 집계'}</summary>
     <p>본문 앞 2,000자 · {summary.total}문장 · 광고·해시태그·저작권 표시 제외 {summary.excluded}문장 · 미확정 {summary.unresolved}문장 · {summary.modelVersion}</p>
+    {summary.decisionPolicy==='voice-neutral-independent-1.0'&&<p>방향 미확정 {summary.uncertainty.direction} · 쟁점 미확정 {summary.uncertainty.issue} · 화자 미확정 {summary.uncertainty.speaker}문장. 확정 중립의 쟁점·화자 유보는 찬반 좌표에 포함하지 않습니다.</p>}
     {summary.issues.filter(issue=>issue.directional||issue.evidence.unresolved).map(issue=><div key={issue.issue}>
       <p><strong>{issue.proposition}</strong></p>
       <p>찬성 {issue.support} / 반대 {issue.oppose} · 분류된 문장의 좌표 {issue.coordinate===null?'산출 보류(방향 문장 3개 미만)':issue.coordinate.toFixed(2)}{issue.unresolved?` · 쟁점 내 유보 ${issue.unresolved}문장`:''}</p>

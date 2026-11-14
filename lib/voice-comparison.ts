@@ -1,7 +1,8 @@
 import {summarizeVoices,type VoiceDocument,type VoiceTopic,VOICE_VERSION} from './sentence-voice';
 
 export type VoiceCoordinate={id:string;url:string;publisher:string;bodyHash:string;eventId:string;topic:VoiceTopic;issue:string;
-  method:'ai'|'svm';modelVersion:string;version:string;coordinate:number;directional:number;unresolved:number;trainingOriginal:boolean;publishedAt?:string};
+  method:'ai'|'svm';modelVersion:string;version:string;coordinate:number;directional:number;unresolved:number;trainingOriginal:boolean;publishedAt?:string;
+  decisionPolicy?:VoiceDocument['decisionPolicy']};
 /** Same sub-issue, event, encoder/version and scope. Equal weight per publisher; never publisher rankings. */
 export function compareVoiceCoordinates(input:VoiceCoordinate,articles:VoiceCoordinate[],trainingHashes:readonly string[]=[]){
   const empty={status:'insufficient' as 'insufficient'|'ready'|'input_unresolved'|'inconsistent_period',score:null as number|null,
@@ -15,7 +16,8 @@ export function compareVoiceCoordinates(input:VoiceCoordinate,articles:VoiceCoor
   const seen=new Set([input.bodyHash]),urls=new Set([input.url]);
   const candidates=articles.filter(item=>{
     if(item.id===input.id||!eligible(item)||item.eventId!==input.eventId||item.topic!==input.topic||item.issue!==input.issue
-      ||item.method!==input.method||item.modelVersion!==input.modelVersion||item.version!==input.version||seen.has(item.bodyHash)||urls.has(item.url)
+      ||item.method!==input.method||item.modelVersion!==input.modelVersion||item.version!==input.version
+      ||item.decisionPolicy!==input.decisionPolicy||seen.has(item.bodyHash)||urls.has(item.url)
       ||live&&(!item.publishedAt||!Number.isFinite(Date.parse(item.publishedAt))||Math.abs(Date.parse(item.publishedAt)-inputTime)>3*86400000))return false;
     seen.add(item.bodyHash);urls.add(item.url);return true;
   });
@@ -44,5 +46,5 @@ export function mainVoiceIssue(body:string,document:VoiceDocument){
   // Tied leading issues must be selected explicitly; never collapse unrelated propositions.
   if(!ranked[0]?.directional||ranked[0].directional===ranked[1]?.directional)return null;
   return {...ranked[0],coordinate:summary.unresolved?null:ranked[0].coordinate,
-    unresolved:summary.unresolved,method:summary.method,modelVersion:summary.modelVersion,topic:summary.topic};
+    unresolved:summary.unresolved,method:summary.method,modelVersion:summary.modelVersion,topic:summary.topic,decisionPolicy:document.decisionPolicy};
 }
