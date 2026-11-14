@@ -126,6 +126,13 @@ export async function analyze(req:TextRequest,config:RuntimeConfig,requestId:str
     try{result.sentenceVoices=await inferEmbeddingVoices(req.body,voiceTopic,config,signal,context.articleUrl?`public:${context.articleUrl}`:`request:${requestId}`)??undefined;}
     catch(error){if(signal.aborted)throw error;delete result.sentenceVoices;result.status='partial';result.warnings.push({code:'VOICE_MODEL_UNAVAILABLE',message:'편향 SVM 분석에 연결하지 못했습니다. 표시된 본문 검토와 편향 점수의 완료 여부를 구분해 주세요.'});}
   }
+  if(!result.sentenceVoices){
+    result.status='partial';
+    if(!result.warnings.some(warning=>warning.code==='VOICE_MODEL_UNAVAILABLE'))result.warnings.push({
+      code:voiceVersion?'VOICE_TOPIC_UNSUPPORTED':'VOICE_MODEL_UNAVAILABLE',
+      message:voiceVersion?'이 기사의 주제를 지원하는 운영 편향 SVM이 없어 편향 점수는 미완료입니다.':'운영 편향 SVM이 활성화되지 않아 편향 점수는 미완료입니다. 본문·표현 분석 결과와 구분해 주세요.',
+    });
+  }
   if(claimsRequired&&!result.claims.length){result.status='partial';result.coverage.claimsMayBeOmitted=true;result.warnings.push({code:'CLAIMS_UNAVAILABLE',message:'기사의 핵심 주장 추출이 누락되어 출처 명시 비율을 계산하지 못했습니다. 완성된 분석이 아닙니다.'});}
   if(overlaps.length){result.status='partial';result.warnings.push({code:'CLASSIFICATION_CONFLICT',message:'일부 문장이 정상 목록과 상세 검토에 중복되었습니다. 원문 근거가 있는 상세 결과를 우선 표시했으니 직접 확인해 주세요.'});}
   return attachVoiceCoordinates(result);

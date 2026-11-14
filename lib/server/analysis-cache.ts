@@ -13,7 +13,7 @@ const TTL_MS = 10 * 60_000;
 const MAX_ENTRIES = 32;
 const memory = new Map<string, Entry>();
 const inFlight=new Map<string,Promise<Analysis>>();
-const CACHE_VERSION = 'article-analysis-4.18-cache-12-voice-svm';
+const CACHE_VERSION = 'article-analysis-4.18-cache-13-voice-readiness';
 
 async function digest(value: unknown) {
   const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value)));

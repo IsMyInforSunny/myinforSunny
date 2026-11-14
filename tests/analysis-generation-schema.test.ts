@@ -38,7 +38,7 @@ describe('analysis provider grammar and tolerant optional hints',()=>{
   const fetch=vi.fn().mockResolvedValue(Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify(raw)}}],usage:{total_tokens:100}}));
   vi.stubGlobal('fetch',fetch);
   const result=await analyze(request,config,'synthetic-optional-hints',AbortSignal.timeout(1000));
-  expect(result.status).toBe('success');expect(result.claims).toHaveLength(1);expect(result.expressions[0].status).toBe('clear');
+  expect(result.status).toBe('partial');expect(result.warnings.some(warning=>warning.code==='VOICE_MODEL_UNAVAILABLE')).toBe(true);expect(result.claims).toHaveLength(1);expect(result.expressions[0].status).toBe('clear');
   expect(result.searchSuggestions).toEqual([]);expect(fetch).toHaveBeenCalledTimes(1);
   const sent=JSON.parse(fetch.mock.calls[0][1].body);
   expect(sent.response_format.json_schema.schema.properties.searchSuggestions.items.type).toBe('object');
@@ -48,7 +48,7 @@ describe('analysis provider grammar and tolerant optional hints',()=>{
   const fetch=vi.fn().mockResolvedValue(Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify(raw)}}]}));vi.stubGlobal('fetch',fetch);
   const result=await analyze(request,config,'synthetic-mixed-hints',AbortSignal.timeout(1000));
   expect(result.searchSuggestions).toEqual([{label:'도서관 자료',query:'도서관 운영 시간'}]);
-  expect(result.status).toBe('success');expect(fetch).toHaveBeenCalledTimes(1);
+  expect(result.status).toBe('partial');expect(result.warnings.some(warning=>warning.code==='VOICE_MODEL_UNAVAILABLE')).toBe(true);expect(fetch).toHaveBeenCalledTimes(1);
  });
  it('still rejects malformed core claims and unknown top-level fields',()=>{
   const schema=analysisResponseSchema(sources,false);
