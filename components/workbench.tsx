@@ -17,6 +17,8 @@ import type {ReviewTab} from './review-tabs';
 import MediaPositionMap from './media-position-map';
 import SourceObservations from './source-observations';
 import ActivityLog from './activity-log';
+import {requestAnalysis} from '@/lib/analysis-stream-client';
+import type {AnalysisPreview} from '@/lib/analysis-preview';
 import {recordActivity} from '@/lib/activity-log';
 import {buildReviewExport} from '@/lib/review-export';
 import {observationsFromResearch} from '@/lib/source-reliability-adapter';
@@ -48,6 +50,7 @@ export default function Workbench(){
   const [view,setView]=useState<'input'|'evidence'|'coordinates'|'tools'|null>(null);
   const [editingBody,setEditingBody]=useState(false);
   const [elapsed,setElapsed]=useState(0);
+  const [preview,setPreview]=useState<AnalysisPreview|null>(null);
   const startedAt=useRef(0);
   const [inputMode,setInputMode]=useState<'url'|'text'>('url');const [articleUrl,updateArticleUrl]=useState('');
   function setArticleUrl(value:string){setTransmissionConsent(false);setResearchConsent(false);setAnalysisResearchConsent(false);updateArticleUrl(value);}
@@ -106,13 +109,13 @@ export default function Workbench(){
     const request=unchanged?{kind:'demo',fixtureId}:{...(inputMode==='url'?{kind:'url',url:articleUrl.trim()}:{kind:'text',body}),transmissionConsent:true,comments:comments.filter(c=>c.text.trim()),...(proposition.trim()?{proposition}: {})};
     if(!unchanged){if(!cap?.live){setError(cap?.reason??'실시간 분석은 준비 중이에요. 예시를 체험해 보세요.');return;}if(!transmissionConsent){setError(`공개·가상 자료 사용과 ${PROVIDER_NAME} 전송 안내를 확인해 주세요.`);return;}if(containsContactInfo([body,proposition,...comments.map(c=>c.text),...references.flatMap(r=>[r.text,r.url])].join('\n'))){setError('전화번호·이메일 등 개인정보를 지워 주세요.');return;}}
     if(inputMode==='url'){try{const u=new URL(articleUrl.trim());if(u.protocol!=='https:'||u.username||u.password)throw Error();}catch{setError('https://로 시작하는 언론사 기사 링크를 입력해 주세요.');inputRef.current?.focus();return;}if(!cap?.directFetch){setError('기사 링크 분석은 현재 준비 중입니다.');return;}}
-    const requestedResearch=researchConsent&&!unchanged;const {c,n}=begin('analyze');try{const a=await post<Analysis>('/api/analyze',request,c.signal);if(!c.signal.aborted&&n===sequence.current){const importedBody=a.sources.find(source=>source.kind==='body')?.text??body;if(inputMode==='url')updateBody(importedBody);accept(a,inputMode==='url'?inputSignature(importedBody,comments.filter(c=>c.text.trim()),proposition,inputMode,articleUrl):sig);setAnalysisResearchConsent(!!requestedResearch&&researchConsentRef.current&&a.mode==='live');if(!unchanged)setFixtureId(null);focusReport();}}catch(e){if(!c.signal.aborted&&n===sequence.current)showRequestError(e);}finally{if(n===sequence.current)setBusy(null);}
+    const requestedResearch=researchConsent&&!unchanged;setPreview(null);const {c,n}=begin('analyze');try{const a=await requestAnalysis(request,c.signal,value=>{if(!c.signal.aborted&&n===sequence.current)setPreview(value);});if(!c.signal.aborted&&n===sequence.current){const importedBody=a.sources.find(source=>source.kind==='body')?.text??body;if(inputMode==='url')updateBody(importedBody);accept(a,inputMode==='url'?inputSignature(importedBody,comments.filter(c=>c.text.trim()),proposition,inputMode,articleUrl):sig);setAnalysisResearchConsent(!!requestedResearch&&researchConsentRef.current&&a.mode==='live');if(!unchanged)setFixtureId(null);focusReport();}}catch(e){if(!c.signal.aborted&&n===sequence.current)showRequestError(e);}finally{if(n===sequence.current)setBusy(null);}
   }
   async function runVerify(){if(!analysis||stale)return;const expected=fixtureId?demoVerification(fixtureId).references:[];const demo=analysis.mode==='demo'&&!!fixtureId&&(references.length===0||JSON.stringify(references)===JSON.stringify(expected.map(r=>({id:r.id,text:r.text,url:r.url??''}))));
     if(!demo&&!cap?.live){setError(cap?.reason??'실시간 자료 대조는 준비 중이에요. 자료를 바꾸지 않은 가상 예시로 대조를 체험해 주세요.');return;}
     if(!demo&&!selectedClaims.length){setError('대조할 사실 주장을 1개 선택해 주세요.');return;}
     if(!demo&&!references.some(r=>r.text.trim())){setError('대조할 참고자료의 본문을 붙여 넣어 주세요.');return;}
-    const request=demo?{kind:'demo',fixtureId}:{kind:'text',transmissionConsent:true,parentAnalysisId:analysis.analysisId,sources:analysis.sources,claims:analysis.claims.filter(c=>selectedClaims.includes(c.id)),references:references.filter(r=>r.text.trim()||r.url.trim()).map(r=>({id:r.id,...(r.text.trim()?{text:r.text}:{}),...(r.url.trim()?{url:r.url}:{})})),useWebSearch:false};
+    const request=demo?{kind:'demo',fixtureId}:{kind:'text',transmissionConsent:true,parentAnalysisId:analysis.analysisId,analysisContextToken:analysis.analysisContextToken,sources:analysis.sources,claims:analysis.claims.filter(c=>selectedClaims.includes(c.id)),references:references.filter(r=>r.text.trim()||r.url.trim()).map(r=>({id:r.id,...(r.text.trim()?{text:r.text}:{}),...(r.url.trim()?{url:r.url}:{})})),useWebSearch:false};
     if(!demo){if(!transmissionConsent){setError(`자료의 ${PROVIDER_NAME} 전송 안내를 확인해 주세요.`);return;}if(containsContactInfo([body,proposition,...comments.map(c=>c.text),...references.flatMap(r=>[r.text,r.url])].join('\n'))){setError('원문·자료에서 전화번호·이메일을 지워 주세요.');return;}}
     const {c,n}=begin('verify');try{const v=await post<Verification>('/api/verify',request,c.signal);if(n===sequence.current){recordActivity('verification','completed',{count:v.checks.length});setVerification(v);setVerificationHistory(old=>[...old,v]);setCheckSources(old=>({...old,...Object.fromEntries(v.checks.map(c=>[c.claimId,v.references]))}));setChecks(old=>{const next=new Map(old.map(c=>[c.claimId,c]));for(const check of v.checks)next.set(check.claimId,check);return [...next.values()];});}}catch(e){if(!c.signal.aborted&&n===sequence.current)showRequestError(e,'verification');}finally{if(n===sequence.current)setBusy(null);}
   }
@@ -143,6 +146,7 @@ export default function Workbench(){
   </section>;
   const articlePanel=analysis&&!showBodyEditor?<><div className="studio-article-origin"><h2>{analysis.article?.title??'분석한 기사 본문'}</h2><span>{analysis.mode==='demo'?'가상 학교생활 예시':stale?'이전 입력의 본문':'현재 분석 원문'}</span>{analysis.article&&<small>분석 {analysis.article.analyzedCharacters.toLocaleString()} / {analysis.article.fullTextLength.toLocaleString()}자 {analysis.article.truncated?'· 기사 일부 분석':''}</small>}</div><ArticleReview analysis={analysis} checks={checks} researchResults={[...verificationHistory,...researchResults]}/></>:undefined;
   return <div className="canva-workspace forecast-workspace canva-native-app">
+    {busy==='analyze'&&preview&&<div className="notice" role="status"><span>원문 {preview.characters.toLocaleString()}자 · {preview.sentences}문장 · {preview.topic??'논점 확인 중'}<br/>규칙 탐색 · FOMO 표현 {preview.fomoSentences}문장 · 이름 있는 출처 {preview.namedSources}개<br/>AI의 편향·표현·근거 분석을 기다리고 있습니다.</span></div>}
     {busy&&view===null&&<div className="notice" role="status"><LoaderCircle size={16} className="spin"/><span>{busy==='analyze'?'기사 분석이 진행 중입니다.':'참고자료 대조가 진행 중입니다.'}</span><button type="button" className="small-button" onClick={()=>busy==='analyze'?focusInput():setView('evidence')}>진행 화면 열기</button><button type="button" className="small-button" onClick={cancel}>요청 취소</button></div>}
     <div aria-live="polite" aria-atomic="true">{error&&<div className="notice error" role="alert"><Info size={16}/>{error}</div>}{cancelled&&<div className="notice">요청을 취소했습니다.</div>}</div>
     <div ref={reportRef} tabIndex={-1} aria-label="기사 분석 작업 공간" className="canva-screen-focus">

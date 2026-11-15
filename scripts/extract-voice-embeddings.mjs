@@ -9,13 +9,13 @@ const localRoot=path.join(root,'.sites-runtime');
 const MODEL='nvidia/nemotron-3.5-embed-1b',DIMENSIONS=2048;
 const ENDPOINT='https://integrate.api.nvidia.com/v1/embeddings';
 const OPTIONS={model:MODEL,input_type:'passage',encoding_format:'float',truncate:'NONE',dimensions:DIMENSIONS};
-const RESERVATION=6500,MAX_BUDGET=117000,INTERVAL=60000;
+const RESERVATION=6500,MAX_BUDGET=117000,INTERVAL=60000,PROVIDER_INTERVAL=20000;
 const args=process.argv.slice(2),options={seedInputs:[],seedVectors:[]};
 for(let i=0;i<args.length;i++){
   const flag=args[i];
   if(flag==='--run'){options.run=true;continue;}
   if(flag==='--retry-unknown'){options.retryUnknown=true;continue;}
-  if(!['--input','--output','--ledger','--budget','--pacing','--seed-input','--seed-vectors'].includes(flag)||!args[i+1])throw Error('Use --input PATH --output PATH [--ledger PATH] [--budget 117000|unlimited] [--pacing fixed|provider] [--seed-input PATH --seed-vectors PATH] [--run]');
+  if(!['--input','--output','--ledger','--budget','--pacing','--seed-input','--seed-vectors','--batch-size','--max-body-bytes'].includes(flag)||!args[i+1])throw Error('Use --input PATH --output PATH [--budget unlimited --pacing provider] [--batch-size 32|64] [--max-body-bytes 6000..12000] [--seed-input PATH --seed-vectors PATH] [--run]');
   const value=args[++i];
   if(flag==='--seed-input')options.seedInputs.push(value);
   else if(flag==='--seed-vectors')options.seedVectors.push(value);
@@ -54,7 +54,14 @@ const budget=unlimited?Infinity:options.budget===undefined?MAX_BUDGET:Number(opt
 if(!unlimited&&(!Number.isSafeInteger(budget)||budget<RESERVATION||budget>MAX_BUDGET))throw Error('Budget must be 6500..117000 or explicitly unlimited');
 const pacing=options.pacing??'fixed';
 if(!['fixed','provider'].includes(pacing)||pacing==='provider'&&!unlimited)throw Error('Provider pacing requires explicit unlimited NVIDIA authorization');
-const interval=pacing==='provider'?0:INTERVAL;
+const interval=pacing==='provider'?PROVIDER_INTERVAL:INTERVAL;
+// The official schema accepts an input array without declaring maxItems.
+// Larger batches are explicit trials until the hosted endpoint is measured.
+const batchSize=options['batch-size']===undefined?32:Number(options['batch-size']);
+const maxBodyBytes=options['max-body-bytes']===undefined?6000:Number(options['max-body-bytes']);
+if(![32,64].includes(batchSize)||!Number.isSafeInteger(maxBodyBytes)||maxBodyBytes<6000||maxBodyBytes>12000)
+  throw Error('Use batch-size 32 or 64 and max-body-bytes from 6000 through 12000');
+if((batchSize>32||maxBodyBytes>6000)&&!unlimited)throw Error('Expanded batches require an explicit unlimited reservation policy');
 const input=load(inputPath),{inputDigest,...payload}=input;
 if(input.schemaVersion!=='voice-embedding-input-1.0'||sha(canonical(payload))!==inputDigest)throw Error('Prepared input digest mismatch');
 if(canonical(input.embedding)!==canonical(OPTIONS))throw Error('Only the reviewed fixed model/options are supported');
@@ -66,11 +73,11 @@ function batches(records){
   const result=[];let current=[];
   for(const record of records){
     const candidate=[...current,record];
-    if(candidate.length>32||Buffer.byteLength(JSON.stringify({...OPTIONS,input:candidate.map(item=>item.text)}),'utf8')>6000){
+    if(candidate.length>batchSize||Buffer.byteLength(JSON.stringify({...OPTIONS,input:candidate.map(item=>item.text)}),'utf8')>maxBodyBytes){
       if(!current.length)throw Error('One sentence exceeds the fixed request byte ceiling');
       result.push(current);current=[record];
     }else current=candidate;
-    if(Buffer.byteLength(JSON.stringify({...OPTIONS,input:current.map(item=>item.text)}),'utf8')>6000)throw Error('One sentence exceeds the fixed request byte ceiling');
+    if(Buffer.byteLength(JSON.stringify({...OPTIONS,input:current.map(item=>item.text)}),'utf8')>maxBodyBytes)throw Error('One sentence exceeds the configured request byte ceiling');
   }
   if(current.length)result.push(current);return result;
 }
@@ -119,7 +126,7 @@ function seededState(){
 let checkpoint=seededState();
 const pending=input.records.filter(record=>!Object.hasOwn(checkpoint.vectors,record.key));
 const planned=batches(pending);
-console.log(JSON.stringify({mode:options.run?'run':'dry-run',model:MODEL,dimensions:DIMENSIONS,totalRecords:input.records.length,completedRecords:Object.keys(checkpoint.vectors).length,pendingRecords:pending.length,plannedCalls:planned.length,requiredReservation:planned.length*RESERVATION,dailyBudget:unlimited?null:budget,budgetPolicy:unlimited?'user-authorized-unlimited':'bounded',maxCallsPerDay:unlimited?null:Math.floor(budget/RESERVATION),inputDigest}));
+console.log(JSON.stringify({mode:options.run?'run':'dry-run',model:MODEL,dimensions:DIMENSIONS,totalRecords:input.records.length,completedRecords:Object.keys(checkpoint.vectors).length,pendingRecords:pending.length,plannedCalls:planned.length,requiredReservation:planned.length*RESERVATION,dailyBudget:unlimited?null:budget,budgetPolicy:unlimited?'user-authorized-unlimited':'bounded',maxCallsPerDay:unlimited?null:Math.floor(budget/RESERVATION),minimumDispatchIntervalMs:interval,batchSize,maxBodyBytes,inputDigest}));
 if(!options.run)process.exit(0);
 const apiKey=process.env.NVIDIA_API_KEY;
 if(pending.length&&(typeof apiKey!=='string'||!apiKey.trim()))throw Error('Existing NVIDIA_API_KEY environment variable is required');
@@ -151,7 +158,7 @@ try{
   const retriedReservations=unknown.map(request=>request.id);
   if(unknown.length){for(const request of unknown)request.retryAuthorizedAt=new Date().toISOString();save(ledgerPath,ledger);}
   for(const batch of work){
-    await sleep(Math.max(0,ledger.lastDispatchAt+interval-Date.now()));
+    await sleep(Math.max(0,Math.max(ledger.lastDispatchAt+interval,ledger.retryAfterAt??0)-Date.now()));
     const day=dayKey(),entry=ledger.days[day]??{reservedTokens:0,requests:[]};
     if(!Number.isSafeInteger(entry.reservedTokens)||entry.reservedTokens<0||!Array.isArray(entry.requests))throw Error('Corrupt daily reservation record');
     if(entry.reservedTokens+RESERVATION>budget){console.log(JSON.stringify({status:'daily_budget_exhausted',day,reservedTokens:entry.reservedTokens,pendingRecords:input.records.length-Object.keys(checkpoint.vectors).length}));process.exitCode=3;break;}
@@ -160,10 +167,19 @@ try{
     entry.reservedTokens+=RESERVATION;entry.requests.push(reservation);ledger.days[day]=entry;ledger.lastDispatchAt=Date.now();
     save(ledgerPath,ledger); // Reservation is durable BEFORE any request.
     const body=JSON.stringify({...OPTIONS,input:batch.map(record=>record.text)});
-    if(batch.length>32||Buffer.byteLength(body,'utf8')>6000)throw Error('Dispatch exceeds the fixed request ceiling');
+    if(batch.length>batchSize||Buffer.byteLength(body,'utf8')>maxBodyBytes)throw Error('Dispatch exceeds the configured request ceiling');
     try{
       const response=await fetch(ENDPOINT,{method:'POST',headers:{Authorization:`Bearer ${apiKey}`, 'Content-Type':'application/json'},body,signal:AbortSignal.timeout(60000),redirect:'error'});
-      if(!response.ok)throw Error(`Embedding HTTP ${response.status}; stopped without retry`);
+      if(!response.ok){
+        if(response.status===429){
+          const retry=response.headers.get('retry-after')??'';
+          const retryMs=/^\d+$/.test(retry)?Number(retry)*1000:Date.parse(retry)-Date.now();
+          ledger.retryAfterAt=Date.now()+Math.max(60000,Math.min(86400000,Number.isFinite(retryMs)?retryMs:60000));
+          reservation.status='rate_limited';
+        }
+        await response.body?.cancel().catch(()=>{});
+        throw Error(`Embedding HTTP ${response.status}; stopped without retry`);
+      }
       const value=await response.json();
       if(value.model!==MODEL||!Array.isArray(value.data)||value.data.length!==batch.length)throw Error('Embedding response model or record count mismatch');
       const indices=new Set();
@@ -178,7 +194,7 @@ try{
       Object.assign(reservation,status);save(ledgerPath,ledger);
       console.log(JSON.stringify({status:'batch_completed',completedRecords:Object.keys(checkpoint.vectors).length,totalRecords:input.records.length,dayReservedTokens:entry.reservedTokens,usageStatus:status.usageStatus}));
     }catch(error){
-      reservation.status='failed_or_unknown';save(ledgerPath,ledger);
+      if(reservation.status!=='rate_limited')reservation.status='failed_or_unknown';save(ledgerPath,ledger);
       // Never print response payloads, request text, headers or credentials.
       const safe=/^Embedding (HTTP \d+; stopped without retry|response model or record count mismatch|response index\/vector validation failed)$/.test(error.message)?error.message:'Embedding request failed; reservation retained; no automatic retry';
       throw Error(safe);

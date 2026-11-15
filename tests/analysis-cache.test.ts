@@ -11,6 +11,31 @@ beforeEach(()=>{vi.stubGlobal('caches',undefined);});
 afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();});
 
 describe('short-lived analysis reuse',()=>{
+ it('does not let the first public caller cancel another caller sharing the analysis',async()=>{
+  const abort=new AbortController();const firstRequest=new Request('https://site.test/api/analyze',{signal:abort.signal,headers:{'cf-connecting-ip':'owner'}});
+  const url={kind:'url' as const,url:'https://news.example/shared-cancel',comments:[],transmissionConsent:true as const};
+  let done!:(value:ReturnType<typeof result>)=>void;let sharedSignal:AbortSignal|undefined;
+  const action=vi.fn((signal?:AbortSignal)=>{sharedSignal=signal;return new Promise<ReturnType<typeof result>>(resolve=>{done=resolve;});});
+  const first=cachedAnalysis(firstRequest,url,config,'cancel-owner',action,{articleHash:'same-body'});
+  const rejected=expect(first).rejects.toMatchObject({name:'AbortError'});
+  const other=cachedAnalysis(request('other'),url,config,'other',action,{articleHash:'same-body'});
+  await vi.waitFor(()=>expect(action).toHaveBeenCalledOnce());
+  // Wait for the second caller to attach after its asynchronous fingerprint.
+  await new Promise(resolve=>setTimeout(resolve,20));abort.abort();await rejected;
+  expect(sharedSignal!.aborted).toBe(false);done(result());
+  expect((await other).cache).toBe('coalesced');
+ });
+ it('shares revalidated public article results for 24 hours and invalidates a changed body',async()=>{
+  vi.useFakeTimers();const action=vi.fn(async()=>result());
+  const url={kind:'url' as const,url:'https://news.example/24-hour',comments:[],transmissionConsent:true as const};
+  await cachedAnalysis(request('public-a'),url,config,'a',action,{articleHash:'body-one'});
+  vi.setSystemTime(Date.now()+23*60*60*1000);
+  expect((await cachedAnalysis(request('public-b'),url,config,'b',action,{articleHash:'body-one'})).cache).toBe('hit');
+  expect((await cachedAnalysis(request(),url,config,'changed',action,{articleHash:'body-two'})).cache).toBe('miss');
+  vi.setSystemTime(Date.now()+2*60*60*1000);
+  expect((await cachedAnalysis(request(),url,config,'expired',action,{articleHash:'body-one'})).cache).toBe('miss');
+  expect(action).toHaveBeenCalledTimes(3);
+ });
  it('coalesces simultaneous identical requests and gives each response its own identity',async()=>{
   let resolve!:(value:ReturnType<typeof result>)=>void;
   const action=vi.fn(()=>new Promise<ReturnType<typeof result>>(done=>{resolve=done;}));

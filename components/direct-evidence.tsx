@@ -35,7 +35,7 @@ export default function DirectEvidence({analysis,cap,locked,onBusy,onProgress,on
   const selectedClaim=factual.find(claim=>claim.id===claimId);
   const targetId=selectedClaim?.id??(proposition?'comparison_position':position?.id);
   if(!targetId){controller.current=null;setBusy(false);callbacks.current.onBusy(false);return;}
-  const input:ResearchInput={sources:analysis.sources,claims:selectedClaim?[selectedClaim]:[],proposition,position,transmissionConsent:true,researchConsent:true};
+  const input:ResearchInput={sources:analysis.sources,claims:selectedClaim?[selectedClaim]:[],proposition,position,articleContextToken:analysis.articleContextToken,analysisContextToken:analysis.analysisContextToken,transmissionConsent:true,researchConsent:true};
   async function post<T>(body:unknown):Promise<T>{
    const response=await fetch('/api/research',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.any([c.signal,AbortSignal.timeout(researchRequestTimeout(cap))])});
    const data=await response.json() as {error?:{message?:string}};if(c.signal.aborted)throw new DOMException('취소됨','AbortError');

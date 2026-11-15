@@ -4,18 +4,43 @@ import type {ResearchInput} from '../lib/research-contract';
 import * as language from '../lib/server/language';
 import * as news from '../lib/server/news';
 import * as retrieval from '../lib/server/retrieval';
+import * as voiceAnalysis from '../lib/server/voice-analysis';
 import * as searchBudget from '../lib/server/search-budget';
 import {planResearch,discoverEvidence,compareEvidence,researchExcerpt} from '../lib/server/research';
 import type {RuntimeConfig} from '../lib/server/config';
+import {clearResearchSearchCache} from '../lib/server/search-cache';
 import {verifiedRecommendations,reliabilityReview} from '../lib/reliability';
 import {makeSources} from '../lib/domain';
 import {AppError} from '../lib/server/errors';
 const request=()=>new Request('https://site.test/api/research',{headers:{'cf-connecting-ip':'192.0.2.1'}});
 const config:RuntimeConfig={AI_PROVIDER:'groq',ENABLE_LIVE_ANALYSIS:'true',GROQ_API_KEY:'synthetic-only-not-real',GROQ_MODEL:'openai/gpt-oss-120b',GROQ_ELIGIBILITY_CONFIRMED:'true',GROQ_FREE_PLAN_CONFIRMED:'true',GROQ_CONSOLE_LIMITS_CONFIRMED:'true',GROQ_CONSOLE_RPD:'1000',GROQ_CONSOLE_TPD:'200000',ENABLE_NEWS_SEARCH:'true',NEWS_TERMS_APPROVED:'true',ALLOWED_RETRIEVAL_HOSTS:'news.example',DB:{} as D1Database};
 const input=():ResearchInput=>{const a=demoAnalysis('conflict');return {sources:a.sources,claims:a.claims.filter(c=>c.kind==='factual').slice(0,1),transmissionConsent:true,researchConsent:true};};
-afterEach(()=>vi.restoreAllMocks());
+afterEach(()=>{clearResearchSearchCache();vi.restoreAllMocks();});
 function planner(i:ResearchInput){return vi.spyOn(language,'structured').mockResolvedValue({queries:[{claimId:i.claims[0].id,label:'운영 시간',query:'school library closing time',purpose:'fact_check'}]});}
 describe('자동 조사 단계 연결 (모의 검색·모의 LLM, 실서비스 검증 아님)',()=>{
+ it('같은 검색어의 다음 계획에 캐시 인덱스를 알려 주고 검색 예약을 추가하지 않는다',async()=>{
+  const i=input();planner(i);
+  const reserve=vi.spyOn(searchBudget,'reserveSearch').mockResolvedValue(undefined);
+  const search=vi.spyOn(news,'searchNews').mockResolvedValue({provider:'gdelt',query:'school library closing time',status:'empty',articles:[],searchedAt:new Date().toISOString(),scopeNote:'모의 응답'});
+  const first=await planResearch(request(),i,config,AbortSignal.timeout(1000));
+  expect(first.cachedQueryIndexes).toEqual([]);
+  await discoverEvidence(request(),i,first.token,0,config,AbortSignal.timeout(1000));
+  const next=await planResearch(request(),i,config,AbortSignal.timeout(1000));
+  expect(next.cachedQueryIndexes).toEqual([0]);
+  await discoverEvidence(request(),i,next.token,0,config,AbortSignal.timeout(1000));
+  expect(search).toHaveBeenCalledTimes(1);expect(reserve).toHaveBeenCalledTimes(1);
+ });
+ it('비교 기사의 저장 좌표가 없으면 실시간 임베딩을 호출하지 않고 미계산 상태를 유지한다',async()=>{
+  const i=input();planner(i);const plan=await planResearch(request(),i,config,AbortSignal.timeout(1000));
+  vi.spyOn(searchBudget,'reserveSearch').mockResolvedValue(undefined);
+  vi.spyOn(news,'searchNews').mockResolvedValue({provider:'gdelt',query:'school library closing time',status:'success',articles:[{id:'n1',title:'공개 합성 자료',url:'https://news.example/cache-miss',publisherDomain:'news.example',language:'Korean',provenance:'search_result',stance:'not_checked'}],searchedAt:new Date().toISOString(),scopeNote:'모의 응답'});
+  vi.spyOn(retrieval,'retrieve').mockResolvedValue({id:'web_0_0',text:'공개 합성 자료의 운영 내용을 기록한다. '.repeat(20),url:'https://news.example/cache-miss',provenance:'web_fetched',fetchedAt:new Date().toISOString(),truncated:false});
+  const lookup=vi.spyOn(voiceAnalysis,'lookupStoredArticleVoices').mockResolvedValue(null);
+  const realtime=vi.spyOn(voiceAnalysis,'analyzeArticleVoices');
+  const evidence=await discoverEvidence(request(),i,plan.token,0,config,AbortSignal.timeout(1000));
+  expect(lookup).toHaveBeenCalledTimes(1);expect(realtime).not.toHaveBeenCalled();
+  expect(evidence.references[0].voiceAnalysisStatus).toBe('unavailable');expect(evidence.references[0].voiceCoordinates).toBeUndefined();
+ });
  it.each(['SEARCH_LOCK_BUSY','SEARCH_RATE_LIMITED','SEARCH_UNAVAILABLE'])('예약 복원은 실제 전송 전 잠금 실패에만 적용한다 (%s)',async code=>{
   const i=input();planner(i);const plan=await planResearch(request(),i,config,AbortSignal.timeout(1000));
   const reserve=vi.spyOn(searchBudget,'reserveSearch').mockResolvedValue(undefined),release=vi.spyOn(searchBudget,'releaseSearch').mockResolvedValue(undefined);

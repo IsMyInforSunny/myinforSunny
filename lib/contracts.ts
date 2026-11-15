@@ -1,7 +1,7 @@
 import { z } from 'zod/v4';
 
 export const RUBRIC = 'rubric-4.0';
-export const ANALYSIS_PROMPT_VERSION='analysis-4.18-body-position';
+export const ANALYSIS_PROMPT_VERSION='analysis-4.19-parallel';
 export const MAX_ARTICLE_CHARACTERS = 8000;
 const id = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 const text = (max: number) => z.string().min(1).max(max).refine(v => v.trim().length > 0, '내용을 입력해 주세요.');
@@ -51,6 +51,7 @@ export type Analysis = {
   voiceCoordinates?:import('./voice-comparison').VoiceCoordinate[];
   issueQuarterComparison?:import('./server/issue-quarter-comparison').IssueQuarterComparison;
   articleContextToken?:string;
+  analysisContextToken?:string;
   expressions:Expression[]; claims:Claim[]; perspectiveQuestions:{text:string;basis:Span[]}[];
   counterArguments?:CounterArgument[];searchSuggestions?:SearchSuggestion[];
   indicators:{topics:{topicId:string;coverage:Ratio}[];expression:Ratio;expressionUndetermined:number;evidenceSupport:Ratio;verificationProgress:Ratio};
@@ -60,7 +61,7 @@ export type Analysis = {
 export const referenceInputSchema = z.object({ id, text:text(1500).optional(), url:z.string().url().max(2048).refine(v=>/^https?:\/\//.test(v),'HTTP/HTTPS 주소만 지원합니다.').optional() }).strict().refine(v=>v.text || v.url,'자료 본문 또는 주소가 필요합니다.');
 export const verifyRequestSchema = z.discriminatedUnion('kind',[
   z.object({kind:z.literal('demo'),fixtureId:id}).strict(),
-  z.object({kind:z.literal('text'),parentAnalysisId:id.optional(),sources:z.array(sourceSchema).min(1).max(6),claims:z.array(claimSchema).min(1).max(1),references:z.array(referenceInputSchema).max(2),useWebSearch:z.literal(false),transmissionConsent:z.literal(true)}).strict(),
+  z.object({kind:z.literal('text'),parentAnalysisId:id.optional(),analysisContextToken:z.string().min(1).max(8000).optional(),sources:z.array(sourceSchema).min(1).max(6),claims:z.array(claimSchema).min(1).max(1),references:z.array(referenceInputSchema).max(2),useWebSearch:z.literal(false),transmissionConsent:z.literal(true)}).strict(),
 ]);
 export type VerifyTextRequest = Omit<Extract<z.infer<typeof verifyRequestSchema>,{kind:'text'}>,'transmissionConsent'>;
 export type Reference = { id:string;provenance:'provided_text'|'web_fetched';text:string;url?:string;title?:string;publishedAt?:string;fetchedAt?:string;truncated:boolean;publisherGroup?:string;fullTextLength?:number;extractionVersion?:string;

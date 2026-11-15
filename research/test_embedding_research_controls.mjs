@@ -24,6 +24,7 @@ test('unlimited research authorization is explicit and dry-run never requires cr
     const bounded=run();assert.equal(bounded.status,0);assert.equal(JSON.parse(bounded.stdout).dailyBudget,117000);
     const unlimited=run('--budget','unlimited','--pacing','provider');assert.equal(unlimited.status,0);
     assert.equal(JSON.parse(unlimited.stdout).dailyBudget,null);assert.equal(JSON.parse(unlimited.stdout).budgetPolicy,'user-authorized-unlimited');
+    assert.equal(JSON.parse(unlimited.stdout).minimumDispatchIntervalMs,20000);
     assert.notEqual(run('--pacing','provider').status,0);
     assert.notEqual(run('--budget','999999').status,0);
     const seedFile=path.join(directory,'seed.json');
@@ -34,5 +35,15 @@ test('unlimited research authorization is explicit and dry-run never requires cr
     assert.equal(Object.keys(JSON.parse(readFileSync(outputFile,'utf8')).vectors).length,1);
     const wrong=JSON.parse(readFileSync(seedFile,'utf8'));wrong.inputDigest='unrelated';writeFileSync(seedFile,JSON.stringify(wrong));
     assert.notEqual(run('--seed-input',inputFile,'--seed-vectors',seedFile).status,0);
+    const large={...input,records:Array.from({length:64},(_,index)=>{
+      const sentence=`Retained CLI contract sentence ${index}.`;
+      return {key:sha(sentence),text:sentence,sourceIDs:[{articleId:'cli-contract',sentenceId:'s'+index}]};
+    })};
+    delete large.inputDigest;large.inputDigest=sha(canonical(large));
+    const largeInput=path.join(directory,'large.json');writeFileSync(largeInput,JSON.stringify(large));
+    const expanded=spawnSync(process.execPath,[script,'--input',largeInput,'--output',path.join(directory,'large-vectors.json'),
+      '--budget','unlimited','--pacing','provider','--batch-size','64','--max-body-bytes','12000'],{encoding:'utf8',env:{...process.env,NVIDIA_API_KEY:''}});
+    assert.equal(expanded.status,0,expanded.stderr);assert.equal(JSON.parse(expanded.stdout).plannedCalls,1);
+    assert.equal(JSON.parse(expanded.stdout).batchSize,64);assert.equal(JSON.parse(expanded.stdout).minimumDispatchIntervalMs,20000);
   }finally{rmSync(directory,{recursive:true,force:true});}
 });

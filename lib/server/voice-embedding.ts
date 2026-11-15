@@ -82,11 +82,18 @@ export async function inferEmbeddingVoices(body:string,topic:VoiceTopic,config:R
       try{await work;}finally{if(pending.get(id)===work)pending.delete(id);}}
     for(const item of items){const cached=vectors.get(item.key);if(cached)resolved.set(item.key,cached.value);}
   };
+  const batches:typeof batch[]=[];
   for(const record of records.values()){
-    if(batch.length&&(batch.length>=32||requestBodyBytes([...batch,record])>6000)){await send(batch);batch=[];}
+    if(batch.length&&(batch.length>=32||requestBodyBytes([...batch,record])>6000)){batches.push(batch);batch=[];}
     batch.push(record);
   }
-  if(batch.length)await send(batch);
+  if(batch.length)batches.push(batch);
+  // Small groups bound provider concurrency for long articles as well.
+  for(let start=0;start<batches.length;start+=3){
+    const settled=await Promise.allSettled(batches.slice(start,start+3).map(send));
+    const failed=settled.find(item=>item.status==='rejected');
+    if(failed?.status==='rejected')throw failed.reason;
+  }
   signal.throwIfAborted();
   const labels=units.map<VoiceLabel>(unit=>{
     if(isVoiceBoilerplate(unit.text))return {sentenceId:unit.sentenceId,issue:'none',direction:'neutral' as const,speaker:'unknown' as const,excluded:true as const};

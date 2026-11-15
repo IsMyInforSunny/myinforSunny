@@ -8,9 +8,9 @@ import {capabilities,provider,type RuntimeConfig} from './config';
 import {AppError} from './errors';
 import {structured} from './language';
 import {validateVerifyInput,verify} from './verify';
-import {searchNews} from './news';
+import {cachedResearchSearch,isResearchSearchCached} from './search-cache';
 import {allowedUrl,retrieve} from './retrieval';
-import {isSearchLockBusy,releaseSearch,reserveSearch} from './search-budget';
+import {releaseSearch,reserveSearch} from './search-budget';
 import {digest,readResearchToken,signResearchToken} from './research-token';
 import {normalizeSourceUrl,selectDiverseSources} from '../source-quality';
 import {releasedBiasModel} from '../bias-model-release';
@@ -19,7 +19,7 @@ import {reviewCitedSources} from '../cited-sources';
 import {canonicalPublisherHost} from '../source-reliability';
 import {actorHash} from './budget';
 import {assertResearchBatch,researchWaitReasons,waitReasonText} from './score-workflow';
-import {analyzeArticleVoices,releasedVoiceModel,releasedEmbeddingVoiceModel,releasedVoiceTopics} from './voice-analysis';
+import {lookupStoredArticleVoices,releasedVoiceTopics} from './voice-analysis';
 import {readVoiceArticleContext,type VoiceArticleContext} from './voice-article-context';
 import {VOICE_TOPICS,type VoiceTopic} from '../sentence-voice';
 
@@ -36,10 +36,10 @@ export function validateResearch(input:ResearchInput){
  if(input.position){if(input.position.kind!=='opinion'||input.claims.some(c=>c.id===input.position!.id))throw new AppError(422,'VALIDATION_ERROR','다른 관점의 탐색 대상은 별도로 추출한 의견이어야 합니다.');validateVerifyInput({kind:'text',sources:input.sources,claims:[input.position],references:[],useWebSearch:false});}
  if(input.proposition!==undefined&&(!input.proposition.trim()||input.proposition.length>160))throw new AppError(422,'VALIDATION_ERROR','비교 명제를 160자 이내로 입력해 주세요.');
  if(!input.claims.length&&!input.position&&!input.proposition)throw new AppError(422,'VALIDATION_ERROR','조사할 주장·의견이나 비교 명제가 없습니다.');
- const {articleContextToken,...content}=input;
+ const {articleContextToken,analysisContextToken,...content}=input;
  if(containsContactInfo(JSON.stringify(content)))throw new AppError(422,'PRIVACY_INPUT_REJECTED','개인 연락처를 지우고 다시 분석해 주세요.');
 }
-const inputHash=(input:ResearchInput)=>digest({sources:input.sources,claims:input.claims,position:input.position??null,proposition:input.proposition??null,...(input.articleContextToken?{articleContextToken:input.articleContextToken}:{})});
+const inputHash=(input:ResearchInput)=>digest({sources:input.sources,claims:input.claims,position:input.position??null,proposition:input.proposition??null,...(input.articleContextToken?{articleContextToken:input.articleContextToken}:{}),...(input.analysisContextToken?{analysisContextToken:input.analysisContextToken}:{})});
 /** A user-selected comparison dimension is not an extracted factual claim.
  * Its query ID must not shadow an actual claim ID, and it has no invented origin quote.
  */
@@ -87,9 +87,12 @@ export async function planResearch(request:Request,input:ResearchInput,config:Ru
  const expiresAt=new Date(Date.now()+30*60000).toISOString();const planId=crypto.randomUUID();
  const queries=out.queries.map(query=>({...query,query:query.query.normalize('NFC')}));
  const data:PlanData={planId,inputDigest:await inputHash(input),queries,expiresAt};
- const evidenceUsesModel=!!releasedEmbeddingVoiceModel&&provider(config)==='nvidia';
- const minimumModelIntervalMs=evidenceUsesModel?20100:['nvidia','deepseek'].includes(provider(config))?0:61000;
- return {schemaVersion:'research-1.0',planId,queries:data.queries,claimCount:input.claims.length,expiresAt,token:await signResearchToken(request,config,'plan',data),nextModelCallAt:new Date(Date.now()+minimumModelIntervalMs).toISOString(),evidenceUsesModel,minimumModelIntervalMs};
+ const evidenceUsesModel=false;
+ const minimumModelIntervalMs=['nvidia','deepseek'].includes(provider(config))?0:61000;
+ const actor=await actorHash(request,config);
+ const cached=await Promise.all(queries.map(query=>isResearchSearchCached(query.query,config,actor)));
+ const cachedQueryIndexes=cached.flatMap((value,index)=>value?[index]:[]);
+ return {schemaVersion:'research-1.0',planId,queries:data.queries,claimCount:input.claims.length,expiresAt,token:await signResearchToken(request,config,'plan',data),nextModelCallAt:new Date(Date.now()+minimumModelIntervalMs).toISOString(),evidenceUsesModel,minimumModelIntervalMs,cachedQueryIndexes};
 }
 /** Pick a bounded excerpt around overlapping terms, retaining offsets in the extracted text. */
 export function researchExcerpt(text:string,claim:string,limit=1500){
@@ -103,9 +106,9 @@ export function researchExcerpt(text:string,claim:string,limit=1500){
 async function evidenceSource(fetched:NonNullable<Awaited<ReturnType<typeof retrieve>>>,url:string,title:string,publisherDomain:string,input:ResearchInput,claimText:string,fallbackVersion:string,anchor:VoiceArticleContext|null|undefined,config:RuntimeConfig,signal:AbortSignal):Promise<RetrievedEvidence>{
  if(!fetched.truncated){
   try{
-   const voices=await analyzeArticleVoices(fetched.text,{url,title:fetched.title||title,publishedAt:fetched.publishedAt},releasedVoiceModel,
-     anchor?{...anchor,body:input.sources.find(source=>source.kind==='body')!.text}:undefined,{config,signal});
-   if(voices){fetched.voiceCoordinates=voices.coordinates;fetched.voiceAnalysisStatus='complete';}else fetched.voiceAnalysisStatus='off_scope';
+   const voices=await lookupStoredArticleVoices(fetched.text,{url,title:fetched.title||title,publishedAt:fetched.publishedAt},
+     anchor?{...anchor,body:input.sources.find(source=>source.kind==='body')!.text}:undefined);
+   if(voices){fetched.voiceCoordinates=voices.coordinates;fetched.voiceAnalysisStatus='complete';}else fetched.voiceAnalysisStatus='unavailable';
   }catch(error){if(signal.aborted)throw error;fetched.voiceAnalysisStatus='unavailable';}
  }
  const biasModel=releasedBiasModel;
@@ -158,7 +161,7 @@ export async function importEvidence(request:Request,input:ResearchInput,claimId
  return {schemaVersion:'evidence-1.0',planId,claimId,references,attempts,expiresAt,token:await signResearchToken(request,config,'evidence',data)};
 }
 /** Only signed plan queries can reach the fixed search endpoint. Publisher fetches remain allowlisted. */
-export async function discoverEvidence(request:Request,input:ResearchInput,planToken:string,queryIndex:number,config:RuntimeConfig,signal:AbortSignal,excludeUrls:string[]=[]):Promise<EvidenceBundle>{
+export async function discoverEvidence(request:Request,input:ResearchInput,planToken:string,queryIndex:number,config:RuntimeConfig,signal:AbortSignal,excludeUrls:string[]=[],cacheOnly=false):Promise<EvidenceBundle>{
  requireResearch(config);validateResearch(input);
  const anchor=await readVoiceArticleContext(request,config,input);
  const exclusions=researchExcludedUrlsSchema.safeParse(excludeUrls);
@@ -174,10 +177,8 @@ export async function discoverEvidence(request:Request,input:ResearchInput,planT
  let result=searchIndexedNews(query.query,config,true,exclusions.data);
  if(!result){
   const reservationId=await digest({planId:plan.planId,queryIndex});
-  await reserveSearch(request,config,reservationId);
-  // Only the pre-dispatch lock failure frees the reservation; no automatic retry.
-  try{result=await searchNews(query.query,config,signal);}
-  catch(e){if(isSearchLockBusy(e))await releaseSearch(request,config,reservationId);throw e;}
+  result=await cachedResearchSearch(query.query,config,signal,await actorHash(request,config),
+    ()=>reserveSearch(request,config,reservationId),()=>releaseSearch(request,config,reservationId),{cacheOnly});
  }
  attempts.push({stage:'search',query:query.query,status:result.articles.length?'completed':'empty'});
  const hosts=config.ALLOWED_RETRIEVAL_HOSTS!.split(',').map(h=>h.trim()).filter(Boolean);

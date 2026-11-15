@@ -21,8 +21,8 @@ export async function actorHash(request:Request,config:Pick<RuntimeConfig,'IP_HA
   }
   return hex(await hmac(key,`ip:${request.headers.get('cf-connecting-ip')??'local'}`));
 }
-export async function withBudget<T>(request:Request,config:RuntimeConfig,requestId:string,timeout:number,action:(config:RuntimeConfig,signal:AbortSignal)=>Promise<T>):Promise<T>{
-  if(provider(config)==='nvidia')return withNvidiaBudget(request,config,requestId,Math.max(timeout,NVIDIA_TIMEOUT_MS),action);
+export async function withBudget<T>(request:Request,config:RuntimeConfig,requestId:string,timeout:number,action:(config:RuntimeConfig,signal:AbortSignal)=>Promise<T>,groupId?:string):Promise<T>{
+  if(provider(config)==='nvidia')return withNvidiaBudget(request,config,requestId,Math.max(timeout,NVIDIA_TIMEOUT_MS),action,'nvidia',groupId);
   if(provider(config)==='deepseek')return withNvidiaBudget(request,config,requestId,Math.max(timeout,600000),action,'deepseek');
   if(config.ENABLE_LIVE_ANALYSIS!=='true'||!providerReady(config)||!dailyLimits(config).verified||!config.DB)throw new AppError(503,'FEATURE_UNAVAILABLE','실시간 분석은 준비 중입니다. 예시 체험을 이용해 주세요.');
   const minute=minuteLimits(config);

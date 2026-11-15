@@ -12,6 +12,8 @@ import type {VoiceArticleContext} from './voice-article-context';
 import {inferEmbeddingVoices,releasedEmbeddingVoiceModel} from './voice-embedding';
 import type {RuntimeConfig} from './config';
 import {AppError} from './errors';
+import {readPrecomputedVoiceDocument} from './precomputed-voices';
+import {VOICE_INDEPENDENT_NEUTRAL} from '../sentence-voice';
 
 // Experimental weights never enter this module or the browser bundle.
 export const releasedVoiceModel=parseVoiceModel(artifact);
@@ -19,9 +21,24 @@ export {releasedEmbeddingVoiceModel};
 export const releasedVoiceTopics=[...new Set([...Object.keys(releasedVoiceModel?.topics??{}),...Object.keys(releasedEmbeddingVoiceModel?.topics??{})])];
 type Article={url?:string;title?:string;publishedAt?:string};
 
+/** Related articles use this lookup exclusively, without a new provider call. */
+export async function lookupStoredArticleVoices(body:string,article:Article={},anchor?:VoiceArticleContext&{body:string}){
+  const topic=classifyRelativeTopic(body,article.title);
+  const articleIssue=topic?selectArticleVoiceIssue(body,topic,undefined,article.title):null;
+  if(!topic||!articleIssue)return null;
+  const semantic=releasedEmbeddingVoiceModel?.topics[topic]?releasedEmbeddingVoiceModel:null;
+  const selected=semantic??(releasedVoiceModel?.topics[topic]?releasedVoiceModel:null);
+  if(!selected)return null;
+  const document=await readPrecomputedVoiceDocument(body,{modelVersion:selected.version,
+    decisionPolicy:semantic?(semantic.decisionPolicy??'voice-joint-1.0'):VOICE_INDEPENDENT_NEUTRAL,topic,articleIssue});
+  return document?{document,coordinates:await articleVoiceCoordinates(body,document,article,selected.trainingArticleHashes,anchor)}:null;
+}
+
 /** Full retrieved body, before an excerpt is selected; the released semantic
  * model requires the provider lease and never silently uses another model. */
 export async function analyzeArticleVoices(body:string,article:Article={},model:VoiceModel|null=releasedVoiceModel,anchor?:VoiceArticleContext&{body:string},runtime?:{config:RuntimeConfig;signal:AbortSignal}){
+  const retained=model===releasedVoiceModel?await lookupStoredArticleVoices(body,article,anchor):null;
+  if(retained)return retained;
   const topic=classifyRelativeTopic(body,article.title);
   const articleIssue=topic?selectArticleVoiceIssue(body,topic,undefined,article.title):null;
   if(releasedEmbeddingVoiceModel&&topic&&releasedEmbeddingVoiceModel.topics[topic]){

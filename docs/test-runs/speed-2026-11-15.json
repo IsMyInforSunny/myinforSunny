@@ -1,0 +1,703 @@
+{
+  "schemaVersion": "speed-plan-evidence-1.0",
+  "generatedAt": "2026-11-15T10:58:57.776Z",
+  "scope": {
+    "actualArticles": 5,
+    "publishers": 4,
+    "articleTextOrUrlsIncluded": false,
+    "externalNewsSearchEnabled": false,
+    "productionDeployed": false,
+    "visualCheckCompleted": false,
+    "visualCheckBlockedReason": "Unrelated YouTube window capture rejected by automatic approval review; requested user to open target site.",
+    "baselineCommit": "5148b9d",
+    "comparisonModel": "nvidia/nemotron-3.5-lightning-30b-a3b",
+    "productionModelUnchanged": true,
+    "limitations": [
+      "Single sequential local run per version, no statistical latency guarantee.",
+      "All completed live analyses are partial because no released sentence-voice model is installed.",
+      "No production SVM embedding latency or end-to-end automated reliability research measurement.",
+      "Isolated local databases; no budget bypass or retries after provider 429.",
+      "A separate test against a shared database stopped on application RATE_LIMITED before provider dispatch."
+    ]
+  },
+  "before": {
+    "startedAt": "2026-11-15T10:56:10.348Z",
+    "completedAt": "2026-11-15T10:58:08.276Z",
+    "completedArticleCount": 4,
+    "completedCacheCount": 0,
+    "measurements": [
+      {
+        "publisher": "dailian.co.kr",
+        "phase": "first",
+        "status": "completed",
+        "httpStatus": 200,
+        "initialPreviewMs": null,
+        "totalMs": 17168,
+        "cache": "miss",
+        "resultStatus": "partial",
+        "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "voiceModelVersion": null,
+        "voicesPresent": false,
+        "embeddingStatus": "no_released_voice_model",
+        "warningCodes": [
+          "VOICE_MODEL_UNAVAILABLE"
+        ],
+        "errorCode": null,
+        "articleIndex": 1,
+        "stages": [
+          {
+            "stage": "retrieved",
+            "durationMs": 2835
+          }
+        ]
+      },
+      {
+        "publisher": "dailian.co.kr",
+        "phase": "cache",
+        "status": "completed",
+        "httpStatus": 200,
+        "initialPreviewMs": null,
+        "totalMs": 14191,
+        "cache": "miss",
+        "resultStatus": "partial",
+        "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "voiceModelVersion": null,
+        "voicesPresent": false,
+        "embeddingStatus": "no_released_voice_model",
+        "warningCodes": [
+          "VOICE_MODEL_UNAVAILABLE"
+        ],
+        "errorCode": null,
+        "articleIndex": 1,
+        "stages": [
+          {
+            "stage": "retrieved",
+            "durationMs": 2855
+          }
+        ]
+      },
+      {
+        "publisher": "newdaily.co.kr",
+        "phase": "first",
+        "status": "completed",
+        "httpStatus": 200,
+        "initialPreviewMs": null,
+        "totalMs": 8841,
+        "cache": "miss",
+        "resultStatus": "partial",
+        "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "voiceModelVersion": null,
+        "voicesPresent": false,
+        "embeddingStatus": "no_released_voice_model",
+        "warningCodes": [
+          "VOICE_MODEL_UNAVAILABLE"
+        ],
+        "errorCode": null,
+        "articleIndex": 2,
+        "stages": [
+          {
+            "stage": "retrieved",
+            "durationMs": 1162
+          }
+        ]
+      },
+      {
+        "publisher": "newdaily.co.kr",
+        "phase": "cache",
+        "status": "completed",
+        "httpStatus": 200,
+        "initialPreviewMs": null,
+        "totalMs": 8055,
+        "cache": "miss",
+        "resultStatus": "partial",
+        "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "voiceModelVersion": null,
+        "voicesPresent": false,
+        "embeddingStatus": "no_released_voice_model",
+        "warningCodes": [
+          "VOICE_MODEL_UNAVAILABLE"
+        ],
+        "errorCode": null,
+        "articleIndex": 2,
+        "stages": [
+          {
+            "stage": "retrieved",
+            "durationMs": 827
+          }
+        ]
+      },
+      {
+        "publisher": "ohmynews.com",
+        "phase": "first",
+        "status": "completed",
+        "httpStatus": 200,
+        "initialPreviewMs": null,
+        "totalMs": 7913,
+        "cache": "miss",
+        "resultStatus": "partial",
+        "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "voiceModelVersion": null,
+        "voicesPresent": false,
+        "embeddingStatus": "no_released_voice_model",
+        "warningCodes": [
+          "VOICE_MODEL_UNAVAILABLE"
+        ],
+        "errorCode": null,
+        "articleIndex": 3,
+        "stages": [
+          {
+            "stage": "retrieved",
+            "durationMs": 1484
+          }
+        ]
+      },
+      {
+        "publisher": "ohmynews.com",
+        "phase": "cache",
+        "status": "completed",
+        "httpStatus": 200,
+        "initialPreviewMs": null,
+        "totalMs": 7880,
+        "cache": "miss",
+        "resultStatus": "partial",
+        "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "voiceModelVersion": null,
+        "voicesPresent": false,
+        "embeddingStatus": "no_released_voice_model",
+        "warningCodes": [
+          "VOICE_MODEL_UNAVAILABLE"
+        ],
+        "errorCode": null,
+        "articleIndex": 3,
+        "stages": [
+          {
+            "stage": "retrieved",
+            "durationMs": 1516
+          }
+        ]
+      },
+      {
+        "publisher": "pressian.com",
+        "phase": "first",
+        "status": "failed",
+        "httpStatus": 502,
+        "initialPreviewMs": null,
+        "totalMs": 30353,
+        "cache": null,
+        "resultStatus": null,
+        "model": null,
+        "voiceModelVersion": null,
+        "voicesPresent": false,
+        "embeddingStatus": "not_observed",
+        "warningCodes": [],
+        "errorCode": "INVALID_MODEL_OUTPUT",
+        "articleIndex": 4,
+        "stages": [
+          {
+            "stage": "retrieved",
+            "durationMs": 1162
+          }
+        ]
+      },
+      {
+        "publisher": "newdaily.co.kr",
+        "phase": "first",
+        "status": "completed",
+        "httpStatus": 200,
+        "initialPreviewMs": null,
+        "totalMs": 10481,
+        "cache": "miss",
+        "resultStatus": "partial",
+        "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "voiceModelVersion": null,
+        "voicesPresent": false,
+        "embeddingStatus": "no_released_voice_model",
+        "warningCodes": [
+          "VOICE_MODEL_UNAVAILABLE"
+        ],
+        "errorCode": null,
+        "articleIndex": 5,
+        "stages": [
+          {
+            "stage": "retrieved",
+            "durationMs": 959
+          }
+        ]
+      },
+      {
+        "publisher": "newdaily.co.kr",
+        "phase": "cache",
+        "status": "completed",
+        "httpStatus": 200,
+        "initialPreviewMs": null,
+        "totalMs": 13022,
+        "cache": "miss",
+        "resultStatus": "partial",
+        "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "voiceModelVersion": null,
+        "voicesPresent": false,
+        "embeddingStatus": "no_released_voice_model",
+        "warningCodes": [
+          "VOICE_MODEL_UNAVAILABLE"
+        ],
+        "errorCode": null,
+        "articleIndex": 5,
+        "stages": [
+          {
+            "stage": "retrieved",
+            "durationMs": 998
+          }
+        ]
+      }
+    ]
+  },
+  "after": {
+    "startedAt": "2026-11-15T10:53:57.704Z",
+    "completedAt": "2026-11-15T10:54:54.794Z",
+    "completedArticleCount": 5,
+    "completedCacheCount": 5,
+    "measurements": [
+      {
+        "publisher": "dailian.co.kr",
+        "phase": "first",
+        "status": "completed",
+        "httpStatus": 200,
+        "initialPreviewMs": 2985,
+        "totalMs": 13541,
+        "cache": "miss",
+        "resultStatus": "partial",
+        "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "voiceModelVersion": null,
+        "voicesPresent": false,
+        "embeddingStatus": "no_released_voice_model",
+        "warningCodes": [
+          "VOICE_MODEL_UNAVAILABLE"
+        ],
+        "errorCode": null,
+        "articleIndex": 1,
+        "stages": [
+          {
+            "stage": "retrieved",
+            "durationMs": 2782
+          },
+          {
+            "stage": "llm",
+            "durationMs": 10419
+          }
+        ]
+      },
+      {
+        "publisher": "dailian.co.kr",
+        "phase": "cache",
+        "status": "completed",
+        "httpStatus": 200,
+        "initialPreviewMs": 2826,
+        "totalMs": 2827,
+        "cache": "hit",
+        "resultStatus": "partial",
+        "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "voiceModelVersion": null,
+        "voicesPresent": false,
+        "embeddingStatus": "no_released_voice_model",
+        "warningCodes": [
+          "VOICE_MODEL_UNAVAILABLE",
+          "CACHED_ANALYSIS"
+        ],
+        "errorCode": null,
+        "articleIndex": 1,
+        "stages": [
+          {
+            "stage": "retrieved",
+            "durationMs": 2811
+          }
+        ]
+      },
+      {
+        "publisher": "newdaily.co.kr",
+        "phase": "first",
+        "status": "completed",
+        "httpStatus": 200,
+        "initialPreviewMs": 960,
+        "totalMs": 8583,
+        "cache": "miss",
+        "resultStatus": "partial",
+        "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "voiceModelVersion": null,
+        "voicesPresent": false,
+        "embeddingStatus": "no_released_voice_model",
+        "warningCodes": [
+          "VOICE_MODEL_UNAVAILABLE"
+        ],
+        "errorCode": null,
+        "articleIndex": 2,
+        "stages": [
+          {
+            "stage": "retrieved",
+            "durationMs": 953
+          },
+          {
+            "stage": "llm",
+            "durationMs": 7591
+          }
+        ]
+      },
+      {
+        "publisher": "newdaily.co.kr",
+        "phase": "cache",
+        "status": "completed",
+        "httpStatus": 200,
+        "initialPreviewMs": 950,
+        "totalMs": 950,
+        "cache": "hit",
+        "resultStatus": "partial",
+        "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "voiceModelVersion": null,
+        "voicesPresent": false,
+        "embeddingStatus": "no_released_voice_model",
+        "warningCodes": [
+          "VOICE_MODEL_UNAVAILABLE",
+          "CACHED_ANALYSIS"
+        ],
+        "errorCode": null,
+        "articleIndex": 2,
+        "stages": [
+          {
+            "stage": "retrieved",
+            "durationMs": 939
+          }
+        ]
+      },
+      {
+        "publisher": "ohmynews.com",
+        "phase": "first",
+        "status": "completed",
+        "httpStatus": 200,
+        "initialPreviewMs": 1543,
+        "totalMs": 9282,
+        "cache": "miss",
+        "resultStatus": "partial",
+        "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "voiceModelVersion": null,
+        "voicesPresent": false,
+        "embeddingStatus": "no_released_voice_model",
+        "warningCodes": [
+          "VOICE_MODEL_UNAVAILABLE"
+        ],
+        "errorCode": null,
+        "articleIndex": 3,
+        "stages": [
+          {
+            "stage": "retrieved",
+            "durationMs": 1537
+          },
+          {
+            "stage": "llm",
+            "durationMs": 7706
+          }
+        ]
+      },
+      {
+        "publisher": "ohmynews.com",
+        "phase": "cache",
+        "status": "completed",
+        "httpStatus": 200,
+        "initialPreviewMs": 1579,
+        "totalMs": 1580,
+        "cache": "hit",
+        "resultStatus": "partial",
+        "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "voiceModelVersion": null,
+        "voicesPresent": false,
+        "embeddingStatus": "no_released_voice_model",
+        "warningCodes": [
+          "VOICE_MODEL_UNAVAILABLE",
+          "CACHED_ANALYSIS"
+        ],
+        "errorCode": null,
+        "articleIndex": 3,
+        "stages": [
+          {
+            "stage": "retrieved",
+            "durationMs": 1568
+          }
+        ]
+      },
+      {
+        "publisher": "pressian.com",
+        "phase": "first",
+        "status": "completed",
+        "httpStatus": 200,
+        "initialPreviewMs": 1092,
+        "totalMs": 8477,
+        "cache": "miss",
+        "resultStatus": "partial",
+        "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "voiceModelVersion": null,
+        "voicesPresent": false,
+        "embeddingStatus": "no_released_voice_model",
+        "warningCodes": [
+          "VOICE_MODEL_UNAVAILABLE"
+        ],
+        "errorCode": null,
+        "articleIndex": 4,
+        "stages": [
+          {
+            "stage": "retrieved",
+            "durationMs": 1085
+          },
+          {
+            "stage": "llm",
+            "durationMs": 7356
+          }
+        ]
+      },
+      {
+        "publisher": "pressian.com",
+        "phase": "cache",
+        "status": "completed",
+        "httpStatus": 200,
+        "initialPreviewMs": 1088,
+        "totalMs": 1089,
+        "cache": "hit",
+        "resultStatus": "partial",
+        "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "voiceModelVersion": null,
+        "voicesPresent": false,
+        "embeddingStatus": "no_released_voice_model",
+        "warningCodes": [
+          "VOICE_MODEL_UNAVAILABLE",
+          "CACHED_ANALYSIS"
+        ],
+        "errorCode": null,
+        "articleIndex": 4,
+        "stages": [
+          {
+            "stage": "retrieved",
+            "durationMs": 1078
+          }
+        ]
+      },
+      {
+        "publisher": "newdaily.co.kr",
+        "phase": "first",
+        "status": "completed",
+        "httpStatus": 200,
+        "initialPreviewMs": 854,
+        "totalMs": 9922,
+        "cache": "miss",
+        "resultStatus": "partial",
+        "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "voiceModelVersion": null,
+        "voicesPresent": false,
+        "embeddingStatus": "no_released_voice_model",
+        "warningCodes": [
+          "VOICE_MODEL_UNAVAILABLE"
+        ],
+        "errorCode": null,
+        "articleIndex": 5,
+        "stages": [
+          {
+            "stage": "retrieved",
+            "durationMs": 847
+          },
+          {
+            "stage": "llm",
+            "durationMs": 9034
+          }
+        ]
+      },
+      {
+        "publisher": "newdaily.co.kr",
+        "phase": "cache",
+        "status": "completed",
+        "httpStatus": 200,
+        "initialPreviewMs": 814,
+        "totalMs": 815,
+        "cache": "hit",
+        "resultStatus": "partial",
+        "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "voiceModelVersion": null,
+        "voicesPresent": false,
+        "embeddingStatus": "no_released_voice_model",
+        "warningCodes": [
+          "VOICE_MODEL_UNAVAILABLE",
+          "CACHED_ANALYSIS"
+        ],
+        "errorCode": null,
+        "articleIndex": 5,
+        "stages": [
+          {
+            "stage": "retrieved",
+            "durationMs": 803
+          }
+        ]
+      }
+    ]
+  },
+  "deepseekFailures": {
+    "startedAt": "2026-11-15T10:39:01.204Z",
+    "completedAt": "2026-11-15T10:52:39.028Z",
+    "completedArticleCount": 0,
+    "completedCacheCount": 0,
+    "measurements": [
+      {
+        "publisher": "dailian.co.kr",
+        "phase": "first",
+        "status": "failed",
+        "httpStatus": 200,
+        "initialPreviewMs": 3104,
+        "totalMs": 273735,
+        "cache": null,
+        "resultStatus": null,
+        "model": null,
+        "voiceModelVersion": null,
+        "voicesPresent": false,
+        "embeddingStatus": "not_observed",
+        "warningCodes": [],
+        "errorCode": "PROVIDER_UNAVAILABLE",
+        "articleIndex": 1,
+        "stages": [
+          {
+            "stage": "retrieved",
+            "durationMs": 3001
+          }
+        ]
+      },
+      {
+        "publisher": "newdaily.co.kr",
+        "phase": "first",
+        "status": "failed",
+        "httpStatus": 200,
+        "initialPreviewMs": null,
+        "totalMs": 27,
+        "cache": null,
+        "resultStatus": null,
+        "model": null,
+        "voiceModelVersion": null,
+        "voicesPresent": false,
+        "embeddingStatus": "not_observed",
+        "warningCodes": [],
+        "errorCode": "ARTICLE_URL_NOT_ALLOWED",
+        "articleIndex": 2,
+        "stages": []
+      },
+      {
+        "publisher": "ohmynews.com",
+        "phase": "first",
+        "status": "failed",
+        "httpStatus": 200,
+        "initialPreviewMs": 1849,
+        "totalMs": 272357,
+        "cache": null,
+        "resultStatus": null,
+        "model": null,
+        "voiceModelVersion": null,
+        "voicesPresent": false,
+        "embeddingStatus": "not_observed",
+        "warningCodes": [],
+        "errorCode": "PROVIDER_UNAVAILABLE",
+        "articleIndex": 3,
+        "stages": [
+          {
+            "stage": "retrieved",
+            "durationMs": 1816
+          }
+        ]
+      },
+      {
+        "publisher": "pressian.com",
+        "phase": "first",
+        "status": "failed",
+        "httpStatus": 200,
+        "initialPreviewMs": 1175,
+        "totalMs": 271689,
+        "cache": null,
+        "resultStatus": null,
+        "model": null,
+        "voiceModelVersion": null,
+        "voicesPresent": false,
+        "embeddingStatus": "not_observed",
+        "warningCodes": [],
+        "errorCode": "PROVIDER_UNAVAILABLE",
+        "articleIndex": 4,
+        "stages": [
+          {
+            "stage": "retrieved",
+            "durationMs": 1145
+          }
+        ]
+      },
+      {
+        "publisher": "newdaily.co.kr",
+        "status": "skipped",
+        "reason": "publisher_unavailable_in_this_run",
+        "articleIndex": 5,
+        "stages": []
+      }
+    ]
+  },
+  "directProviderProbes": {
+    "sameActualArticle": true,
+    "deepseek": {
+      "outcome": "no_response_within_timeout",
+      "timeoutMs": 45000,
+      "elapsedMs": 45013
+    },
+    "lightning": {
+      "httpStatus": 200,
+      "headersMs": 926,
+      "firstChunkMs": 927,
+      "scope": "Connection probe; cancelled after first chunk, not a completed analysis."
+    }
+  },
+  "offline": {
+    "selectedArticles": 45,
+    "priorityIssueCount": 4,
+    "completedUniqueSentences": 711,
+    "completedRequests": 12,
+    "maximumRecords": 64,
+    "minimumDispatchIntervalMs": 20001,
+    "dailyReservationCap": null,
+    "boundaryReviewDraftArticles": 2,
+    "boundaryReviewDraftSentences": 22,
+    "originalLabelsUnchanged": true,
+    "coordinateCounts": {
+      "articles": 3000,
+      "sentences": 70078,
+      "boilerplate": 7101,
+      "cachedSentences": 11496,
+      "missingSentences": 51481,
+      "unsupportedTopicArticles": 19,
+      "unsupportedIssueArticles": 0,
+      "issueUnassignedArticles": 794,
+      "fullyCachedArticles": 470,
+      "sourceCoordinates": 67,
+      "journalistCoordinates": 8,
+      "rangeArticles": 49
+    },
+    "precomputedResearchDocuments": 454,
+    "acceptedComparisonArticles": 57,
+    "pointComparisonArticles": 15,
+    "rangeComparisonArticles": 42,
+    "readyGroupCounts": {
+      "quarter": 0,
+      "half": 0,
+      "all": 0
+    },
+    "researchOnly": true,
+    "usageReviewed": false
+  },
+  "validation": {
+    "typecheck": "passed",
+    "build": "passed",
+    "vitest": {
+      "passed": 1057,
+      "skipped": 13,
+      "filesPassed": 102,
+      "filesSkipped": 1
+    },
+    "cli": {
+      "passed": 7
+    }
+  }
+}

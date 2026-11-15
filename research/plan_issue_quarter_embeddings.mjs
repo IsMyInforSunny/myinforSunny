@@ -9,12 +9,14 @@ const root = path.resolve(fileURLToPath(new URL('../', import.meta.url)));
 const runtime = fs.realpathSync(path.join(root, '.sites-runtime'));
 const reservation = 6500;
 const dailyBudget = 117000;
+const priorityIssues=new Set(['housing_supply:supply','medical_school_quota:quota','nuclear_energy:expansion','minimum_wage:increase']);
 const options = {};
 const argumentsList = process.argv.slice(2);
 for (let index = 0; index < argumentsList.length; index++) {
   const flag = argumentsList[index];
   if (flag === '--target-only') { options.targetOnly = true; continue; }
-  if (!['--snapshot', '--output', '--max-calls', '--budget', '--topic'].includes(flag) || !argumentsList[index + 1]) {
+  if (flag === '--priority-four') { options.priorityFour = true; continue; }
+  if (!['--snapshot', '--output', '--max-calls', '--budget', '--topic','--batch-size','--max-body-bytes'].includes(flag) || !argumentsList[index + 1]) {
     throw new Error('Use --snapshot LOCAL_DIRECTORY --output NEW_LOCAL_DIRECTORY [--max-calls N] [--budget unlimited] [--topic TOPIC] [--target-only]');
   }
   options[flag.slice(2)] = argumentsList[++index];
@@ -46,6 +48,11 @@ const output = localPath(options.output);
 if (fs.existsSync(output)) throw new Error('Preserve existing plans and choose a new output directory');
 if (options.budget !== undefined && options.budget !== 'unlimited') throw new Error('Only an explicit --budget unlimited overrides the existing reservation ceiling');
 const unlimited = options.budget === 'unlimited';
+const batchSize=options['batch-size']===undefined?32:Number(options['batch-size']);
+const maxBodyBytes=options['max-body-bytes']===undefined?6000:Number(options['max-body-bytes']);
+if(![32,64].includes(batchSize)||!Number.isSafeInteger(maxBodyBytes)||maxBodyBytes<6000||maxBodyBytes>12000)
+  throw new Error('Use batch-size 32 or 64 and max-body-bytes from 6000 through 12000');
+if((batchSize>32||maxBodyBytes>6000)&&!unlimited)throw new Error('Expanded batches require an explicit unlimited reservation policy');
 const maximumCalls = options['max-calls'] === undefined ? 18 : Number(options['max-calls']);
 if (!Number.isSafeInteger(maximumCalls) || maximumCalls < 1 || !unlimited && maximumCalls > dailyBudget / reservation) {
   throw new Error('The existing daily reservation permits at most 18 calls');
@@ -86,12 +93,12 @@ function batches(items) {
   const result = [];
   let batch = [];
   for (const item of items) {
-    if (batch.length && (batch.length === 32 || requestBytes([...batch, item]) > 6000)) {
+    if (batch.length && (batch.length === batchSize || requestBytes([...batch, item]) > maxBodyBytes)) {
       result.push(batch);
       batch = [];
     }
     batch.push(item);
-    if (requestBytes(batch) > 6000) throw new Error('A retained sentence exceeds the existing 6000-byte ceiling');
+    if (requestBytes(batch) > maxBodyBytes) throw new Error('A retained sentence exceeds the configured request byte ceiling');
   }
   if (batch.length) result.push(batch);
   return result;
@@ -110,6 +117,8 @@ for (const row of rows) {
   if (options.topic&&row.topic!==options.topic) { exclude('outside_requested_topic'); continue; }
   if (!summary.supportedTopics.includes(row.topic)) { exclude('unsupported_topic'); continue; }
   if (!row.issue) { exclude('issue_unassigned'); continue; }
+  if(options.priorityFour&&!priorityIssues.has(`${row.topic}:${row.issue}`)){exclude('outside_priority_issues');continue;}
+  if(row.status==='unsupported_issue'){exclude('untrained_issue');continue;}
   if (!publishers.has(row.publisher)) { exclude('outside_four_publishers'); continue; }
   if (typeof row.id !== 'string' || !/^[a-f0-9]{64}$/i.test(row.bodyHash) || !Number.isSafeInteger(row.cache?.missing) || row.cache.missing < 0) {
     throw new Error('Invalid article/cache identity');
@@ -165,6 +174,10 @@ possible.sort((left, right) => periodRank[left.group.period.kind] - periodRank[r
   || left.missingSentences - right.missingSentences || left.group.key.localeCompare(right.group.key)
   || left.seed.map(article => article.id).join('|').localeCompare(right.seed.map(article => article.id).join('|')));
 const target = possible[0] ?? null;
+const priorityTargets=options.priorityFour?[...priorityIssues].flatMap(key=>{
+  const match=possible.find(item=>`${item.group.topic}:${item.group.issue}`===key);
+  return match?[match]:[];
+}):[];
 
 const queue = [];
 const queued = new Set();
@@ -187,7 +200,11 @@ function roundRobin(articles) {
     }
   }
 }
-if (target) {
+if(options.priorityFour){
+  // Complete one seed for each requested issue before expanding a large cohort.
+  for(const item of priorityTargets)roundRobin(item.seed.sort(order));
+  for(const item of priorityTargets)roundRobin([...item.group.publishers.values()].flat().sort(order));
+}else if (target) {
   roundRobin(target.seed.sort(order));
   roundRobin([...target.group.publishers.values()].flat().sort(order));
 }
@@ -215,6 +232,9 @@ const report = {
   schemaVersion:'issue-quarter-embedding-plan-1.0', generatedAt:new Date().toISOString(), researchOnly:true, apiCalls:0,
   modelVersion:summary.modelVersion, supportedTopics:summary.supportedTopics,
   requestedTopic:options.topic??null,
+  priorityFour:!!options.priorityFour,batchSize,maxBodyBytes,minimumDispatchIntervalMs:20000,
+  priorityTargets:priorityTargets.map(item=>({topic:item.group.topic,issue:item.group.issue,period:item.group.period,
+    seedArticleCount:item.seed.length,selectedSeedArticleCount:item.seed.filter(article=>selectedIds.has(article.id)).length})),
   sourceArticleCount:rows.length, candidateArticleCount:candidates.length, excluded,
   target:target ? {topic:target.group.topic, issue:target.group.issue, period:target.group.period,
     seedArticleCount:6, seedMissingSentences:target.missingSentences, selectedSeedArticleCount:completedSeed,

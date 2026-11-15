@@ -6,7 +6,7 @@ if(!process.env.NVIDIA_API_KEY?.trim())throw Error('Set NVIDIA_API_KEY in the se
 const configPath=fileURLToPath(new URL('../dist/server/wrangler.json',import.meta.url));
 const config=JSON.parse(readFileSync(configPath,'utf8'));
 config.vars={...config.vars,AI_PROVIDER:'nvidia',NVIDIA_MODEL:process.env.NVIDIA_MODEL??'deepseek-ai/deepseek-v4.1-flash',ENABLE_LIVE_ANALYSIS:'true',ENABLE_DIRECT_FETCH:'true',ENABLE_NEWS_SEARCH:process.env.ENABLE_NEWS_SEARCH??'true',NEWS_PROVIDER:process.env.NEWS_PROVIDER??'publisher_feeds',NEWS_TERMS_APPROVED:'true',
- ALLOWED_RETRIEVAL_HOSTS:process.env.ALLOWED_RETRIEVAL_HOSTS??'www.dailian.co.kr,www.newdaily.co.kr,www.ohmynews.com,www.pressian.com,news.kbs.co.kr,imnews.imbc.com,news.sbs.co.kr,www.hani.co.kr,www.khan.co.kr,www.donga.com,www.chosun.com'};
+ ALLOWED_RETRIEVAL_HOSTS:process.env.ALLOWED_RETRIEVAL_HOSTS??'www.dailian.co.kr,www.newdaily.co.kr,biz.newdaily.co.kr,www.ohmynews.com,www.pressian.com,news.kbs.co.kr,imnews.imbc.com,news.sbs.co.kr,www.hani.co.kr,www.khan.co.kr,www.donga.com,www.chosun.com'};
 // Only the generated, ignored configuration is modified. Secret value stays in memory.
 delete config.vars.NVIDIA_API_KEY;
 config.secrets={required:['NVIDIA_API_KEY']};

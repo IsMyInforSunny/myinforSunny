@@ -15,6 +15,7 @@ import {articleMapObservations,articleMapPoints} from '../lib/reader-metrics';
 import {publisherPositions} from '../lib/media-position';
 import {digest} from '../lib/server/research-token';
 import type {RuntimeConfig} from '../lib/server/config';
+import {clearResearchSearchCache} from '../lib/server/search-cache';
 
 const proposition='학교 도서관 운영 시간을 늘려야 한다.';
 const request=()=>new Request('https://site.test/api/research',{headers:{'cf-connecting-ip':'192.0.2.10'}});
@@ -35,7 +36,7 @@ function articles(text='학교 도서관 운영 시간을 늘려야 한다.'){
  vi.spyOn(news,'searchNews').mockResolvedValue({provider:'gdelt',query:'school library extended hours viewpoints',status:'success',articles:[{id:'n',title:'공개 합성 의견',url:'https://news.example/position',publisherDomain:'news.example',language:'Korean',provenance:'search_result',stance:'not_checked'}],searchedAt:new Date().toISOString(),scopeNote:'모의 응답'});
  vi.spyOn(retrieval,'retrieve').mockResolvedValue({id:'web_0_0',url:'https://news.example/position',text,provenance:'web_fetched',fetchedAt:new Date().toISOString(),truncated:false});
 }
-afterEach(()=>{vi.restoreAllMocks();vi.unstubAllGlobals();});
+afterEach(()=>{clearResearchSearchCache();vi.restoreAllMocks();vi.unstubAllGlobals();});
 
 describe('직접 지정한 비교 명제의 자동 조사 연결 — 외부 호출 없는 모의 시험',()=>{
  it('추출된 사실·의견이 없어도 명제를 받되 빈 값·길이 초과는 거부한다',()=>{
@@ -113,6 +114,8 @@ describe('직접 지정한 비교 명제의 자동 조사 연결 — 외부 호�
    return {checks:[],perspectives:[{referenceSentenceId:refs[0].sentences[0].referenceSentenceId,stance:'supports_position',explanation:'실제 취득 문장의 운영 연장 의견이다.'}]};
   });
   for(let n=0;n<6;n++){
+   // Each iteration supplies a new upstream fixture for the same query.
+   clearResearchSearchCache();
    const host=n<3?'news.example':'other.example',url=`https://${host}/article-${n}`;
    const text=common+(n<3?'동일한 기록입니다.':`독립 기사 식별 기록 ${n}입니다.`);
    search.mockResolvedValue({provider:'gdelt',query:'school library hours',status:'success',articles:[{id:`n${n}`,title:'공개 합성 기사',url,publisherDomain:host,language:'Korean',provenance:'search_result',stance:'not_checked'}],searchedAt:new Date().toISOString(),scopeNote:'모의 응답'});

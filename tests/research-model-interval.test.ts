@@ -14,6 +14,49 @@ function input(): ResearchInput {
 afterEach(() => vi.restoreAllMocks());
 
 describe('provider-specific research model spacing', () => {
+  it('rechecks stale hints without a provider retry and waits for the original rolling search slots',async()=>{
+    let now=0,plans=0;const waits:number[]=[],cacheChecks:number[]=[],dispatches:{index:number;at:number}[]=[];
+    await runResearch(input(),new AbortController().signal,{
+      now:()=>now,modelIntervalMs:0,wait:async ms=>{waits.push(ms);now+=ms;},
+      post:async<T,>(body:unknown)=>{
+        const operation=body as {operation:string;queryIndex:number;cacheOnly?:boolean};
+        if(operation.operation==='plan'){plans++;return {token:'plan',queries:Array.from({length:4},(_,index)=>({label:String(index),purpose:'fact_check'})),cachedQueryIndexes:[1,3],nextModelCallAt:new Date(0).toISOString()} as T;}
+        if(operation.cacheOnly){cacheChecks.push(operation.queryIndex);throw Object.assign(new Error('Cache expired'),{code:'SEARCH_CACHE_MISS'});}
+        dispatches.push({index:operation.queryIndex,at:now});return {token:'evidence',references:[]} as T;
+      },
+    },()=>{},()=>{});
+    expect(plans).toBe(1);expect(cacheChecks).toEqual([1,3]);
+    expect(dispatches).toEqual([{index:0,at:0},{index:1,at:7000},{index:2,at:14000},{index:3,at:61000}]);
+    expect(waits).toEqual([7000,7000,47000]);
+  });
+  it.each(['SEARCH_RATE_LIMITED','SEARCH_CACHE_MISS'])('never repeats a provider failure or more than one cache fallback (%s)',async code=>{
+    const operations:{operation:string;cacheOnly?:boolean}[]=[];
+    await expect(runResearch(input(),new AbortController().signal,{
+      now:()=>0,modelIntervalMs:0,wait:async()=>{},
+      post:async<T,>(body:unknown)=>{
+        const operation=body as {operation:string;cacheOnly?:boolean};operations.push(operation);
+        if(operation.operation==='plan')return {token:'plan',queries:[{label:'one'}],cachedQueryIndexes:[0],nextModelCallAt:new Date(0).toISOString()} as T;
+        throw Object.assign(new Error('Stopped'),{code});
+      },
+    },()=>{},()=>{})).rejects.toThrow('Stopped');
+    expect(operations).toHaveLength(code==='SEARCH_CACHE_MISS'?3:2);
+    expect(operations[1].cacheOnly).toBe(true);
+    if(code==='SEARCH_CACHE_MISS')expect(operations[2].cacheOnly).toBeUndefined();
+  });
+  it('compares a perspective first and cached searches do not consume search spacing',async()=>{
+    let now=0;const waits:number[]=[],queryOrder:number[]=[],compared:number[]=[];
+    const value=input(),verification=demoVerification('supported');
+    await runResearch(value,new AbortController().signal,{
+      now:()=>now,modelIntervalMs:0,wait:async ms=>{waits.push(ms);now+=ms;},
+      post:async<T,>(body:unknown)=>{
+        const operation=body as {operation:string;queryIndex:number};
+        if(operation.operation==='plan')return {token:'plan',queries:[{label:'fact',purpose:'fact_check'},{label:'perspective',purpose:'perspective'},{label:'another fact',purpose:'fact_check'}],cachedQueryIndexes:[0,1],nextModelCallAt:new Date(0).toISOString(),evidenceUsesModel:false} as T;
+        if(operation.operation==='discover'){queryOrder.push(operation.queryIndex);return {token:'evidence',references:[{text:'Fetched evidence'}]} as T;}
+        compared.push(now);return verification as T;
+      },
+    },()=>{},()=>{});
+    expect(queryOrder).toEqual([1,0,2]);expect(compared).toEqual([0,0,0]);expect(waits).toEqual([]);
+  });
   it.each([
     {modelIntervalMs: undefined, planDelay: 61000, compareTimes: [61000, 122000], waits: [61000, 61000]},
     {modelIntervalMs: 0, planDelay: 0, compareTimes: [0, 7000], waits: [7000]},

@@ -8,7 +8,8 @@ import {AppError} from './errors';
 import {allowedUrl,retrieve} from './retrieval';
 import {attachVoiceCoordinates} from './voice-analysis';
 
-export async function analyzeUrl(req:Extract<import('zod/v4').infer<typeof analyzeRequestSchema>,{kind:'url'}>,config:RuntimeConfig,requestId:string,signal:AbortSignal):Promise<Analysis>{
+type UrlRequest=Extract<import('zod/v4').infer<typeof analyzeRequestSchema>,{kind:'url'}>;
+export async function prepareUrlAnalysis(req:UrlRequest,config:RuntimeConfig,requestId:string,signal:AbortSignal){
  const hosts=(config.ALLOWED_RETRIEVAL_HOSTS??'').split(',').map(s=>s.trim()).filter(Boolean);
  if(!capabilities(config).directFetch)throw new AppError(503,'ARTICLE_IMPORT_UNAVAILABLE','기사 링크 분석은 현재 준비 중입니다. 잠시 후 다시 시도해 주세요.');
  const url=allowedUrl(req.url,hosts);
@@ -21,8 +22,17 @@ export async function analyzeUrl(req:Extract<import('zod/v4').infer<typeof analy
  if(containsContactInfo([body,req.proposition??'',...req.comments.map(c=>c.text)].join('\n')))throw new AppError(422,'PRIVACY_INPUT_REJECTED','기사나 댓글에서 전화번호·이메일 등 개인정보가 발견되어 분석을 중단했습니다.');
  const input=analyzeRequestSchema.safeParse({kind:'text',body,comments:req.comments,proposition:req.proposition,transmissionConsent:true});
  if(!input.success||input.data.kind!=='text')throw new AppError(422,'ARTICLE_BODY_UNAVAILABLE','분석할 기사 본문을 확인하지 못했습니다.');
- const result=await analyze(input.data,config,requestId,signal,{article:true,articleUrl:ref.url??url.href});
- result.article={url:ref.url??url.href,title:ref.title,...(ref.publishedAt?{publishedAt:ref.publishedAt}:{}),fetchedAt:ref.fetchedAt??new Date().toISOString(),fullTextLength:ref.fullTextLength??ref.text.length,analyzedCharacters:body.length,truncated:!!ref.truncated||body.length<ref.text.length};
+ const article={url:ref.url??url.href,title:ref.title,...(ref.publishedAt?{publishedAt:ref.publishedAt}:{}),fetchedAt:ref.fetchedAt??new Date().toISOString(),fullTextLength:ref.fullTextLength??ref.text.length,analyzedCharacters:body.length,truncated:!!ref.truncated||body.length<ref.text.length};
+ const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify([ref.text,ref.title,ref.publishedAt])));
+ const articleHash=Array.from(new Uint8Array(bytes),byte=>byte.toString(16).padStart(2,'0')).join('');
+ return {input:input.data,article,articleHash};
+}
+export async function analyzePreparedUrl(prepared:Awaited<ReturnType<typeof prepareUrlAnalysis>>,config:RuntimeConfig,requestId:string,signal:AbortSignal):Promise<Analysis>{
+ const result=await analyze(prepared.input,config,requestId,signal,{article:true,articleUrl:prepared.article.url,articleTitle:prepared.article.title});
+ result.article=prepared.article;
  if(result.article.truncated)result.warnings.push({code:'ARTICLE_TRUNCATED',message:'긴 기사에서 처음 8,000자 이내만 분석했습니다. 기사 전체에 대한 결과가 아닙니다.'});
  return attachVoiceCoordinates(result);
+}
+export async function analyzeUrl(req:UrlRequest,config:RuntimeConfig,requestId:string,signal:AbortSignal):Promise<Analysis>{
+ return analyzePreparedUrl(await prepareUrlAnalysis(req,config,requestId,signal),config,requestId,signal);
 }
