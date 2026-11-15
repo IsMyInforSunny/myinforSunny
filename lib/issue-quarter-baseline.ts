@@ -182,7 +182,7 @@ function groupMatches(input:IssueQuarterArticle,group:BaselineGroup) {
     &&group.issuePolicy===input.issuePolicy&&group.axis===input.axis;
 }
 function emptyComparison(status:'input_unresolved'|'insufficient'|'version_mismatch'|'membership_unverified'|'input_in_population') {
-  return {status,score:null as number|null,scoreRange:null as {lower:number;upper:number}|null,
+  return {status,selfExcluded:false,score:null as number|null,scoreRange:null as {lower:number;upper:number}|null,
     baseline:null as number|null,baselineBounds:null as CoordinateInterval|null,baselineUncertain:false,direction:'undetermined' as 'above'|'below'|'at_baseline'|'undetermined',
     percentile:null as {lower:number;upper:number}|null,topPercentile:null as {lower:number;upper:number}|null,
     count:0,pointCount:0,rangeCount:0,publisherCount:0,publisherCounts:[] as BaselineGroup['publisherCounts'],
@@ -229,7 +229,7 @@ export function compareIssueQuarterBaseline(input:IssueQuarterArticle,bundle:Iss
     :range.upper<baselineBounds.lower?'below' as const:point?'at_baseline' as const:'undetermined' as const;
   const widened=selected.period.key!==periods[0].key;
   const proposition=(definition.topics[input.topic].issues as Record<string,string>)[input.issue];
-  return {status:'ready' as const,score:point?Math.round(near*50):null,scoreRange,baseline,baselineBounds,baselineUncertain,direction,percentile,topPercentile,
+  return {status:'ready' as const,selfExcluded:options.inputExcluded===true,score:point?Math.round(near*50):null,scoreRange,baseline,baselineBounds,baselineUncertain,direction,percentile,topPercentile,
     count:selected.count,pointCount:selected.pointCount,rangeCount:selected.rangeCount,publisherCount:selected.publisherCount,publisherCounts:selected.publisherCounts,
     period:selected.period,widened,comparisonLabel:`같은 쟁점(${proposition})을 다룬 ${selected.publisherCount}개 매체 기사 ${selected.count}건(${selected.period.label})과 비교`,
     fallbackReason:widened?`${periods[0].label} 표본 부족으로 ${selected.period.label}과 비교`:null};

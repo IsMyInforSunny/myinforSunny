@@ -51,6 +51,26 @@ describe('무료 분석 입력 경계 (공급자 모의, 실제 모델 품질 �
   expect(result.expressions).toHaveLength(40);
   expect(fetch).toHaveBeenCalledTimes(1);
  });
+ it('splits sentence output after 40 while keeping claims and propositions in the first call',async()=>{
+  const req=request(41),raw=clearOutput(req);
+  const core=Object.fromEntries(['topics','topicAssignments','stances','bodyPosition','claims','perspectiveQuestions','counterArguments','searchSuggestions','claimsMayBeOmitted'].filter(key=>key in raw).map(key=>[key,(raw as Record<string,unknown>)[key]]));
+  core.bodyPosition={proposition:'문장의 주제',label:'not_expressed',evidence:[{sentenceId:'body_s0',quote:'공개 문장 1입니다.'}],reason:'작성자 입장이 드러나지 않는다.',attribution:'author'};
+  const units=makeSources(req)[0].sentences;
+  const sentencePass=(batch:typeof units)=>({clearSentenceIds:batch.map(unit=>unit.id),expressions:[],bodyAssigned:batch[0].id==='body_s0'?[raw.bodyAssigned[0]]:[],bodyOtherIds:batch.filter(unit=>unit.id!=='body_s0').map(unit=>unit.id),bodyUndeterminedIds:[]});
+  const fetch=vi.fn().mockResolvedValueOnce(Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify(core)}}]}))
+   .mockResolvedValueOnce(Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify(sentencePass(units.slice(0,40)))}}]}))
+   .mockResolvedValueOnce(Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify(sentencePass(units.slice(40)))}}]}));
+  vi.stubGlobal('fetch',fetch);
+  const result=await analyze(req,config,'boundary-split-41',new AbortController().signal);
+  expect(result.coverage.totalSentences).toBe(41);expect(result.expressions).toHaveLength(41);
+  expect(result.bodyTopicAssignments).toHaveLength(41);expect(fetch).toHaveBeenCalledTimes(3);
+  const first=JSON.parse(fetch.mock.calls[0][1].body).messages[1].content;
+  expect(first).toContain('공개 문장 41입니다.');
+  const second=JSON.parse(fetch.mock.calls[1][1].body).messages[1].content;
+  expect(second).not.toContain('공개 문장 41입니다.');
+  const third=JSON.parse(fetch.mock.calls[2][1].body).messages[1].content;
+  expect(third).toContain('공개 문장 41입니다.');
+ });
  it('문자수 상한 안이어도 실제 토큰 예산을 넘으면 외부 전송하지 않는다',async()=>{
   const req:TextRequest={kind:'text',body:'가나다라마바사아자차카타파하'.repeat(142),comments:Array.from({length:5},(_,i)=>({id:`c${i}`,text:'가나다라마바사아자차카타파하'.repeat(14)}))};
   expect(analyzeRequestSchema.safeParse({...req,transmissionConsent:true}).success).toBe(true);

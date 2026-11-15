@@ -17,7 +17,7 @@ async function fixture(){
     decisionPolicy:VOICE_INDEPENDENT_NEUTRAL,labels:input.sentences.map((unit,i)=>({sentenceId:unit.sentenceId,issue:'expansion',speaker:'source',direction:i===3?'uncertain':'support'}))};
   analysis.voiceCoordinates=await articleVoiceCoordinates(body,analysis.sentenceVoices,analysis.article!,[]);
   const reference=analysis.voiceCoordinates[0];
-  const rows:IssueQuarterArticle[]=Array.from({length:6},(_,i)=>({...reference,id:`reference-${i}`,bodyHash:String(i).padStart(64,'0'),url:`https://example.org/${i}`,
+  const rows:IssueQuarterArticle[]=Array.from({length:6},(_,i)=>({...reference,id:`reference-${i}`,bodyHash:String(i).padStart(64,'0'),url:`https://example.org/${i}`,title:`Article ${i}`,
     publisher:i<3?'dailian.co.kr':'pressian.com',coordinate:i<3?-1:1,bounds:undefined,unresolved:0}));
   return {analysis,rows,bundle:buildIssueQuarterBaselines(rows),provenance:{corpusArticleHashes:rows.map(row=>row.bodyHash)}};
 }
@@ -56,5 +56,21 @@ describe('server-only quarter baseline attachment',()=>{
     analysis.mode='demo';attachIssueQuarterComparison(analysis,bundle,provenance);expect(analysis.issueQuarterComparison).toBeUndefined();
     analysis.mode='live';analysis.voiceCoordinates![0].modelVersion='other';
     attachIssueQuarterComparison(analysis,bundle,provenance);expect(analysis.issueQuarterComparison).toBeUndefined();
+  });
+  it('rebuilds the baseline after excluding a stored input article and marks the exclusion',async()=>{
+    const {analysis,rows,bundle,provenance}=await fixture();
+    const input=analysis.voiceCoordinates![0];
+    const population=[...rows,{...rows[0],id:'input-copy',bodyHash:input.bodyHash,url:'https://example.org/input',publishedAt:analysis.article!.publishedAt}];
+    attachIssueQuarterComparison(analysis,bundle,{corpusArticleHashes:population.map(row=>row.bodyHash)},population);
+    expect(analysis.issueQuarterComparison).toMatchObject({status:'ready',selfExcluded:true,count:6});
+  });
+  it('reports source-composition counts, interval histogram and recent different-composition items',async()=>{
+    const {analysis,rows,bundle,provenance}=await fixture();
+    attachIssueQuarterComparison(analysis,bundle,provenance,rows);
+    expect(analysis.issueQuarterComparison?.sourceComposition).toMatchObject({
+      inputCategory:'support',counts:{support:3,oppose:3,mixed:0},
+      histogram:expect.arrayContaining([expect.objectContaining({lower:-1,upper:-.75,count:6})]),
+    });
+    expect(analysis.issueQuarterComparison?.sourceComposition?.differentCompositionArticles).toHaveLength(3);
   });
 });

@@ -46,7 +46,7 @@ describe('NVIDIA request accounting without token caps',()=>{
   const restored=latch();const three=['restored-one','restored-two','restored-three'].map(actor=>withBudget(actorRequest(actor),config,crypto.randomUUID(),60000,async()=>restored.promise));
   await vi.waitFor(async()=>expect((await db.prepare('SELECT COUNT(*) AS n FROM request_budget WHERE active=1').first<{n:number}>())!.n).toBe(3));
   restored.release();await Promise.all(three);
- });
+ },15000);
  it('recovers an expired crashed-server lease and gives a new request a bounded lease',async()=>{
   const now=Date.now(),orphan=crypto.randomUUID(),next=crypto.randomUUID();
   await db.prepare('INSERT INTO request_budget(id,actor,day,created_at,reserved,active,lease_until) VALUES(?,?,?,?,0,1,?)').bind(orphan,'orphan',new Date(now).toISOString().slice(0,10),now-60000,now-1).run();

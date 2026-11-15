@@ -90,6 +90,7 @@ export const bodyPositionCandidateSchema=z.object({
   attribution:z.enum(['author','reported_sources','unclear']).optional(),
 }).strict();
 export const rawAnalysisSchema=z.object({
+  clearSentenceIds:z.array(id).optional(),
   topics:z.array(z.object({id,label:text(50),description:text(300),evidence:z.array(quoteCandidate).min(1).max(5)}).strict()).max(5),
   topicAssignments:z.array(z.object({sourceId:id,topicIds:z.array(id).max(5),status:z.enum(['assigned','other','undetermined']),evidence:z.array(quoteCandidate).max(5),reason:z.string().max(300)}).strict()).max(5),
   stances:z.array(z.object({sourceId:id,label:stanceLabelSchema,evidence:z.array(quoteCandidate).max(5),reason:z.string().max(300)}).strict()).max(5),

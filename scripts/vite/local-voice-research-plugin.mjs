@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {createHash} from 'node:crypto';
 
 /** Explicit local opt-in. Release validation and public JSON remain untouched. */
 export function localVoiceResearchPlugin({command,root,env=process.env}){
@@ -28,8 +29,11 @@ export function localVoiceResearchPlugin({command,root,env=process.env}){
   if(!selectedFile.startsWith(runtime+path.sep))throw Error('Research comparison files must resolve inside project .sites-runtime.');
   return JSON.parse(fs.readFileSync(selectedFile,'utf8').replace(/^\uFEFF/,''));
  };
+ const comparisonFiles=['LOCAL_VOICE_PRECOMPUTED','LOCAL_VOICE_BASELINES','LOCAL_VOICE_PROVENANCE','LOCAL_VOICE_RECOMMENDATIONS']
+  .filter(name=>env[name]).map(name=>fs.readFileSync(fs.realpathSync(path.resolve(root,env[name]))));
+ const identity=createHash('sha256').update(comparisonFiles.map(bytes=>`${bytes.length}:`).join('|')).update(Buffer.concat(comparisonFiles)).digest('hex');
  const comparison={precomputed:localJson('LOCAL_VOICE_PRECOMPUTED'),baselines:localJson('LOCAL_VOICE_BASELINES'),
-  provenance:localJson('LOCAL_VOICE_PROVENANCE'),recommendations:localJson('LOCAL_VOICE_RECOMMENDATIONS')?.articles??null};
+  provenance:localJson('LOCAL_VOICE_PROVENANCE'),recommendations:localJson('LOCAL_VOICE_RECOMMENDATIONS')?.articles??null,identity};
  return {name:'local-voice-research',enforce:'pre',
   config(){return {server:{host:'127.0.0.1',allowedHosts:['localhost','127.0.0.1']}};},
   transform(_code,id){

@@ -1,0 +1,468 @@
+﻿{
+    "schemaVersion":  "bias-diagnosis-2026-11-16-1.0",
+    "generatedAt":  "2026-11-15T16:25:11.305Z",
+    "researchOnly":  true,
+    "usageReviewed":  false,
+    "apiCalls":  0,
+    "source":  {
+                   "coordinates":  ".sites-runtime/speed-20261115/coordinates-priority-complete/coordinates.local.jsonl",
+                   "baseline":  ".sites-runtime/speed-20261115/coordinates-priority-complete/baselines.local.json",
+                   "precomputedLabels":  "local artifact keyed by body hash; no text copied"
+               },
+    "eligibility":  {
+                        "minimumDirectionalSentences":  3,
+                        "maximumRangeWidth":  0.5,
+                        "minimumArticlesPerPublisher":  3,
+                        "minimumPublishers":  2,
+                        "midpointImputation":  false,
+                        "trainingOriginalsExcluded":  true
+                    },
+    "topics":  {
+                   "housing_supply":  {
+                                          "issue":  "supply",
+                                          "topicArticleRows":  716,
+                                          "issueAssignedRows":  233,
+                                          "embeddingCompleteRows":  212,
+                                          "directionalAtLeast3":  49,
+                                          "rangeWidthAtMostHalf":  9,
+                                          "eligibleRows":  7,
+                                          "eligibleByPublisher":  {
+                                                                      "dailian.co.kr":  4,
+                                                                      "ohmynews.com":  1,
+                                                                      "newdaily.co.kr":  1,
+                                                                      "pressian.com":  1
+                                                                  },
+                                          "coordinateBounds":  {
+                                                                   "minimum":  -1,
+                                                                   "maximum":  0.8333333333333334
+                                                               },
+                                          "endpointHistogram":  {
+                                                                    "binWidth":  0.25,
+                                                                    "bins":  [
+                                                                                 {
+                                                                                     "lower":  -1,
+                                                                                     "upper":  -0.75,
+                                                                                     "count":  2
+                                                                                 },
+                                                                                 {
+                                                                                     "lower":  -0.75,
+                                                                                     "upper":  -0.5,
+                                                                                     "count":  2
+                                                                                 },
+                                                                                 {
+                                                                                     "lower":  -0.5,
+                                                                                     "upper":  -0.25,
+                                                                                     "count":  0
+                                                                                 },
+                                                                                 {
+                                                                                     "lower":  -0.25,
+                                                                                     "upper":  0,
+                                                                                     "count":  2
+                                                                                 },
+                                                                                 {
+                                                                                     "lower":  0,
+                                                                                     "upper":  0.25,
+                                                                                     "count":  3
+                                                                                 },
+                                                                                 {
+                                                                                     "lower":  0.25,
+                                                                                     "upper":  0.5,
+                                                                                     "count":  1
+                                                                                 },
+                                                                                 {
+                                                                                     "lower":  0.5,
+                                                                                     "upper":  0.75,
+                                                                                     "count":  3
+                                                                                 },
+                                                                                 {
+                                                                                     "lower":  0.75,
+                                                                                     "upper":  1,
+                                                                                     "count":  1
+                                                                                 }
+                                                                             ],
+                                                                    "endpointCount":  14,
+                                                                    "atPlusMinusOne":  2,
+                                                                    "atPlusMinusOneShare":  0.14285714285714285
+                                                                },
+                                          "unresolvedReasonSentenceCounts":  {
+                                                                                 "directionUnresolved":  241,
+                                                                                 "speakerUnresolved":  97,
+                                                                                 "issueUnrelated":  4266,
+                                                                                 "sourceArticlesWithCachedLabels":  205
+                                                                             },
+                                          "selfExcludedDiscrimination":  {
+                                                                             "directionDecided":  0,
+                                                                             "undetermined":  0,
+                                                                             "noBaseline":  7,
+                                                                             "baselineUncertain":  0,
+                                                                             "total":  7
+                                                                         },
+                                          "allPeriodBaseline":  {
+                                                                    "status":  "insufficient",
+                                                                    "count":  7,
+                                                                    "publisherCount":  1,
+                                                                    "publisherCounts":  [
+                                                                                            {
+                                                                                                "publisher":  "dailian.co.kr",
+                                                                                                "pointCount":  0,
+                                                                                                "rangeCount":  4
+                                                                                            },
+                                                                                            {
+                                                                                                "publisher":  "newdaily.co.kr",
+                                                                                                "pointCount":  0,
+                                                                                                "rangeCount":  1
+                                                                                            },
+                                                                                            {
+                                                                                                "publisher":  "ohmynews.com",
+                                                                                                "pointCount":  0,
+                                                                                                "rangeCount":  1
+                                                                                            },
+                                                                                            {
+                                                                                                "publisher":  "pressian.com",
+                                                                                                "pointCount":  1,
+                                                                                                "rangeCount":  0
+                                                                                            }
+                                                                                        ],
+                                                                    "bounds":  null
+                                                                }
+                                      },
+                   "medical_school_quota":  {
+                                                "issue":  "quota",
+                                                "topicArticleRows":  638,
+                                                "issueAssignedRows":  559,
+                                                "embeddingCompleteRows":  558,
+                                                "directionalAtLeast3":  244,
+                                                "rangeWidthAtMostHalf":  112,
+                                                "eligibleRows":  104,
+                                                "eligibleByPublisher":  {
+                                                                            "pressian.com":  24,
+                                                                            "ohmynews.com":  29,
+                                                                            "dailian.co.kr":  27,
+                                                                            "newdaily.co.kr":  24
+                                                                        },
+                                                "coordinateBounds":  {
+                                                                         "minimum":  -1,
+                                                                         "maximum":  1
+                                                                     },
+                                                "endpointHistogram":  {
+                                                                          "binWidth":  0.25,
+                                                                          "bins":  [
+                                                                                       {
+                                                                                           "lower":  -1,
+                                                                                           "upper":  -0.75,
+                                                                                           "count":  63
+                                                                                       },
+                                                                                       {
+                                                                                           "lower":  -0.75,
+                                                                                           "upper":  -0.5,
+                                                                                           "count":  37
+                                                                                       },
+                                                                                       {
+                                                                                           "lower":  -0.5,
+                                                                                           "upper":  -0.25,
+                                                                                           "count":  18
+                                                                                       },
+                                                                                       {
+                                                                                           "lower":  -0.25,
+                                                                                           "upper":  0,
+                                                                                           "count":  15
+                                                                                       },
+                                                                                       {
+                                                                                           "lower":  0,
+                                                                                           "upper":  0.25,
+                                                                                           "count":  6
+                                                                                       },
+                                                                                       {
+                                                                                           "lower":  0.25,
+                                                                                           "upper":  0.5,
+                                                                                           "count":  15
+                                                                                       },
+                                                                                       {
+                                                                                           "lower":  0.5,
+                                                                                           "upper":  0.75,
+                                                                                           "count":  20
+                                                                                       },
+                                                                                       {
+                                                                                           "lower":  0.75,
+                                                                                           "upper":  1,
+                                                                                           "count":  34
+                                                                                       }
+                                                                                   ],
+                                                                          "endpointCount":  208,
+                                                                          "atPlusMinusOne":  77,
+                                                                          "atPlusMinusOneShare":  0.3701923076923077
+                                                                      },
+                                                "unresolvedReasonSentenceCounts":  {
+                                                                                       "directionUnresolved":  1541,
+                                                                                       "speakerUnresolved":  930,
+                                                                                       "issueUnrelated":  4061,
+                                                                                       "sourceArticlesWithCachedLabels":  454
+                                                                                   },
+                                                "selfExcludedDiscrimination":  {
+                                                                                   "directionDecided":  58,
+                                                                                   "undetermined":  46,
+                                                                                   "noBaseline":  0,
+                                                                                   "baselineUncertain":  0,
+                                                                                   "total":  104
+                                                                               },
+                                                "allPeriodBaseline":  {
+                                                                          "status":  "ready",
+                                                                          "count":  104,
+                                                                          "publisherCount":  4,
+                                                                          "publisherCounts":  [
+                                                                                                  {
+                                                                                                      "publisher":  "dailian.co.kr",
+                                                                                                      "pointCount":  5,
+                                                                                                      "rangeCount":  22
+                                                                                                  },
+                                                                                                  {
+                                                                                                      "publisher":  "newdaily.co.kr",
+                                                                                                      "pointCount":  7,
+                                                                                                      "rangeCount":  17
+                                                                                                  },
+                                                                                                  {
+                                                                                                      "publisher":  "ohmynews.com",
+                                                                                                      "pointCount":  4,
+                                                                                                      "rangeCount":  25
+                                                                                                  },
+                                                                                                  {
+                                                                                                      "publisher":  "pressian.com",
+                                                                                                      "pointCount":  7,
+                                                                                                      "rangeCount":  17
+                                                                                                  }
+                                                                                              ],
+                                                                          "bounds":  {
+                                                                                         "lower":  -0.6666666666666666,
+                                                                                         "upper":  -0.3333333333333333
+                                                                                     }
+                                                                      }
+                                            },
+                   "nuclear_energy":  {
+                                          "issue":  "expansion",
+                                          "topicArticleRows":  545,
+                                          "issueAssignedRows":  269,
+                                          "embeddingCompleteRows":  252,
+                                          "directionalAtLeast3":  91,
+                                          "rangeWidthAtMostHalf":  44,
+                                          "eligibleRows":  36,
+                                          "eligibleByPublisher":  {
+                                                                      "dailian.co.kr":  5,
+                                                                      "newdaily.co.kr":  11,
+                                                                      "pressian.com":  4,
+                                                                      "ohmynews.com":  16
+                                                                  },
+                                          "coordinateBounds":  {
+                                                                   "minimum":  -1,
+                                                                   "maximum":  1
+                                                               },
+                                          "endpointHistogram":  {
+                                                                    "binWidth":  0.25,
+                                                                    "bins":  [
+                                                                                 {
+                                                                                     "lower":  -1,
+                                                                                     "upper":  -0.75,
+                                                                                     "count":  5
+                                                                                 },
+                                                                                 {
+                                                                                     "lower":  -0.75,
+                                                                                     "upper":  -0.5,
+                                                                                     "count":  8
+                                                                                 },
+                                                                                 {
+                                                                                     "lower":  -0.5,
+                                                                                     "upper":  -0.25,
+                                                                                     "count":  3
+                                                                                 },
+                                                                                 {
+                                                                                     "lower":  -0.25,
+                                                                                     "upper":  0,
+                                                                                     "count":  6
+                                                                                 },
+                                                                                 {
+                                                                                     "lower":  0,
+                                                                                     "upper":  0.25,
+                                                                                     "count":  2
+                                                                                 },
+                                                                                 {
+                                                                                     "lower":  0.25,
+                                                                                     "upper":  0.5,
+                                                                                     "count":  13
+                                                                                 },
+                                                                                 {
+                                                                                     "lower":  0.5,
+                                                                                     "upper":  0.75,
+                                                                                     "count":  11
+                                                                                 },
+                                                                                 {
+                                                                                     "lower":  0.75,
+                                                                                     "upper":  1,
+                                                                                     "count":  24
+                                                                                 }
+                                                                             ],
+                                                                    "endpointCount":  72,
+                                                                    "atPlusMinusOne":  26,
+                                                                    "atPlusMinusOneShare":  0.3611111111111111
+                                                                },
+                                          "unresolvedReasonSentenceCounts":  {
+                                                                                 "directionUnresolved":  237,
+                                                                                 "speakerUnresolved":  153,
+                                                                                 "issueUnrelated":  2926,
+                                                                                 "sourceArticlesWithCachedLabels":  216
+                                                                             },
+                                          "selfExcludedDiscrimination":  {
+                                                                             "directionDecided":  12,
+                                                                             "undetermined":  24,
+                                                                             "noBaseline":  0,
+                                                                             "baselineUncertain":  0,
+                                                                             "total":  36
+                                                                         },
+                                          "allPeriodBaseline":  {
+                                                                    "status":  "ready",
+                                                                    "count":  36,
+                                                                    "publisherCount":  4,
+                                                                    "publisherCounts":  [
+                                                                                            {
+                                                                                                "publisher":  "dailian.co.kr",
+                                                                                                "pointCount":  1,
+                                                                                                "rangeCount":  4
+                                                                                            },
+                                                                                            {
+                                                                                                "publisher":  "newdaily.co.kr",
+                                                                                                "pointCount":  2,
+                                                                                                "rangeCount":  9
+                                                                                            },
+                                                                                            {
+                                                                                                "publisher":  "ohmynews.com",
+                                                                                                "pointCount":  3,
+                                                                                                "rangeCount":  13
+                                                                                            },
+                                                                                            {
+                                                                                                "publisher":  "pressian.com",
+                                                                                                "pointCount":  0,
+                                                                                                "rangeCount":  4
+                                                                                            }
+                                                                                        ],
+                                                                    "bounds":  {
+                                                                                   "lower":  0.5,
+                                                                                   "upper":  1
+                                                                               }
+                                                                }
+                                      },
+                   "minimum_wage":  {
+                                        "issue":  "increase",
+                                        "topicArticleRows":  415,
+                                        "issueAssignedRows":  299,
+                                        "embeddingCompleteRows":  290,
+                                        "directionalAtLeast3":  165,
+                                        "rangeWidthAtMostHalf":  40,
+                                        "eligibleRows":  34,
+                                        "eligibleByPublisher":  {
+                                                                    "pressian.com":  7,
+                                                                    "dailian.co.kr":  13,
+                                                                    "ohmynews.com":  11,
+                                                                    "newdaily.co.kr":  3
+                                                                },
+                                        "coordinateBounds":  {
+                                                                 "minimum":  -1,
+                                                                 "maximum":  1
+                                                             },
+                                        "endpointHistogram":  {
+                                                                  "binWidth":  0.25,
+                                                                  "bins":  [
+                                                                               {
+                                                                                   "lower":  -1,
+                                                                                   "upper":  -0.75,
+                                                                                   "count":  4
+                                                                               },
+                                                                               {
+                                                                                   "lower":  -0.75,
+                                                                                   "upper":  -0.5,
+                                                                                   "count":  16
+                                                                               },
+                                                                               {
+                                                                                   "lower":  -0.5,
+                                                                                   "upper":  -0.25,
+                                                                                   "count":  8
+                                                                               },
+                                                                               {
+                                                                                   "lower":  -0.25,
+                                                                                   "upper":  0,
+                                                                                   "count":  14
+                                                                               },
+                                                                               {
+                                                                                   "lower":  0,
+                                                                                   "upper":  0.25,
+                                                                                   "count":  8
+                                                                               },
+                                                                               {
+                                                                                   "lower":  0.25,
+                                                                                   "upper":  0.5,
+                                                                                   "count":  11
+                                                                               },
+                                                                               {
+                                                                                   "lower":  0.5,
+                                                                                   "upper":  0.75,
+                                                                                   "count":  5
+                                                                               },
+                                                                               {
+                                                                                   "lower":  0.75,
+                                                                                   "upper":  1,
+                                                                                   "count":  2
+                                                                               }
+                                                                           ],
+                                                                  "endpointCount":  68,
+                                                                  "atPlusMinusOne":  5,
+                                                                  "atPlusMinusOneShare":  0.07352941176470588
+                                                              },
+                                        "unresolvedReasonSentenceCounts":  {
+                                                                               "directionUnresolved":  648,
+                                                                               "speakerUnresolved":  319,
+                                                                               "issueUnrelated":  3125,
+                                                                               "sourceArticlesWithCachedLabels":  256
+                                                                           },
+                                        "selfExcludedDiscrimination":  {
+                                                                           "directionDecided":  18,
+                                                                           "undetermined":  16,
+                                                                           "noBaseline":  0,
+                                                                           "baselineUncertain":  0,
+                                                                           "total":  34
+                                                                       },
+                                        "allPeriodBaseline":  {
+                                                                  "status":  "ready",
+                                                                  "count":  34,
+                                                                  "publisherCount":  4,
+                                                                  "publisherCounts":  [
+                                                                                          {
+                                                                                              "publisher":  "dailian.co.kr",
+                                                                                              "pointCount":  1,
+                                                                                              "rangeCount":  12
+                                                                                          },
+                                                                                          {
+                                                                                              "publisher":  "newdaily.co.kr",
+                                                                                              "pointCount":  0,
+                                                                                              "rangeCount":  3
+                                                                                          },
+                                                                                          {
+                                                                                              "publisher":  "ohmynews.com",
+                                                                                              "pointCount":  2,
+                                                                                              "rangeCount":  9
+                                                                                          },
+                                                                                          {
+                                                                                              "publisher":  "pressian.com",
+                                                                                              "pointCount":  2,
+                                                                                              "rangeCount":  5
+                                                                                          }
+                                                                                      ],
+                                                                  "bounds":  {
+                                                                                 "lower":  -0.25,
+                                                                                 "upper":  0
+                                                                             }
+                                                              }
+                                    }
+               },
+    "limitations":  [
+                        "Coordinate and embedding-ledger artifacts are snapshot-bound. A missing sentence count of 0 here is an article-row cache signal; it does not override the separate four-priority queue snapshot.",
+                        "Sentence-level cause counts are derived from cached labels for rejected coordinate rows only; classes can overlap and are not exclusive.",
+                        "All-period baseline numbers are compatible with the recorded six-topic coordinate snapshot; not a model-accuracy evaluation."
+                    ]
+}

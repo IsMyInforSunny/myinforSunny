@@ -6,6 +6,7 @@ import {capabilities, modelName, type RuntimeConfig} from './config';
 import {actorHash} from './budget';
 import {allowedUrl} from './retrieval';
 import {releasedVoiceModel,releasedEmbeddingVoiceModel} from './voice-analysis';
+import localResearchComparison from './local-research-comparison';
 import type {prepareUrlAnalysis} from './analyze-url';
 import {AppError} from './errors';
 
@@ -43,7 +44,7 @@ export async function cachedPublicUrlAnalysis(request:Request,input:UrlRequest,c
   return cachedAnalysis(request,input,config,requestId,signal=>action(prepared,signal),{articleHash:prepared.articleHash});
  }
  const key=await digest(['public-url-swr-1',CACHE_VERSION,ANALYSIS_PROMPT_VERSION,RUBRIC,SEGMENTER,
-  config.AI_PROVIDER??'groq',modelName(config),releasedVoiceModel?.version??null,releasedEmbeddingVoiceModel?.version??null,
+  config.AI_PROVIDER??'groq',modelName(config),releasedVoiceModel?.version??null,releasedEmbeddingVoiceModel?.version??null,localResearchComparison?.identity??null,
   config.NEWS_PROVIDER??'gdelt',config.NEWS_TERMS_APPROVED??'',config.FIRECRAWL_SOURCE_TERMS_APPROVED??'',hosts,url.href]);
  const edgeRequest=new Request(`https://article-cache.invalid/public-url/${key}`);
  let edge:Cache|undefined;
@@ -136,7 +137,7 @@ export async function cachedAnalysis(
   const hosts = (config.ALLOWED_RETRIEVAL_HOSTS ?? '').split(',').map(host => host.trim()).filter(Boolean);
   const url = input.kind === 'url' ? allowedUrl(input.url, hosts) : null;
   if (input.kind === 'url' && !url) return {analysis:await action(),cache:'miss'};
-  const version = [CACHE_VERSION, ANALYSIS_PROMPT_VERSION, RUBRIC, SEGMENTER, config.AI_PROVIDER ?? 'groq', modelName(config),releasedVoiceModel?.version??null,releasedEmbeddingVoiceModel?.version??null];
+  const version = [CACHE_VERSION, ANALYSIS_PROMPT_VERSION, RUBRIC, SEGMENTER, config.AI_PROVIDER ?? 'groq', modelName(config),releasedVoiceModel?.version??null,releasedEmbeddingVoiceModel?.version??null,localResearchComparison?.identity??null];
   const payload = {...input, ...(url ? {url:url.href} : {})};
   const publicArticle=input.kind==='url'&&!input.comments.length&&!input.proposition&&!!options.articleHash;
   const ttl=publicArticle?PUBLIC_TTL_MS:TTL_MS;

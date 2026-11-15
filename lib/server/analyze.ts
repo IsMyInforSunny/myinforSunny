@@ -93,6 +93,36 @@ export function assembleAnalysis(req:TextRequest,raw:RawAnalysis,requestId:strin
   }).slice(0,2);
   const a:Analysis={schemaVersion:'2.1',analysisId:crypto.randomUUID(),requestId,mode:'live',status:damaged?'partial':'success',versions:{rubric:RUBRIC,prompt:ANALYSIS_PROMPT_VERSION,model,segmenter:SEGMENTER},sources,proposition:req.proposition,...(bodyPosition?{bodyPosition}:{}),topics,topicAssignments,bodyTopicAssignments,stances,expressions,claims,perspectiveQuestions:questions,counterArguments,searchSuggestions,indicators:null as unknown as Analysis['indicators'],coverage:{totalSentences:expressions.length,naturalSentences:naturalSentenceCount(sources),factualClaimsExtracted:claims.filter(c=>c.kind==='factual').length,claimsMayBeOmitted:raw.claimsMayBeOmitted||claims.length===5||damaged,scopeNote:'제출한 자료 안에서 추출한 결과입니다. 아직 외부 자료와 대조하지 않았으며, 모든 주장을 빠짐없이 추출했다고 보장하지 않습니다.'},warnings,createdAt:new Date().toISOString()};a.indicators=indicators(a);assertAnalysis(a);return a;
 }
+const SENTENCE_OUTPUT_BATCH=40;
+async function analyzeInSentenceBatches(config:RuntimeConfig,req:TextRequest,requestId:string,signal:AbortSignal,
+ sources:ReturnType<typeof makeSources>,instructions:string,input:Record<string,unknown>,hasProposition:boolean){
+ const units=sources.flatMap(source=>source.sentences.map(sentence=>({source,sentence})));
+ if(units.length<=SENTENCE_OUTPUT_BATCH)
+  return structured(config,analysisResponseSchema(sources,hasProposition),searchLanguagePrompt(instructions,config),input,signal,
+   {generationSchema:analysisModelSchema(sources,hasProposition),requestId});
+ const fullSchema=analysisModelSchema(sources,hasProposition);
+ const coreSchema=fullSchema.pick({topics:true,topicAssignments:true,stances:true,bodyPosition:true,claims:true,
+  perspectiveQuestions:true,counterArguments:true,searchSuggestions:true,claimsMayBeOmitted:true});
+ const coreInput={...input};delete coreInput.requiredExpressionSentenceIds;
+ const coreInstructions=instructions+' 본문 문장별 분류는 다음 단계에서 나눠 처리한다. 이 호출에서는 전체 글을 읽고 논점·작성자 입장·주장·검토 질문만 반환한다. clearSentenceIds, expressions, bodyAssigned, bodyOtherIds, bodyUndeterminedIds는 출력하지 않는다.';
+ const core=await structured(config,coreSchema,searchLanguagePrompt(coreInstructions,config),coreInput,signal,{requestId});
+ const clearSentenceIds:string[]=[],expressions:RawAnalysis['expressions']=[],bodyAssigned:RawAnalysis['bodyAssigned']=[],
+  bodyOtherIds:string[]=[],bodyUndeterminedIds:string[]=[];
+ const topicSummary=core.topics.map(topic=>({id:topic.id,label:topic.label}));
+ for(let offset=0;offset<units.length;offset+=SENTENCE_OUTPUT_BATCH){
+  const batch=units.slice(offset,offset+SENTENCE_OUTPUT_BATCH);
+  const batchSources=[...new Map(batch.map(({source})=>[source.id,{...source,sentences:batch.filter(item=>item.source.id===source.id).map(item=>item.sentence)}])).values()];
+  const schema=analysisModelSchema(batchSources,false).pick({clearSentenceIds:true,expressions:true,bodyAssigned:true,bodyOtherIds:true,bodyUndeterminedIds:true});
+  const sentenceInput={documentType:input.documentType,proposition:input.proposition,topics:topicSummary,
+   requiredExpressionSentenceIds:batch.map(item=>item.sentence.id),sources:batchSources.map(source=>({id:source.id,kind:source.kind,
+    sentences:source.sentences.map(sentence=>({sentenceId:sentence.id,text:source.text.slice(sentence.start,sentence.end)}))}))};
+  const sentenceInstructions=instructions+' 현재 제공된 문장 ID만 분류한다. clearSentenceIds에는 명확한 문장 ID만 쓴다. 표현이 flagged 또는 undetermined인 문장만 expressions에 설명과 정확한 원문 근거를 넣는다. 본문 문장은 제공된 논점 ID에만 배정하고 나머지는 bodyOtherIds 또는 bodyUndeterminedIds에 한 번씩 넣는다. 주장·명제·논점 정의는 생성하지 않는다.';
+  const result=await structured(config,schema,searchLanguagePrompt(sentenceInstructions,config),sentenceInput,signal,{requestId});
+  clearSentenceIds.push(...result.clearSentenceIds);expressions.push(...result.expressions);bodyAssigned.push(...result.bodyAssigned);
+  bodyOtherIds.push(...result.bodyOtherIds);bodyUndeterminedIds.push(...result.bodyUndeterminedIds);
+ }
+ return {...core,clearSentenceIds,expressions,bodyAssigned,bodyOtherIds,bodyUndeterminedIds} as RawAnalysis;
+}
 export async function analyze(req:TextRequest,config:RuntimeConfig,requestId:string,signal:AbortSignal,context:{article?:boolean;articleUrl?:string;articleTitle?:string}={}){
   const canonicalProposition=!req.proposition?canonicalStanceProposition(req.body):undefined;
   if(new Set(req.comments.map(c=>c.id)).size!==req.comments.length)throw new AppError(422,'VALIDATION_ERROR','댓글 ID가 중복되었습니다.');
@@ -113,7 +143,8 @@ export async function analyze(req:TextRequest,config:RuntimeConfig,requestId:str
   const coverageInstructions=' 출력은 간결하게 작성한다. 자극적이지 않은 clear 문장은 ID만 clearSentenceIds에 넣고 expressions 객체는 만들지 않는다. flagged 또는 undetermined 문장만 expressions에 넣는다. 두 배열을 합쳐 requiredExpressionSentenceIds의 모든 ID가 정확히 한 번씩 있어야 한다. topicAssignments에는 requiredTopicAssignmentSourceIds의 댓글만 각 1개씩 반환하며 본문 body는 여기에 넣지 않는다. 댓글이 없어도 본문 body의 모든 문장 ID를 bodyAssigned({sentenceId,topicIds}: 해당 논점 있음)·bodyOtherIds(해당 논점 없음)·bodyUndeterminedIds(유보) 중 정확히 한 곳에 한 번씩 넣는다. topicIds는 topics의 id만 쓰며 여러 개 가능하다. topics 근거 인용은 예시일 뿐 분포에 쓰이지 않는다. stances는 proposition이 없으면 빈 배열이다.';
   const bodyPositionInstructions=' bodyPosition은 댓글을 제외한 기사 본문 자체의 입장이다. 과학·교육·경제·건강·소비·환경 등 모든 주제를 다루며 정치적 좌우로 강제하지 않는다. 사용자 proposition이 있으면 그대로 비교하고, 없으면 본문 중심의 찬반 가능한 명제를 긍정형으로 짧게 정한다. label은 그 명제에 대한 본문 입장 support/oppose/mixed/not_expressed/undetermined다. evidence에는 body 문장의 실제 인용만, reason에는 입장 판단 이유를 쓴다. 댓글 의견·취재원 인용을 기사 작성자의 지지로 바꾸지 않는다. 사실만 전달하고 입장을 드러내지 않으면 not_expressed로 두며, 비교할 논쟁이 없으면 proposition은 빈 문자열로 둔다. 수치 점수는 생성하지 않는다.';
   const compact=['nvidia','deepseek'].includes(config.AI_PROVIDER??'');
-  const transport=compact?compactAnalysisTransport(sources,!!req.proposition,claimsRequired):null;
+  const transport=compact&&sources.reduce((count,source)=>count+source.sentences.length,0)<=SENTENCE_OUTPUT_BATCH
+    ?compactAnalysisTransport(sources,!!req.proposition,claimsRequired):null;
   const articleInstructions=claimsRequired?' claims에 실제 원문에 있는 핵심 주장을 1~5개 반드시 추출한다. 사건·실험 결과·통계·연구진의 설명은 factual이다. 본문에 확인 가능한 사실이 있으면 factual을 최소 1개 포함한다. 수치나 내용을 새로 만들지 말고 실제 문장 ID에 연결한다. 사실이 없는 순수 의견 기사라면 opinion을 추출한다.':'';
   const attributionInstructions=' bodyPosition.attribution은 입장 근거의 발화 주체다: author(기사 작성자 자신의 명시적 평가·제안), reported_sources(취재원·단체·정부·연구진의 발언이나 요구만 전달), unclear(구분 불가). 한쪽 발언만 실렸거나 제목에 인용됐다는 이유로 author로 두지 않는다. 보도문에서 노동계·경영계 등의 요구를 전달하는 것은 reported_sources이며 label=not_expressed다. 사설·칼럼이라도 실제 작성자 평가 인용이 있어야 author다. not_expressed에서도 쟁점이 있으면 비교 명제는 유지한다.';
   const instructions=(compact?COMPACT_ANALYZE_PROMPT:ANALYZE_PROMPT+coverageInstructions+bodyPositionInstructions)+articleInstructions+attributionInstructions
@@ -127,10 +158,11 @@ export async function analyze(req:TextRequest,config:RuntimeConfig,requestId:str
     :null;
   const modelStarted=Date.now();
   let raw;
-  try{raw=await structured(config,transport?.response??analysisResponseSchema(sources,!!req.proposition),searchLanguagePrompt(instructions+' perspectiveQuestions와 counterArguments는 각각 최대 1개만 반환한다.',config),input,signal,{generationSchema:transport?.generation??analysisModelSchema(sources,!!req.proposition),requestId});}
+  try{raw=transport?await structured(config,transport.response,searchLanguagePrompt(instructions+' perspectiveQuestions와 counterArguments는 각각 최대 1개만 반환한다.',config),input,signal,{generationSchema:transport.generation,requestId})
+    :await analyzeInSentenceBatches(config,req,requestId,signal,sources,instructions+' perspectiveQuestions와 counterArguments는 각각 최대 1개만 반환한다.',input,!!req.proposition);}
   catch(error){voiceController.abort();await embeddingWork;throw error;}
   console.info(JSON.stringify({type:'article_timing',stage:'llm',startedAt:modelStarted,durationMs:Date.now()-modelStarted,status:'completed',requestId}));
-  const {clearSentenceIds,...proposal}=raw;
+  const {clearSentenceIds=[],...proposal}=raw;
   const explicitIds=new Set(proposal.expressions.map(e=>e.sentenceId));
   const overlaps=clearSentenceIds.filter(id=>explicitIds.has(id));
   // A clear shortcut must never suppress a detailed finding. That finding still needs valid evidence.
