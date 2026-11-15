@@ -22,6 +22,13 @@ describe('reviewed precomputed voice documents',()=>{
     first!.labels[0].direction='oppose';
     expect((await readPrecomputedVoiceDocument(body,expected,artifact))!.labels[0].direction).toBe('support');
   });
+  it('selects the exact issue document when one retained article has two tied issues',async()=>{
+    const {body,expected,artifact,document}=await fixture();
+    const second:VoiceDocument={...document,articleIssue:'lifetime',labels:document.labels.map(label=>({...label,issue:'lifetime'}))};
+    const hash=await voiceArticleHash(body);
+    const multi={...artifact,documentsByIssue:{[hash]:{expansion:document,lifetime:second}}};
+    expect(await readPrecomputedVoiceDocument(body,{...expected,articleIssue:'lifetime'},multi)).toEqual(second);
+  });
   it('keeps research artifacts and the empty deployment placeholder inactive',async()=>{
     const {body,expected,artifact}=await fixture();
     expect(await readPrecomputedVoiceDocument(body,expected)).toBeNull();

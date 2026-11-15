@@ -16,6 +16,7 @@ const stamp=new Date().toISOString().replace(/[:.]/g,'-');
 const reportPath=local(process.argv[3]??path.join(runtime,'speed-20261115',`analysis-speed-${stamp}.local.json`));
 if(fs.existsSync(reportPath))throw Error('Preserve previous measurements and choose a new report path');
 const privateInputPath=reportPath.replace(/\.json$/,'')+'.inputs.local.json';
+const timingLog=process.env.ANALYSIS_SPEED_SERVER_LOG?local(process.env.ANALYSIS_SPEED_SERVER_LOG):null;
 if(privateInputPath===reportPath||fs.existsSync(privateInputPath))throw Error('A separate new input manifest path is required');
 const sourcePath=path.join(runtime,'collection-1000-20261105','articles-reviewed-3000.local.jsonl');
 const publishers=['dailian.co.kr','newdaily.co.kr','ohmynews.com','pressian.com'];
@@ -50,6 +51,7 @@ for(const [index,article] of selected.entries()){
   }
   for(const phase of ['first','cache']){
     const measurement=await measure(article,index,phase);
+    if(timingLog)attachTimings(measurement);
     report.measurements.push(measurement);persist();
     console.log(JSON.stringify(measurement));
     if(measurement.errorCode==='RATE_LIMITED'||measurement.httpStatus===429){
@@ -77,6 +79,19 @@ function local(value){
   return resolved;
 }
 function sha(value){return createHash('sha256').update(value).digest('hex');}
+function attachTimings(metric){
+ const entries=fs.readFileSync(timingLog,'utf8').split(/\r?\n/).filter(line=>line.startsWith('{')).flatMap(line=>{try{return [JSON.parse(line)];}catch{return [];}})
+  .filter(event=>event.type==='article_timing'&&event.requestId===metric.requestId);
+ metric.stages=Object.fromEntries(entries.filter(event=>['retrieved','llm','embedding','svm','voice_plan'].includes(event.stage)).map(event=>[event.stage,
+  Object.fromEntries(['startedAt','durationMs','batchCount','sentenceCount','status'].filter(key=>event[key]!==undefined).map(key=>[key,event[key]]))]));
+ const embedding=metric.stages.embedding,llm=metric.stages.llm;
+ metric.llmEmbeddingStartDifferenceMs=embedding?.startedAt!==undefined&&llm?.startedAt!==undefined?Math.abs(embedding.startedAt-llm.startedAt):null;
+ metric.llmEmbeddingOverlapped=embedding?.startedAt!==undefined&&llm?.startedAt!==undefined
+  ?embedding.startedAt<llm.startedAt+llm.durationMs&&llm.startedAt<embedding.startedAt+embedding.durationMs:null;
+ if(embedding)metric.embeddingStatus=embedding.status==='completed'?(embedding.batchCount?'executed':'vector_cache_hit'):'failed';
+ else if(metric.cache==='hit')metric.embeddingStatus='analysis_cache_hit';
+ else if(metric.stages.voice_plan)metric.embeddingStatus=metric.stages.voice_plan.status;
+}
 function persist(){
   const temporary=reportPath+'.tmp-'+process.pid;
   fs.writeFileSync(temporary,JSON.stringify(report,null,2)+'\n',{mode:0o600});fs.renameSync(temporary,reportPath);

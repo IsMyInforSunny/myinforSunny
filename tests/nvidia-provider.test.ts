@@ -3,8 +3,13 @@ import {z} from 'zod/v4';
 import {structured} from '../lib/server/language';
 import {capabilities,NVIDIA_MODEL,NVIDIA_FAST_MODEL,providerReady} from '../lib/server/config';
 afterEach(()=>{vi.unstubAllGlobals();vi.restoreAllMocks();});
-const config={AI_PROVIDER:'nvidia',NVIDIA_API_KEY:'synthetic',ENABLE_LIVE_ANALYSIS:'true',DB:{} as D1Database};
+const config={AI_PROVIDER:'nvidia',NVIDIA_MODEL,NVIDIA_API_KEY:'synthetic',ENABLE_LIVE_ANALYSIS:'true',DB:{} as D1Database};
 describe('NVIDIA DeepSeek adapter',()=>{
+ it('defaults to Lightning while keeping DeepSeek an explicit supported choice',()=>{
+  expect(capabilities({...config,NVIDIA_MODEL:undefined}).aiModel).toBe(NVIDIA_FAST_MODEL);
+  expect(capabilities(config).precomputedComparison).toEqual({ready:false,reason:'usage_review_pending'});
+  expect(capabilities(config).aiModel).toBe(NVIDIA_MODEL);
+ });
  it('supports explicitly selected Lightning without silently falling back from DeepSeek',async()=>{
   const selected={...config,NVIDIA_MODEL:NVIDIA_FAST_MODEL};expect(providerReady(selected)).toBe(true);
   const fetch=vi.fn().mockResolvedValue(Response.json({choices:[{finish_reason:'stop',message:{content:'{"ok":true}'}}]}));vi.stubGlobal('fetch',fetch);

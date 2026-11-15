@@ -11,14 +11,18 @@
     "visualCheckBlockedReason": "Unrelated YouTube window capture rejected by automatic approval review; requested user to open target site.",
     "baselineCommit": "5148b9d",
     "comparisonModel": "nvidia/nemotron-3.5-lightning-30b-a3b",
-    "productionModelUnchanged": true,
     "limitations": [
       "Single sequential local run per version, no statistical latency guarantee.",
       "All completed live analyses are partial because no released sentence-voice model is installed.",
       "No production SVM embedding latency or end-to-end automated reliability research measurement.",
       "Isolated local databases; no budget bypass or retries after provider 429.",
       "A separate test against a shared database stopped on application RATE_LIMITED before provider dispatch."
-    ]
+    ],
+    "publicSiteModel": "nvidia/nemotron-3.5-lightning-30b-a3b",
+    "publicSiteModelCheckedAt": "2026-11-15T12:18:45.412Z",
+    "deepseekFailureScope": "Local alternative path; not the public site model or a public site outage.",
+    "historicalMeasurementExcludesEmbeddings": true,
+    "embeddingMeasurement": "speed-with-embedding-2026-11-15.json"
   },
   "before": {
     "startedAt": "2026-11-15T10:56:10.348Z",

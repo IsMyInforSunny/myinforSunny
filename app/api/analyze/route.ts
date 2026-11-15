@@ -1,10 +1,11 @@
 import {withAudit} from '@/lib/server/with-audit';
 import {containsContactInfo} from '@/lib/privacy';
-import { analyzeRequestSchema } from '@/lib/contracts';
+import { analyzeRequestSchema,type Analysis } from '@/lib/contracts';
 import { demoAnalysis } from '@/lib/fixtures';
 import { analyze } from '@/lib/server/analyze';
 import {prepareUrlAnalysis,analyzePreparedUrl} from '@/lib/server/analyze-url';
-import {cachedAnalysis} from '@/lib/server/analysis-cache';
+import {cachedAnalysis,cachedPublicUrlAnalysis} from '@/lib/server/analysis-cache';
+import {after} from 'next/server';
 import { runtimeConfig } from '@/lib/server/config';
 import {REQUEST_TIMEOUT_MS} from '@/lib/server/limits';
 import { withBudget } from '@/lib/server/budget';
@@ -20,13 +21,20 @@ async function handlePost(request:Request){const requestId=crypto.randomUUID();t
   const req=parsed.data;const config=await runtimeConfig();
   const perform=async(signal:AbortSignal,emit?:(event:string,data:unknown)=>void)=>{
     const scopedRequest=new Request(request.url,{method:'POST',headers:request.headers,signal});
-    const prepared=req.kind==='url'?await prepareUrlAnalysis(req,config,requestId,AbortSignal.any([signal,AbortSignal.timeout(REQUEST_TIMEOUT_MS)])):null;
-    const textInput=prepared?.input??req as Extract<typeof req,{kind:'text'}>;
-    if(emit)emit('preview',buildAnalysisPreview(textInput,prepared?.article.title));
-    const result=await cachedAnalysis(scopedRequest,req,config,requestId,sharedSignal=>{
+    const withActiveBudget=(sharedSignal:AbortSignal|undefined,action:(activeConfig:typeof config,activeSignal:AbortSignal)=>Promise<Analysis>)=>{
       const budgetRequest=new Request(request.url,{method:'POST',headers:request.headers,signal:sharedSignal??signal});
-      return withBudget(budgetRequest,config,requestId,REQUEST_TIMEOUT_MS,(activeConfig,activeSignal)=>prepared?analyzePreparedUrl(prepared,activeConfig,requestId,activeSignal):analyze(textInput,activeConfig,requestId,activeSignal));
-    },prepared?{articleHash:prepared.articleHash}:{});
+      return withBudget(budgetRequest,config,requestId,REQUEST_TIMEOUT_MS,action);
+    };
+    const result=req.kind==='url'?await cachedPublicUrlAnalysis(scopedRequest,req,config,requestId,
+      async activeSignal=>{
+        const prepared=await prepareUrlAnalysis(req,config,requestId,AbortSignal.any([activeSignal,AbortSignal.timeout(REQUEST_TIMEOUT_MS)]));
+        if(emit&&!signal.aborted)emit('preview',buildAnalysisPreview(prepared.input,prepared.article.title));
+        return prepared;
+      },(prepared,sharedSignal)=>withActiveBudget(sharedSignal,(activeConfig,activeSignal)=>analyzePreparedUrl(prepared,activeConfig,requestId,activeSignal)),task=>after(task))
+      :await cachedAnalysis(scopedRequest,req,config,requestId,sharedSignal=>{
+        if(emit)emit('preview',buildAnalysisPreview(req));
+        return withActiveBudget(sharedSignal,(activeConfig,activeSignal)=>analyze(req,activeConfig,requestId,activeSignal));
+      });
     const articleContextToken=await issueVoiceArticleContext(scopedRequest,config,result.analysis);
     const analysisContextToken=await issueAnalysisBudgetContext(scopedRequest,config,result.analysis);
     return {analysis:{...result.analysis,...(articleContextToken?{articleContextToken}:{}),...(analysisContextToken?{analysisContextToken}:{})},cache:result.cache};

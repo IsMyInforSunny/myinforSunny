@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "precomputed-local-check-1.0",
+  "checkedAt": "2026-11-15T12:35:17.749Z",
+  "localResearchArtifactAccepted": true,
+  "actualRetainedDocumentRead": true,
+  "researchUsageFlagsUnchanged": true,
+  "publicArtifactNull": true,
+  "publicComparisonAvailability": {
+    "ready": false,
+    "reason": "usage_review_pending"
+  },
+  "localComparisonAvailability": {
+    "ready": true,
+    "reason": "local_research_only"
+  },
+  "apiCalls": 0,
+  "articleBodiesOrUrlsIncluded": false,
+  "baselineEndToEndCheck": "Actual retained coordinate aggregation with input excluded; not browser verification and not final post-embedding population.",
+  "intervalBaselineLocalInjection": true,
+  "intervalComparisonProof": {
+    "realRetainedCoordinate": true,
+    "inputExcludedByFreshAggregation": true,
+    "selfIncludedStaticBundleStatus": "input_in_population",
+    "status": "ready",
+    "scoreRange": {
+      "lower": 0,
+      "upper": 25
+    },
+    "baselineBounds": {
+      "lower": 0.5,
+      "upper": 1
+    },
+    "count": 34,
+    "publisherCount": 4
+  }
+}

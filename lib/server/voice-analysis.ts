@@ -88,8 +88,9 @@ export async function articleVoiceCoordinates(body:string,document:VoiceDocument
 export async function attachVoiceCoordinates(analysis:Analysis,model?:{trainingArticleHashes:string[]}|null){
   const body=analysis.sources.find(source=>source.kind==='body')?.text;
   const selected=model===undefined?(analysis.sentenceVoices?.modelVersion===releasedEmbeddingVoiceModel?.version?releasedEmbeddingVoiceModel:releasedVoiceModel):model;
-  if(selected&&body&&analysis.sentenceVoices)
-    analysis.voiceCoordinates=await articleVoiceCoordinates(body,analysis.sentenceVoices,analysis.article??{},selected.trainingArticleHashes);
+  const documents=[analysis.sentenceVoices,...analysis.additionalSentenceVoices??[]].filter((item):item is VoiceDocument=>!!item);
+  if(selected&&body&&documents.length)
+    analysis.voiceCoordinates=(await Promise.all(documents.map(document=>articleVoiceCoordinates(body,document,analysis.article??{},selected.trainingArticleHashes)))).flat();
   if(analysis.article?.url&&analysis.article.publishedAt&&Number.isFinite(Date.parse(analysis.article.publishedAt)))
     analysis.voiceCoordinates=analysis.voiceCoordinates?.map(item=>({...item,eventId:liveVoiceEventId(item.bodyHash),publishedAt:analysis.article!.publishedAt}));
   return attachIssueQuarterComparison(analysis);

@@ -1,7 +1,7 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
 import {demoAnalysis} from '../lib/fixtures';
 import {ANALYSIS_PROMPT_VERSION} from '../lib/contracts';
-import {modelName,type RuntimeConfig} from '../lib/server/config';
+import {modelName,NVIDIA_MODEL,type RuntimeConfig} from '../lib/server/config';
 import {issueAnalysisBudgetContext,readAnalysisBudgetContext} from '../lib/server/analysis-budget-context';
 
 const config:RuntimeConfig={AI_PROVIDER:'nvidia',NVIDIA_API_KEY:'synthetic-context',ENABLE_LIVE_ANALYSIS:'true'};
@@ -22,7 +22,7 @@ describe('server-signed follow-up request groups',()=>{
   await expect(readAnalysisBudgetContext(request(),config,{...input,sources:value.sources.map(source=>({...source,text:source.text+' changed'}))})).rejects.toMatchObject({code:'RESEARCH_INPUT_CHANGED'});
   await expect(readAnalysisBudgetContext(request(),config,{...input,claims:value.claims.map(claim=>({...claim,text:claim.text+' changed'}))})).rejects.toMatchObject({code:'RESEARCH_INPUT_CHANGED'});
   await expect(readAnalysisBudgetContext(request('other'),config,input)).rejects.toMatchObject({code:'INVALID_RESEARCH_EVIDENCE'});
-  await expect(readAnalysisBudgetContext(request(),{...config,NVIDIA_MODEL:'nvidia/nemotron-3.5-lightning-30b-a3b'},input)).rejects.toMatchObject({code:'RESEARCH_INPUT_CHANGED'});
+  await expect(readAnalysisBudgetContext(request(),{...config,NVIDIA_MODEL},input)).rejects.toMatchObject({code:'RESEARCH_INPUT_CHANGED'});
   await expect(readAnalysisBudgetContext(request(),config,{...input,analysisContextToken:'invalid.signature'})).rejects.toMatchObject({code:'INVALID_RESEARCH_EVIDENCE'});
  });
  it('leaves legacy follow-ups without a token on their existing accounting path and skips demos',async()=>{

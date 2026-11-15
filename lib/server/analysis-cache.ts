@@ -6,6 +6,8 @@ import {capabilities, modelName, type RuntimeConfig} from './config';
 import {actorHash} from './budget';
 import {allowedUrl} from './retrieval';
 import {releasedVoiceModel,releasedEmbeddingVoiceModel} from './voice-analysis';
+import type {prepareUrlAnalysis} from './analyze-url';
+import {AppError} from './errors';
 
 type LiveRequest = Exclude<z.infer<typeof analyzeRequestSchema>, {kind:'demo'}>;
 type Entry = {expiresAt: number; analysis: Analysis};
@@ -16,10 +18,84 @@ const memory = new Map<string, Entry>();
 type Running={promise:Promise<Analysis>;controller:AbortController;waiters:number};
 const inFlight=new Map<string,Running>();
 const CACHE_VERSION = 'article-analysis-cache-14-body-revalidated';
+type PreparedUrl=Awaited<ReturnType<typeof prepareUrlAnalysis>>;
+type UrlRequest=Extract<LiveRequest,{kind:'url'}>;
+export type BackgroundScheduler=(task:()=>Promise<void>)=>void;
+type PublicEntry={expiresAt:number;analysis:Analysis;articleHash:string;cacheCheckedAt:string;invalid:boolean;invalidReason?:'changed'|'unavailable';generation:string};
+const publicMemory=new Map<string,PublicEntry>();
+const revalidating=new Set<string>();
 function reusable(analysis:Analysis){
   const unavailableOnly=!releasedVoiceModel&&!releasedEmbeddingVoiceModel&&analysis.warnings.length>0
     &&analysis.warnings.every(warning=>warning.code==='VOICE_MODEL_UNAVAILABLE');
   return analysis.mode==='live'&&!!analysis.bodyPosition&&(analysis.status==='success'||analysis.status==='partial'&&unavailableOnly);
+}
+
+/** Public URL pointer: return saved analysis before I/O to the publisher, then
+ * revalidate with the framework's post-response scheduler (Workers waitUntil).
+ * Tests must explicitly supply a scheduler; background promises are never dropped. */
+export async function cachedPublicUrlAnalysis(request:Request,input:UrlRequest,config:RuntimeConfig,requestId:string,
+ prepare:(signal:AbortSignal)=>Promise<PreparedUrl>,
+ action:(prepared:PreparedUrl,signal?:AbortSignal)=>Promise<Analysis>,schedule:BackgroundScheduler){
+ const cap=capabilities(config),hosts=(config.ALLOWED_RETRIEVAL_HOSTS??'').split(',').map(host=>host.trim()).filter(Boolean);
+ const url=allowedUrl(input.url,hosts);
+ if(!cap.live||!cap.directFetch||!url||input.comments.length||input.proposition){
+  const prepared=await prepare(request.signal);
+  return cachedAnalysis(request,input,config,requestId,signal=>action(prepared,signal),{articleHash:prepared.articleHash});
+ }
+ const key=await digest(['public-url-swr-1',CACHE_VERSION,ANALYSIS_PROMPT_VERSION,RUBRIC,SEGMENTER,
+  config.AI_PROVIDER??'groq',modelName(config),releasedVoiceModel?.version??null,releasedEmbeddingVoiceModel?.version??null,
+  config.NEWS_PROVIDER??'gdelt',config.NEWS_TERMS_APPROVED??'',config.FIRECRAWL_SOURCE_TERMS_APPROVED??'',hosts,url.href]);
+ const edgeRequest=new Request(`https://article-cache.invalid/public-url/${key}`);
+ let edge:Cache|undefined;
+ try{if(typeof caches!=='undefined')edge=await caches.open('naeinfo-public-url-analysis-v1');}catch{/* Memory remains usable. */}
+ let entry=publicMemory.get(key);
+ if(!entry&&edge){try{const response=await edge.match(edgeRequest);if(response){const stored=await response.json() as PublicEntry;
+   if(stored.expiresAt>Date.now()&&typeof stored.articleHash==='string'&&typeof stored.cacheCheckedAt==='string'
+    &&typeof stored.invalid==='boolean'&&typeof stored.generation==='string'&&reusable(stored.analysis)
+    &&stored.analysis.article?.url===url.href&&stored.analysis.versions.prompt===ANALYSIS_PROMPT_VERSION
+    &&stored.analysis.sources.length===1&&stored.analysis.sources[0].kind==='body'&&!stored.analysis.proposition){
+    assertAnalysis(stored.analysis);entry=stored;publicMemory.set(key,stored);
+   }
+  }}catch{/* Malformed/unavailable edge data is a miss. */}}
+ if(entry&&entry.expiresAt<=Date.now()){publicMemory.delete(key);entry=undefined;}
+ const save=async(value:PublicEntry)=>{
+  if(publicMemory.size>=MAX_ENTRIES&&!publicMemory.has(key))publicMemory.delete(publicMemory.keys().next().value!);
+  publicMemory.set(key,value);
+  if(edge)try{await edge.put(edgeRequest,Response.json(value,{headers:{'Cache-Control':`public, max-age=${Math.max(1,Math.ceil((value.expiresAt-Date.now())/1000))}`}}));}catch{/* Completed results stay usable in memory. */}
+ };
+ if(entry&&!entry.invalid){
+  const snapshot=entry;
+  if(!revalidating.has(key)){
+   revalidating.add(key);
+   try{schedule(async()=>{
+    try{
+     const checked=await prepare(AbortSignal.timeout(15000));
+     const current=publicMemory.get(key);
+     // An older check must never invalidate a newer successful analysis.
+     if(current?.generation!==snapshot.generation)return;
+     const changed=checked.articleHash!==current.articleHash;
+     await save({...current,invalid:changed,invalidReason:changed?'changed':undefined,cacheCheckedAt:new Date().toISOString()});
+    }catch(error){
+     if(error instanceof AppError&&['ARTICLE_BODY_UNAVAILABLE','PRIVACY_INPUT_REJECTED','ARTICLE_URL_NOT_ALLOWED','ARTICLE_IMPORT_UNAVAILABLE'].includes(error.code)){
+      const current=publicMemory.get(key);
+      if(current?.generation===snapshot.generation)await save({...current,invalid:true,invalidReason:'unavailable'});
+     }
+     // A failed retrieval is not confirmation that the stored body is current.
+     console.info(JSON.stringify({type:'article_cache_revalidation',status:'unavailable'}));
+    }finally{revalidating.delete(key);}
+   });}catch(error){revalidating.delete(key);throw error;}
+  }
+  return {analysis:{...delivered(snapshot.analysis,requestId),cacheCheckedAt:snapshot.cacheCheckedAt},cache:'hit' as const};
+ }
+ const changed=entry?.invalid===true&&entry.invalidReason==='changed';
+ const prepared=await prepare(request.signal);
+ const result=await cachedAnalysis(request,input,config,requestId,signal=>action(prepared,signal),{articleHash:prepared.articleHash});
+ const checkedAt=new Date().toISOString();
+ const analysis={...result.analysis,cacheCheckedAt:checkedAt,
+  warnings:[...result.analysis.warnings,...(changed?[{code:'ARTICLE_CHANGED',message:'기사 수정됨 · 변경된 원문으로 다시 분석했습니다.'}]:[])]};
+ if(reusable(result.analysis))await save({expiresAt:Date.now()+PUBLIC_TTL_MS,articleHash:prepared.articleHash,cacheCheckedAt:checkedAt,
+  generation:crypto.randomUUID(),invalid:false,analysis:{...result.analysis,warnings:result.analysis.warnings.filter(w=>!['CACHED_ANALYSIS','SHARED_ANALYSIS','ARTICLE_CHANGED'].includes(w.code))}});
+ return {analysis,cache:result.cache};
 }
 function waitForAnalysis(running:Running,signal:AbortSignal){
   signal.throwIfAborted();running.waiters++;
@@ -45,6 +121,7 @@ function delivered(analysis: Analysis, requestId: string,coalesced=false): Analy
   const analysisId=crypto.randomUUID();
   return {...structuredClone(analysis), analysisId, requestId,
     ...(analysis.issueQuarterComparison?{issueQuarterComparison:{...analysis.issueQuarterComparison,parentAnalysisId:analysisId}}:{}),
+    ...(analysis.issueQuarterComparisons?{issueQuarterComparisons:analysis.issueQuarterComparisons.map(item=>({...item,parentAnalysisId:analysisId}))}:{}),
     warnings: [...analysis.warnings, coalesced?{code:'SHARED_ANALYSIS',message:'동시에 요청한 동일 기사 분석을 한 번의 AI 호출로 처리했습니다.'}:{code:'CACHED_ANALYSIS', message:`최근 저장된 분석을 재사용했습니다. 원문 취득·분석 시각은 ${analysis.createdAt}입니다.`}]};
 }
 

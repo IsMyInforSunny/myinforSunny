@@ -9,6 +9,7 @@ import {compareVoiceCoordinates,mainVoiceIssue,type VoiceCoordinate} from './voi
  * Model weights stay on the server; these records contain aggregates only. */
 export function voiceAssessmentFromResearch(analysis:Analysis|null,results:readonly ResearchVerification[]){
   const empty={status:'model_unavailable' as string,score:null as number|null,magnitude:null as number|null,baseline:null as number|null,
+    baselineBounds:null as {lower:number;upper:number}|null,baselineUncertain:false,
     scoreBounds:null as {lower:number;upper:number}|null,direction:null as 'support'|'oppose'|'center'|'undetermined'|null,
     count:0,publisherCount:0,rangeCount:0,distributionCount:0,similar:[] as VoiceCoordinate[],opposing:[] as VoiceCoordinate[],issue:null as string|null};
   if(!analysis||analysis.mode!=='live'||analysis.sentenceVoices?.method!=='svm')return empty;

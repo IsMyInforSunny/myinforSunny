@@ -97,8 +97,8 @@ try{
   const compare=await server.ssrLoadModule('/lib/voice-comparison.ts');
   const issues=options.inventoryOnly?null:await server.ssrLoadModule('/lib/voice-article-issue.ts');
   for(const article of corpus)if(trainingIds.has(article.id))trainingHashes.add(await voice.voiceArticleHash(article.text));
-  const records=new Map(),rows=[],documents={},counts={articles:0,sentences:0,boilerplate:0,cachedSentences:0,missingSentences:0,
-    unsupportedTopicArticles:0,unsupportedIssueArticles:0,issueUnassignedArticles:0,fullyCachedArticles:0,sourceCoordinates:0,journalistCoordinates:0,rangeArticles:0};
+  const records=new Map(),rows=[],documents={},documentsByIssue={},sourceCoordinateArticles=new Set(),counts={articles:0,sentences:0,boilerplate:0,cachedSentences:0,missingSentences:0,
+    unsupportedTopicArticles:0,unsupportedIssueArticles:0,issueUnassignedArticles:0,multiIssueArticles:0,fullyCachedArticles:0,sourceCoordinates:0,journalistCoordinates:0,rangeArticles:0};
   const topicCounts={},articleIssues={},missingByTopic={};
   for(const article of corpus){
     if(selectedIds&&!selectedIds.has(article.id))continue;
@@ -107,11 +107,12 @@ try{
     const topic=relative.classifyRelativeTopic(body,article.title??'');
     const bodyHash=await voice.voiceArticleHash(body);
     const knownTopic=!!topic&&Object.hasOwn(voice.VOICE_TOPICS,topic);
-    const articleIssue=knownTopic&&issues?issues.selectArticleVoiceIssue(body,topic,undefined,article.title??''):null;
+    const selection=knownTopic&&issues?issues.selectArticleVoiceIssues(body,topic,undefined,article.title??''):{issues:[],source:'unassigned'};
+    const articleIssueCandidates=selection.issues;
     const trainedIssueClasses=candidate.topics?.[topic]?.trainedIssueClasses??candidate.topics?.[topic]?.heads?.issue?.classes??candidate.heads?.issue?.classes??[];
-    const supportedIssue=!!articleIssue&&trainedIssueClasses.includes(articleIssue);
     const units=voice.voiceSentences(body);
     let cached=0,missing=0,boilerplate=0;
+    const predictions=new Map();
     const labels=units.map(unit=>{
       if(voice.isVoiceBoilerplate(unit.text)){boilerplate++;return {sentenceId:unit.sentenceId,issue:'none',direction:'neutral',speaker:'unknown',excluded:true};}
       const text=dense.denseVoiceInputText(unit.text),key=sha(text),record=cacheRecords.get(key);
@@ -128,9 +129,9 @@ try{
         }
       }
       const heads=candidate.topics?.[topic]?.heads??candidate.heads;
-      const prediction=value&&heads&&knownTopic&&supportedTopics.includes(topic)&&supportedIssue?dense.inferDenseVoiceHeads(heads,value):null;
-      const issue=prediction&&articleIssue?issues.relatedVoiceIssue(prediction.margins.issue,articleIssue):'unknown';
-      return {sentenceId:unit.sentenceId,issue,direction:prediction?.direction??'uncertain',speaker:prediction?.speaker??'unknown'};
+      const prediction=value&&heads&&knownTopic&&supportedTopics.includes(topic)?dense.inferDenseVoiceHeads(heads,value):null;
+      predictions.set(unit.sentenceId,prediction);
+      return {sentenceId:unit.sentenceId,issue:'unknown',direction:prediction?.direction??'uncertain',speaker:prediction?.speaker??'unknown'};
     });
     counts.articles++;counts.sentences+=units.length;counts.boilerplate+=boilerplate;counts.cachedSentences+=cached;counts.missingSentences+=missing;
     if(!missing)counts.fullyCachedArticles++;
@@ -138,17 +139,21 @@ try{
     missingByTopic[topic??'unknown']=(missingByTopic[topic??'unknown']??0)+missing;
     const supported=knownTopic&&supportedTopics.includes(topic);
     if(!supported)counts.unsupportedTopicArticles++;
-    if(supported&&articleIssue&&!supportedIssue)counts.unsupportedIssueArticles++;
-    if(!articleIssue)counts.issueUnassignedArticles++;
+    if(supported&&articleIssueCandidates.some(issue=>!trainedIssueClasses.includes(issue)))counts.unsupportedIssueArticles++;
+    if(!articleIssueCandidates.length)counts.issueUnassignedArticles++;
+    if(articleIssueCandidates.length===2)counts.multiIssueArticles++;
+    for(const articleIssue of articleIssueCandidates.length?articleIssueCandidates:[null]){
+    const supportedIssue=!!articleIssue&&trainedIssueClasses.includes(articleIssue);
     articleIssues[`${topic??'unknown'}:${articleIssue??'unassigned'}`]=(articleIssues[`${topic??'unknown'}:${articleIssue??'unassigned'}`]??0)+1;
     let document=null,summary=null,primary=null;
     if(!options.inventoryOnly&&supported&&articleIssue&&supportedIssue){
       document=voice.validateVoiceDocument(body,{version:voice.VOICE_VERSION,segmenter:'sentence-3.1',scopeCharacters:voice.VOICE_SCOPE,
         topic,method:'svm',modelVersion:candidate.version,decisionPolicy:voice.VOICE_INDEPENDENT_NEUTRAL,
-        issuePolicy:voice.VOICE_ARTICLE_ISSUE,articleIssue,labels});
+        issuePolicy:voice.VOICE_ARTICLE_ISSUE,articleIssue,labels:labels.map(label=>label.excluded?label:{...label,
+          issue:issues.relatedVoiceIssue(predictions.get(label.sentenceId)?.margins.issue,articleIssue)})});
       if(!document)throw Error('The runtime rejected the prepared research document');
       summary=voice.summarizeVoices(body,document);primary=compare.mainVoiceIssue(body,document);
-      if(!missing)documents[bodyHash]=document;
+      if(!missing){documents[bodyHash]??=document;(documentsByIssue[bodyHash]??={})[articleIssue]=document;}
     }
     const axis=(name)=>{
       const part=primary?.[name];
@@ -160,16 +165,17 @@ try{
         bounds:eligible?{lower,upper}:null};
     };
     const source=axis('source'),journalist=axis('journalist');
-    if(source.eligible)counts.sourceCoordinates++;
+    if(source.eligible){counts.sourceCoordinates++;sourceCoordinateArticles.add(article.id);}
     if(journalist.eligible)counts.journalistCoordinates++;
     if(source.eligible&&source.coordinate===null)counts.rangeArticles++;
     rows.push({id:article.id,url:article.url??'',title:article.title??'',publisher:article.publisherId??'',publishedAt:article.publishedAt,
-      bodyHash,topic,issue:articleIssue,axis:'source',method:'svm',version:voice.VOICE_VERSION,modelVersion:candidate.version,
+      bodyHash,topic,issue:articleIssue,primaryIssues:articleIssueCandidates,issueSelection:selection.source,axis:'source',method:'svm',version:voice.VOICE_VERSION,modelVersion:candidate.version,
       decisionPolicy:voice.VOICE_INDEPENDENT_NEUTRAL,issuePolicy:voice.VOICE_ARTICLE_ISSUE??'voice-article-issue-1.0',
       scopeCharacters:voice.VOICE_SCOPE,segmenter:'sentence-3.1',researchOnly:true,trainingOriginal:trainingIds.has(article.id)||trainingHashes.has(bodyHash),
       coordinate:source.coordinate,bounds:source.bounds,directional:source.directional,unresolved:source.unresolved,
       eligible:source.eligible,source,journalist,cache:{cached,missing,boilerplate},
       status:!supported?'unsupported_topic':!articleIssue?'issue_unassigned':!supportedIssue?'unsupported_issue':source.eligible?'coordinate_available':'evidence_insufficient'});
+    }
   }
   const pending=[...records.values()].sort((a,b)=>a.key.localeCompare(b.key));
   const batches=[];let batch=[];
@@ -188,7 +194,7 @@ try{
   const summary={schemaVersion:'issue-quarter-coordinate-preparation-1.0',generatedAt:new Date().toISOString(),researchOnly:true,
     modelVersion:candidate.version,embeddingModel:MODEL,supportedTopics,scopeCharacters:voice.VOICE_SCOPE,segmenter:'sentence-3.1',decisionPolicy:voice.VOICE_INDEPENDENT_NEUTRAL,
     issuePolicy:voice.VOICE_ARTICLE_ISSUE??'voice-article-issue-1.0',axis:'source',inventoryOnly:!!options.inventoryOnly,
-    counts,topicCounts,articleIssues,missingByTopic,uniquePendingSentences:pending.length,apiCalls:0,
+    counts,sourceCoordinateArticleCount:sourceCoordinateArticles.size,coordinateRowCount:rows.length,topicCounts,articleIssues,missingByTopic,uniquePendingSentences:pending.length,apiCalls:0,
     budget:{day,budgetPolicy:unlimited?'user-authorized-unlimited':'bounded',dailyReservationLimit:budget,alreadyReserved:reserved,remainingReservation:unlimited?null:Math.max(0,budget-reserved),
       reservationPerCall:6500,plannedCalls:batches.length,requiredReservation:batches.length*6500,
       availableCallsToday:unlimited?null:Math.floor(Math.max(0,budget-reserved)/6500),fullBudgetDaysRequired:unlimited?null:Math.ceil(batches.length/Math.floor(budget/6500))},
@@ -207,7 +213,7 @@ try{
     schemaVersion:'precomputed-voices-1.0',generatedAt:summary.generatedAt,researchOnly:true,usageReviewed:false,
     modelVersion:candidate.version,decisionPolicy:voice.VOICE_INDEPENDENT_NEUTRAL,issuePolicy:voice.VOICE_ARTICLE_ISSUE,
     definitionVersion:voice.VOICE_VERSION,segmenter:'sentence-3.1',scopeCharacters:voice.VOICE_SCOPE,
-    documents,sourceDigests:summary.sourceDigests,
+    documents,documentsByIssue,sourceDigests:summary.sourceDigests,
   });
   fs.writeFileSync(path.join(output,'coordinates.local.jsonl'),rows.map(row=>JSON.stringify(row)).join('\n')+'\n',{encoding:'utf8',flag:'wx'});
   console.log(JSON.stringify(summary));

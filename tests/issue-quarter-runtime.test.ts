@@ -38,6 +38,16 @@ describe('server-only quarter baseline attachment',()=>{
     analysis.issueQuarterComparison!.parentAnalysisId='another-analysis';
     expect(buildAnalysisScores(analysis).bias.status).toBe('pending');
   });
+  it('keeps a comparison for each retained primary issue document',async()=>{
+    const {analysis,bundle,provenance}=await fixture();
+    const second=structuredClone(analysis.sentenceVoices!);second.articleIssue='lifetime';
+    second.labels=second.labels.map(label=>({...label,issue:label.excluded?'none':'lifetime'}));
+    analysis.additionalSentenceVoices=[second];
+    analysis.voiceCoordinates=[...analysis.voiceCoordinates!,...await articleVoiceCoordinates(analysis.sources[0].text,second,analysis.article!,[])];
+    attachIssueQuarterComparison(analysis,bundle,provenance);
+    expect(analysis.issueQuarterComparisons).toHaveLength(2);
+    expect(analysis.issueQuarterComparisons?.map(item=>item.status)).toEqual(['ready','insufficient']);
+  });
   it('refuses self-membership, absent provenance, demo mode and mismatched models',async()=>{
     const {analysis,bundle,provenance}=await fixture();
     attachIssueQuarterComparison(analysis,bundle,{corpusArticleHashes:[analysis.voiceCoordinates![0].bodyHash]});

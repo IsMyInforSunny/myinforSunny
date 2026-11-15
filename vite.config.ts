@@ -8,6 +8,7 @@ import { connectorPreview } from "./scripts/vite/connector-preview-plugin.mjs";
 import {localNvidiaRuntime} from './scripts/local-nvidia-runtime.mjs';
 import { localGroqRuntime } from "./scripts/local-groq-runtime.mjs";
 import path from "node:path";
+import {localVoiceResearchPlugin} from './scripts/vite/local-voice-research-plugin.mjs';
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "00000000-0000-4000-8000-000000000000";
@@ -42,6 +43,7 @@ const localBindingConfig = {
 
 export default defineConfig(async ({ command }) => {
   configureToolEnvironment(process.cwd());
+  const researchVoice=localVoiceResearchPlugin({command,root:process.cwd()});
   const localGroq = localNvidiaRuntime({command,root:process.cwd()}) ?? localGroqRuntime({ command, root: process.cwd() });
 
   // Wrangler snapshots its log path while the Cloudflare plugin is imported.
@@ -57,6 +59,7 @@ export default defineConfig(async ({ command }) => {
         : {}),
     },
     plugins: [
+      ...(researchVoice?[researchVoice]:[]),
       vinext(),
       sites({ mockAuth: !managedLinux }),
       connectorPreview(),

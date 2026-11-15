@@ -61,6 +61,14 @@ describe('embedding SVM provider boundaries',()=>{
   await inferEmbeddingVoices('원전 확대가 필요하다.','nuclear_energy',active,signal,'request:private',selected);
   expect(fetcher).toHaveBeenCalledTimes(2);
  });
+ it('reuses one embedding dispatch to build two issue-specific comparison documents',async()=>{
+  const fetcher=vi.fn(response);vi.stubGlobal('fetch',fetcher);const selected=model(),active=config(),signal=new AbortController().signal;
+  await inferEmbeddingVoices('원전 확대와 노후 원전 수명을 살폈다.','nuclear_energy',active,signal,'public:two-issues',selected);
+  const expansion=await inferEmbeddingVoices('원전 확대와 노후 원전 수명을 살폈다.','nuclear_energy',active,signal,'public:two-issues',selected,'expansion');
+  const lifetime=await inferEmbeddingVoices('원전 확대와 노후 원전 수명을 살폈다.','nuclear_energy',active,signal,'public:two-issues',selected,'lifetime');
+  expect(expansion?.articleIssue).toBe('expansion');expect(lifetime?.articleIssue).toBe('lifetime');
+  expect(fetcher).toHaveBeenCalledTimes(1);expect(active.onDispatch).toHaveBeenCalledTimes(1);
+ });
  it('stops at rate limits without a retry or another model',async()=>{
   const fetcher=vi.fn(async()=>new Response('',{status:429,headers:{'Retry-After':'61'}}));vi.stubGlobal('fetch',fetcher);
   const active=config();

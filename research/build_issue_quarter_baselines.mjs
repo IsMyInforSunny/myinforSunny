@@ -57,7 +57,8 @@ const report={schemaVersion:'issue-quarter-baseline-report-1.0',generatedAt:base
   modelVersions:[...new Set(rows.map(row=>row?.modelVersion).filter(Boolean))],
   readyGroupCounts:Object.fromEntries(['quarter','half','all'].map(kind=>[kind,baselines.groups.filter(group=>group.period.kind===kind&&group.status==='ready').length])),
   insufficientGroupCount:baselines.groups.filter(group=>group.status==='insufficient').length,exclusions:baselines.exclusions,
-  scope:'Point coordinates determine weighted distribution boundaries. Eligible range coordinates are counted separately. Each contributing publisher needs three point articles and at least two publishers are required. No API or embedding requests were made by this aggregation command.'};
+  baselineUncertainGroupCount:baselines.groups.filter(group=>group.baselineBounds&&group.baselineBounds.upper-group.baselineBounds.lower>.5+1e-12).length,
+  scope:'Point and interval article coordinates both determine endpoint weighted quantiles with equal publisher weight. Each contributing publisher needs three eligible point-or-interval articles and at least two publishers are required. No article midpoint imputation, API or embedding requests were made by this aggregation command.'};
 await atomicJson(outputFile,baselines);
 if(reportFile)await atomicJson(reportFile,report);
 if(recommendationsFile){

@@ -1,5 +1,7 @@
 ﻿import {summarizeVoices,type VoiceDocument,type VoiceTopic,VOICE_VERSION,VOICE_ARTICLE_ISSUE} from './sentence-voice';
 
+import {intervalDistance,weightedIntervalDistribution,type CoordinateInterval} from './issue-quarter-baseline';
+
 export type VoiceCoordinate={id:string;url:string;publisher:string;bodyHash:string;eventId:string;topic:VoiceTopic;issue:string;
   method:'ai'|'svm';modelVersion:string;version:string;coordinate:number|null;directional:number;unresolved:number;trainingOriginal:boolean;publishedAt?:string;
   decisionPolicy?:VoiceDocument['decisionPolicy'];issuePolicy?:VoiceDocument['issuePolicy'];axis?:'source'|'journalist';
@@ -20,7 +22,7 @@ export function compareVoiceCoordinates(input:VoiceCoordinate,articles:VoiceCoor
   const empty={status:'insufficient' as 'insufficient'|'ready'|'input_unresolved'|'inconsistent_period',score:null as number|null,
     magnitude:null as number|null,scoreBounds:null as {lower:number;upper:number}|null,
     direction:null as 'support'|'oppose'|'center'|'undetermined'|null,
-    baseline:null as number|null,opposing:[] as VoiceCoordinate[],similar:[] as VoiceCoordinate[],count:0,publisherCount:0,
+    baseline:null as number|null,baselineBounds:null as CoordinateInterval|null,baselineUncertain:false,opposing:[] as VoiceCoordinate[],similar:[] as VoiceCoordinate[],count:0,publisherCount:0,
     rangeCount:0,distributionCount:0};
   const eligible=(item:VoiceCoordinate)=>voiceCoordinateBounds(item)!==null&&!item.trainingOriginal
     &&!trainingHashes.includes(item.bodyHash)&&!!item.bodyHash&&!!item.eventId&&item.version===VOICE_VERSION;
@@ -44,36 +46,35 @@ export function compareVoiceCoordinates(input:VoiceCoordinate,articles:VoiceCoor
     const bounds=voiceCoordinateBounds(item)!;return bounds.lower===bounds.upper;
   }));
   const points=pointGroups.flat();
-  const counts={count:population.length,publisherCount:publishers.length,rangeCount:population.length-points.length,distributionCount:points.length};
-  if(publishers.length<2||pointGroups.some(items=>!items.length))return {...empty,...counts};
+  const counts={count:population.length,publisherCount:publishers.length,rangeCount:population.length-points.length,distributionCount:population.length};
+  if(publishers.length<2)return {...empty,...counts};
   if(live){const times=[inputTime,...population.map(item=>Date.parse(item.publishedAt!))];
     if(Math.max(...times)-Math.min(...times)>3*86400000)return {...empty,...counts,status:'inconsistent_period' as const};}
-  const weighted=pointGroups.flatMap(items=>items.map(item=>({item,value:voiceCoordinateBounds(item)!.lower,weight:1/publishers.length/items.length})))
-    .sort((a,b)=>a.value-b.value);
-  let sum=0,baseline=weighted[weighted.length-1].value;
-  for(let i=0;i<weighted.length;i++){
-    sum+=weighted[i].weight;
-    if(sum>=.5-1e-12){baseline=Math.abs(sum-.5)<1e-12&&weighted[i+1]?(weighted[i].value+weighted[i+1].value)/2:weighted[i].value;break;}
-  }
-  const lowerDistance=inputBounds.lower<=baseline&&inputBounds.upper>=baseline?0:Math.min(Math.abs(inputBounds.lower-baseline),Math.abs(inputBounds.upper-baseline));
-  const upperDistance=Math.max(Math.abs(inputBounds.lower-baseline),Math.abs(inputBounds.upper-baseline));
-  const point=inputBounds.lower===inputBounds.upper;
+  const weighted=publishers.flatMap(items=>items.map(item=>({bounds:voiceCoordinateBounds(item)!,weight:1/publishers.length/items.length})));
+  const {median:baseline,baselineBounds}=weightedIntervalDistribution(weighted);
+  const baselineUncertain=baselineBounds.upper-baselineBounds.lower>.5+1e-12;
+  const {lower:lowerDistance,upper:upperDistance}=intervalDistance(inputBounds,baselineBounds);
+  const point=inputBounds.lower===inputBounds.upper&&baselineBounds.lower===baselineBounds.upper;
   const score=point?Math.round(lowerDistance/2*100):null;
-  const scoreBounds=point?{lower:score!,upper:score!}:{lower:Math.floor(lowerDistance/2*100),upper:Math.ceil(upperDistance/2*100)};
-  const direction=inputBounds.lower>baseline?'support' as const:inputBounds.upper<baseline?'oppose' as const
+  const scoreBounds=point?{lower:score!,upper:score!}:{lower:Math.floor(lowerDistance/2*100+1e-10),upper:Math.ceil(upperDistance/2*100-1e-10)};
+  const direction=baselineUncertain?'undetermined' as const:inputBounds.lower>baselineBounds.upper?'support' as const:inputBounds.upper<baselineBounds.lower?'oppose' as const
     :point?'center' as const:'undetermined' as const;
   // Range inputs can rank whole candidate intervals, without inventing a center point.
-  const opposite=points.filter(item=>direction==='support'?voiceCoordinateBounds(item)!.upper<baseline
-    :direction==='oppose'?voiceCoordinateBounds(item)!.lower>baseline:false);
-  const distanceToRange=(value:number,lower:number,upper:number)=>value<lower?lower-value:value>upper?value-upper:0;
-  const targetLower=2*baseline-inputBounds.upper,targetUpper=2*baseline-inputBounds.lower;
-  const opposing=opposite.sort((a,b)=>distanceToRange(voiceCoordinateBounds(a)!.lower,targetLower,targetUpper)
-    -distanceToRange(voiceCoordinateBounds(b)!.lower,targetLower,targetUpper));
-  const similar=points.filter(item=>direction==='support'?voiceCoordinateBounds(item)!.lower>=baseline
-    :direction==='oppose'?voiceCoordinateBounds(item)!.upper<=baseline:direction==='center')
-    .sort((a,b)=>distanceToRange(voiceCoordinateBounds(a)!.lower,inputBounds.lower,inputBounds.upper)
-      -distanceToRange(voiceCoordinateBounds(b)!.lower,inputBounds.lower,inputBounds.upper));
-  return {status:'ready' as const,score,scoreBounds,direction,magnitude:point?lowerDistance:null,baseline,opposing,similar,...counts};
+  const opposite=population.filter(item=>direction==='support'?voiceCoordinateBounds(item)!.upper<baselineBounds.lower
+    :direction==='oppose'?voiceCoordinateBounds(item)!.lower>baselineBounds.upper:false);
+  const target={lower:2*baselineBounds.lower-inputBounds.upper,upper:2*baselineBounds.upper-inputBounds.lower};
+  const opposing=opposite.sort((a,b)=>intervalDistance(voiceCoordinateBounds(a)!,target).lower
+    -intervalDistance(voiceCoordinateBounds(b)!,target).lower);
+  const samePoint=(bounds:CoordinateInterval)=>baseline!==null&&bounds.lower===bounds.upper&&bounds.lower===baseline;
+  const similar=population.filter(item=>{
+    const bounds=voiceCoordinateBounds(item)!;
+    return direction==='support'?bounds.lower>baselineBounds.upper||samePoint(bounds)
+      :direction==='oppose'?bounds.upper<baselineBounds.lower||samePoint(bounds):direction==='center';
+  })
+    .sort((a,b)=>intervalDistance(voiceCoordinateBounds(a)!,inputBounds).lower
+      -intervalDistance(voiceCoordinateBounds(b)!,inputBounds).lower);
+  return {status:'ready' as const,score,scoreBounds,direction,magnitude:point?lowerDistance:null,baseline,baselineBounds,baselineUncertain,opposing,similar,
+    ...counts};
 }
 
 export function mainVoiceIssue(body:string,document:VoiceDocument){

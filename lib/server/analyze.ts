@@ -1,4 +1,4 @@
-import {selectArticleVoiceIssue} from '../voice-article-issue';
+import {selectArticleVoiceIssue,selectArticleVoiceIssues} from '../voice-article-issue';
 import {searchLanguagePrompt} from './search-language';
 import { Analysis, BodyTopicAssignment, RawAnalysis, RUBRIC, ANALYSIS_PROMPT_VERSION, TextRequest, analysisModelSchema, analysisResponseSchema, bodyPositionCandidateSchema, Expression, Span, searchQuerySchema } from '../contracts';
 import { assertAnalysis, indicators, locate, makeSources, naturalSentenceCount, SEGMENTER } from '../domain';
@@ -98,13 +98,13 @@ export async function analyze(req:TextRequest,config:RuntimeConfig,requestId:str
   if(new Set(req.comments.map(c=>c.id)).size!==req.comments.length)throw new AppError(422,'VALIDATION_ERROR','댓글 ID가 중복되었습니다.');
   const sources=makeSources(req);if(!sources[0].sentences.length)throw new AppError(422,'VALIDATION_ERROR','분석할 수 있는 본문 문장을 입력해 주세요.');
   const voiceTopic=classifyRelativeTopic(req.body,context.articleTitle);
-  const articleIssue=voiceTopic?selectArticleVoiceIssue(req.body,voiceTopic,req.proposition??canonicalProposition,context.articleTitle):null;
+  const proposedArticleIssue=voiceTopic?selectArticleVoiceIssue(req.body,voiceTopic,req.proposition??canonicalProposition,context.articleTitle):null;
   const voiceModel=releasedVoiceModel;
-  const localVoices=voiceModel&&voiceTopic?inferVoices(voiceModel,req.body,voiceTopic,articleIssue):null;
+  const localVoices=voiceModel&&voiceTopic?inferVoices(voiceModel,req.body,voiceTopic,proposedArticleIssue??undefined):null;
   const semanticModel=voiceTopic&&releasedEmbeddingVoiceModel?.topics[voiceTopic]?releasedEmbeddingVoiceModel:null;
   const storedModel=semanticModel??(localVoices?voiceModel:null);
-  const storedVoices=storedModel&&voiceTopic&&articleIssue?await readPrecomputedVoiceDocument(req.body,{
-    modelVersion:storedModel.version,decisionPolicy:semanticModel?.decisionPolicy??localVoices?.decisionPolicy??'voice-joint-1.0',topic:voiceTopic,articleIssue}):null;
+  const storedVoices=storedModel&&voiceTopic&&proposedArticleIssue?await readPrecomputedVoiceDocument(req.body,{
+    modelVersion:storedModel.version,decisionPolicy:semanticModel?.decisionPolicy??localVoices?.decisionPolicy??'voice-joint-1.0',topic:voiceTopic,articleIssue:proposedArticleIssue}):null;
   // Research annotations remain offline until the sentence model passes release gates.
   const reportedFact=/\d+(?:\.\d+)?\s*(?:%|명|건|원|일|년)[\s\S]{0,100}(?:밝혔다|발표했다|집계됐다|조사됐다)/.test(req.body);
   const claimsRequired=!!context.article||reportedFact;
@@ -120,16 +120,16 @@ export async function analyze(req:TextRequest,config:RuntimeConfig,requestId:str
     +(compact?' 찬반 비교 명제는 당위·제안 형태로 쓴다. 사실·예보·사건 요약은 비교 명제가 아니며 찬반 논점이 없으면 빈 문자열로 둔다. 작성자의 직접적인 비판·비난·반대 논증도 oppose 근거다. 찬성·반대라는 단어가 없다는 이유만으로 not_expressed로 두지 않는다. 직접 평가와 취재원 인용이 섞인 글에서는 작성자의 직접 평가 문장을 evidence로 골라 판단한다. 본문 직접 입력도 확인 가능한 사건·발표·수치가 있으면 claims에 factual을 최소 1개 추출한다. 사실·의견이 함께 있으면 사실을 생략하지 않는다.':'')
     +(canonicalProposition?` 이번 공통 비교 명제(bodyPosition.proposition)는 반드시 다음 문장을 그대로 쓴다: ${canonicalProposition} 이 명제에 대한 본문 작성자의 입장을 분류한다. 사건의 사실 서술을 비교 명제로 바꾸지 않는다.`:'');
   const voiceController=new AbortController();
-  const embeddingStarted=Date.now();
+  console.info(JSON.stringify({type:'article_timing',stage:'voice_plan',status:storedVoices?'precomputed':!semanticModel?'unsupported_topic':proposedArticleIssue===null?'proposition_resolution_pending':'pending',requestId}));
   const embeddingWork=!storedVoices&&semanticModel&&voiceTopic
-    ?inferEmbeddingVoices(req.body,voiceTopic,config,AbortSignal.any([signal,voiceController.signal]),context.articleUrl?`public:${context.articleUrl}`:`request:${requestId}`,undefined,articleIssue)
-      .then(value=>{console.info(JSON.stringify({type:'article_timing',stage:'embedding',durationMs:Date.now()-embeddingStarted,requestId}));return {value,error:null};},error=>({value:null,error}))
+    ?inferEmbeddingVoices(req.body,voiceTopic,config,AbortSignal.any([signal,voiceController.signal]),context.articleUrl?`public:${context.articleUrl}`:`request:${requestId}`,undefined,proposedArticleIssue??undefined,event=>console.info(JSON.stringify({type:'article_timing',...event,requestId})))
+      .then(value=>({value,error:null}),error=>({value:null,error}))
     :null;
   const modelStarted=Date.now();
   let raw;
   try{raw=await structured(config,transport?.response??analysisResponseSchema(sources,!!req.proposition),searchLanguagePrompt(instructions+' perspectiveQuestions와 counterArguments는 각각 최대 1개만 반환한다.',config),input,signal,{generationSchema:transport?.generation??analysisModelSchema(sources,!!req.proposition),requestId});}
   catch(error){voiceController.abort();await embeddingWork;throw error;}
-  console.info(JSON.stringify({type:'article_timing',stage:'llm',durationMs:Date.now()-modelStarted,requestId}));
+  console.info(JSON.stringify({type:'article_timing',stage:'llm',startedAt:modelStarted,durationMs:Date.now()-modelStarted,status:'completed',requestId}));
   const {clearSentenceIds,...proposal}=raw;
   const explicitIds=new Set(proposal.expressions.map(e=>e.sentenceId));
   const overlaps=clearSentenceIds.filter(id=>explicitIds.has(id));
@@ -139,9 +139,30 @@ export async function analyze(req:TextRequest,config:RuntimeConfig,requestId:str
   if(storedVoices??localVoices)result.sentenceVoices=(storedVoices??localVoices)!;
   const voiceVersion=releasedEmbeddingVoiceModel?.version??releasedVoiceModel?.version;
   if(voiceVersion)result.versions.voiceModel=voiceVersion;
+  let embeddingSucceeded=false;
   if(embeddingWork){
-    try{const outcome=await embeddingWork;if(outcome.error)throw outcome.error;result.sentenceVoices=outcome.value??undefined;}
+    try{const outcome=await embeddingWork;if(outcome.error)throw outcome.error;embeddingSucceeded=true;result.sentenceVoices=outcome.value??undefined;}
     catch(error){if(signal.aborted)throw error;delete result.sentenceVoices;result.status='partial';result.warnings.push({code:'VOICE_MODEL_UNAVAILABLE',message:'편향 SVM 분석에 연결하지 못했습니다. 표시된 본문 검토와 편향 점수의 완료 여부를 구분해 주세요.'});}
+  }
+  const selectedIssues=voiceTopic?selectArticleVoiceIssues(req.body,voiceTopic,req.proposition??(proposedArticleIssue?canonicalProposition:undefined),context.articleTitle,
+    proposedArticleIssue?undefined:result.bodyPosition?.proposition):{issues:[],source:'unassigned' as const,scores:[]};
+  const resolvedIssues=selectedIssues.issues;
+  if(voiceTopic&&resolvedIssues.length){
+    const model=semanticModel??(voiceModel?.topics[voiceTopic]?voiceModel:null);
+    const policy=model===semanticModel?semanticModel?.decisionPolicy??'voice-joint-1.0':localVoices?.decisionPolicy??'voice-joint-1.0';
+    const docs=[];
+    for(const issue of resolvedIssues){
+      let document=(issue===proposedArticleIssue?storedVoices:null)??null;
+      if(!document&&model){
+        document=await readPrecomputedVoiceDocument(req.body,{modelVersion:model.version,decisionPolicy:policy,topic:voiceTopic,articleIssue:issue});
+      }
+      if(!document&&semanticModel&&model===semanticModel&&embeddingSucceeded){
+        document=await inferEmbeddingVoices(req.body,voiceTopic,config,signal,context.articleUrl?`public:${context.articleUrl}`:`request:${requestId}`,semanticModel,issue);
+      }
+      if(!document&&model===voiceModel&&voiceModel?.topics[voiceTopic])document=inferVoices(voiceModel,req.body,voiceTopic,issue);
+      if(document)docs.push(document);
+    }
+    if(docs.length){result.sentenceVoices=docs[0];result.additionalSentenceVoices=docs.slice(1);}
   }
   if(!result.sentenceVoices){
     result.status='partial';

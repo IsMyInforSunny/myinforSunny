@@ -16,47 +16,57 @@ function scoreText(point:number|null,bounds:Bounds|null){
 
 export default function SentenceVoicePanel({analysis,researchResults=[]}:{analysis:Analysis;researchResults?:ResearchVerification[]}){
   const body=analysis.sources.find(source=>source.kind==='body')?.text??'';
-  const summary=analysis.sentenceVoices?summarizeVoices(body,analysis.sentenceVoices):null;
+  const documents=[analysis.sentenceVoices,...analysis.additionalSentenceVoices??[]].filter((item):item is NonNullable<typeof analysis.sentenceVoices>=>!!item);
+  const summaries=documents.map(document=>({document,summary:summarizeVoices(body,document)})).filter((item):item is {document:NonNullable<typeof analysis.sentenceVoices>;summary:NonNullable<ReturnType<typeof summarizeVoices>>}=>!!item.summary);
+  const summary=summaries[0]?.summary??null;
   if(!summary)return <div className="studio-relative">
     <p><strong>문장 SVM 분석 준비 중</strong></p>
     <p>실제 기사 AI 라벨 {trainingStatus.annotatedArticleCount}건 · 사람 평가 {trainingStatus.humanEvaluationCount}건</p>
     <p>학습 범위 · {Object.keys(trainingStatus.topics).map(topic=>VOICE_TOPICS[topic as keyof typeof VOICE_TOPICS]?.label??topic).join(' · ')}</p>
     {semanticStatus.performanceChecksPassed&&<p>문장 분류 검사 후 기사 좌표와 같은 쟁점·분기 비교 분포를 로컬에서 검증하고 있습니다.</p>}
     <p>이용 검토와 모델 배포 준비 상태를 확인한 뒤 실제 모델 결과를 연결합니다.</p>
+    <p>비교 기사 사전 계산: 조회 경로 준비, 데이터는 이용 검토 후 연결합니다.</p>
   </div>;
   const units=voiceSentences(body);
   const event=voiceAssessmentFromResearch(analysis,researchResults);
-  const quarter=analysis.issueQuarterComparison;
-  const currentQuarter=quarter?.parentAnalysisId===analysis.analysisId&&quarter.modelVersion===summary.modelVersion?quarter:null;
+  const quarters=(analysis.issueQuarterComparisons??(analysis.issueQuarterComparison?[analysis.issueQuarterComparison]:[])).filter(quarter=>quarter.parentAnalysisId===analysis.analysisId);
   const references=researchResults.flatMap(result=>result.references);
-  const issues=summary.issues.filter(issue=>analysis.sentenceVoices?.articleIssue
-    ?issue.issue===analysis.sentenceVoices.articleIssue:issue.directional||issue.evidence.unresolved);
+  const issueRows=summaries.flatMap(({document,summary:item})=>item.issues.filter(issue=>document.articleIssue
+    ?issue.issue===document.articleIssue:issue.directional||issue.evidence.unresolved).map(issue=>({issue,document})));
   return <details className="studio-relative" open><summary>취재원 인용 균형과 기자 서술 방향</summary>
     <p>본문 앞 2,000자 · {summary.total}문장 · 본문 외 표시 제외 {summary.excluded}문장</p>
-    {issues.map(issue=><section key={issue.issue} aria-label={issue.proposition}>
+    {issueRows.map(({issue,document})=><section key={issue.issue} aria-label={issue.proposition}>
+      {analysis.additionalSentenceVoices?.some(item=>item.articleIssue===issue.issue)&&<p><strong>두 번째 주 쟁점</strong></p>}
       <p><strong>{issue.proposition}</strong></p>
       <p>취재원 인용 균형 · 찬성 {issue.source.support} / 반대 {issue.source.oppose}문장 · 가능한 좌표 {coordinateText(issue.source.evidence)}</p>
       <p>기자 서술 방향 · 찬성 {issue.journalist.support} / 반대 {issue.journalist.oppose}문장 · 가능한 좌표 {coordinateText(issue.journalist.evidence)}</p>
       <p>취재원 미확정 {issue.source.evidence.unresolved} · 기자 미확정 {issue.journalist.evidence.unresolved}문장. 방향 문장 3개 이상, 범위 폭 0.5 이하일 때 상대 비교에 사용합니다.</p>
     </section>)}
-    {!issues.length&&<p>기사의 주 쟁점을 하나로 확인할 근거가 부족합니다.</p>}
+    {!issueRows.length&&<p>기사의 주 쟁점을 하나로 확인할 근거가 부족합니다.</p>}
     {event.status==='ready'&&<section aria-label="같은 사건 비교">
       <p>같은 사건·쟁점 {event.count}건 · {event.publisherCount}개 매체 · 기준선 거리 {scoreText(event.score,event.scoreBounds)}</p>
-      {event.direction==='undetermined'&&<p>좌표 범위가 기준선을 걸쳐 방향을 유보합니다.</p>}
+      {event.baselineBounds&&<p>구간 중앙값 기준선 {coordinateText(event.baselineBounds)}</p>}
+      {event.baselineUncertain?<p>기준선 불확실 · 기준선 범위 폭이 0.5를 넘어 방향을 유보합니다.</p>
+        :event.direction==='undetermined'&&<p>좌표 범위가 기준선 구간에 닿거나 겹쳐 방향을 유보합니다.</p>}
       {([['similar','같은 편 인용 구성'],['opposing','반대편 인용 구성']] as const).map(([key,label])=><div key={key}>
         <strong>{label}</strong>
         {event[key].slice(0,3).map(item=><p key={item.id}><a href={item.url} target="_blank" rel="noopener noreferrer">{references.find(ref=>ref.voiceCoordinates?.some(coordinate=>coordinate.id===item.id))?.title??item.publisher}</a></p>)}
       </div>)}
     </section>}
-    {currentQuarter?.status==='ready'?<section aria-label="같은 쟁점 분기 비교">
+    {quarters.length?quarters.map((currentQuarter,index)=><section key={`${currentQuarter.modelVersion}-${index}`} aria-label="같은 쟁점 분기 비교">
       <p>{currentQuarter.comparisonLabel}</p>
       {currentQuarter.fallbackReason&&<p>{currentQuarter.fallbackReason}</p>}
-      <p>중앙값 거리 {scoreText(currentQuarter.score,currentQuarter.scoreRange)} · {currentQuarter.topPercentile&&`찬성 좌표 기준 상위 ${currentQuarter.topPercentile.lower} ~ ${currentQuarter.topPercentile.upper}%`}</p>
-      <p>분포에 사용한 점 좌표 {currentQuarter.pointCount}건 · 범위만 확인된 기사 {currentQuarter.rangeCount}건</p>
-      {currentQuarter.direction==='undetermined'&&<p>좌표 범위가 기준선을 걸쳐 방향을 유보합니다.</p>}
-    </section>:<p>같은 쟁점·분기의 비교 분포 대기. 매체당 고유 기사 3건·2매체를 확인하며 표본이 부족하면 반기·전체 기간 순으로 비교합니다.</p>}
-    <details><summary>문장별 분류 근거</summary><ol>{analysis.sentenceVoices!.labels.map(label=><li key={label.sentenceId}>
+      {currentQuarter.status==='ready'?<>
+        <p>중앙값 거리 {scoreText(currentQuarter.score,currentQuarter.scoreRange)} · {currentQuarter.topPercentile&&`찬성 좌표 기준 상위 ${currentQuarter.topPercentile.lower} ~ ${currentQuarter.topPercentile.upper}%`}</p>
+        <p>분포에 사용한 점 좌표 {currentQuarter.pointCount}건 · 범위 좌표 {currentQuarter.rangeCount}건</p>
+        {currentQuarter.baselineBounds&&<p>구간 중앙값 기준선 {coordinateText(currentQuarter.baselineBounds)}</p>}
+        {currentQuarter.baselineUncertain?<p>기준선 불확실 · 기준선 범위 폭이 0.5를 넘어 방향을 유보합니다.</p>
+          :currentQuarter.direction==='undetermined'&&<p>좌표 범위가 기준선 구간에 닿거나 겹쳐 방향을 유보합니다.</p>}
+        {!!currentQuarter.opposingArticles.length&&<div><strong>반대편 기사 후보</strong>{currentQuarter.opposingArticles.map(item=><p key={item.id}><a href={item.url} target="_blank" rel="noopener noreferrer">{item.title}</a> · {item.publisher}</p>)}</div>}
+      </>:<p>비교 기사 부족 · 매체당 고유 기사 3건·2매체 기준으로 표본을 모으고 있습니다.</p>}
+    </section>):<p>같은 쟁점 전체 기간 비교 분포를 확인합니다. 매체당 적격 기사 3건·2매체 조건을 유지합니다.</p>}
+    <details><summary>문장별 분류 근거</summary>{documents.map(document=><section key={document.articleIssue??'unassigned'}><p>{document.articleIssue?VOICE_TOPICS[document.topic]?.issues[document.articleIssue]??document.articleIssue:'주 쟁점 미확정'}</p><ol>{document.labels.map(label=><li key={label.sentenceId}>
       {units.find(unit=>unit.sentenceId===label.sentenceId)?.text} <small>· {label.excluded?'본문 외 표시 · 집계 제외':`${label.issue} · ${label.direction} · ${label.speaker}`}</small>
-    </li>)}</ol></details>
+    </li>)}</ol></section>)}</details>
   </details>;
 }

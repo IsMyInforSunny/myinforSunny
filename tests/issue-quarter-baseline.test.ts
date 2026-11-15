@@ -48,14 +48,15 @@ describe('issue and Korean calendar period cohorts',()=>{
   expect(compareAgainstIssueQuarterArticles({...bounded,bounds:{lower:.2,upper:.6}},population())).toMatchObject({status:'ready',score:null,scoreRange:{lower:10,upper:30},direction:'above'});
   expect(compareAgainstIssueQuarterArticles({...bounded,bounds:{lower:-.3,upper:.3}},population()).status).toBe('input_unresolved');
  });
- it('counts eligible ranges separately without substituting them into the distribution',()=>{
+ it('includes intervals in endpoint distributions and in each publisher sample threshold',()=>{
   const ranged=Array.from({length:4},(_,i)=>article(`range${i}`,'dailian.co.kr',null,{unresolved:1,bounds:{lower:.2,upper:.5}}));
   const bundle=buildIssueQuarterBaselines([...population(),...ranged]);
   expect(bundle).toMatchObject({pointArticleCount:6,rangeArticleCount:4});
   const group=bundle.groups.find(g=>g.period.key==='2026-Q3')!;
-  expect(group).toMatchObject({median:0,count:10,pointCount:6,rangeCount:4,status:'ready'});
+  expect(group).toMatchObject({median:null,baselineBounds:{lower:.6,upper:.75},count:10,pointCount:6,rangeCount:4,status:'ready'});
   expect(group.boundaries).toHaveLength(21);
-  expect(compareAgainstIssueQuarterArticles(input(),[...population().slice(0,3),...ranged.map(row=>({...row,publisher:'pressian.com'}))]).status).toBe('insufficient');
+  expect(compareAgainstIssueQuarterArticles(input(),[...population().slice(0,3),...ranged.map(row=>({...row,publisher:'pressian.com'}))]))
+    .toMatchObject({status:'ready',baseline:null,baselineBounds:{lower:-.4,upper:-.25},pointCount:3,rangeCount:4});
  });
  it('excludes the input, duplicate bodies, duplicate URLs and training originals',()=>{
   const rows=[...population(),input(),{...population()[0],id:'copy'},{...article('copy-url'),url:population()[0].url},article('training','pressian.com',0,{trainingOriginal:true})];
@@ -74,7 +75,7 @@ describe('issue and Korean calendar period cohorts',()=>{
   const serialized=JSON.stringify(bundle);
   expect(serialized).not.toContain('https://');expect(serialized).not.toContain('Article low0');
   expect(serialized).not.toContain('bodyHash');expect(serialized).not.toContain('low0');
-  expect(bundle).toMatchObject({researchOnly:true,usageReviewed:false,distributionPopulation:'point-coordinates-only'});
+  expect(bundle).toMatchObject({researchOnly:true,usageReviewed:false,distributionPopulation:'interval-endpoints'});
   expect(compareIssueQuarterBaseline(input(),bundle).status).toBe('membership_unverified');
   expect(compareIssueQuarterBaseline(input(),bundle,{corpusArticleHashes:[input().bodyHash]}).status).toBe('input_in_population');
   expect(compareIssueQuarterBaseline(input(),bundle,{corpusArticleHashes:population().map(a=>a.bodyHash)}).status).toBe('ready');
@@ -108,6 +109,34 @@ describe('issue and Korean calendar period cohorts',()=>{
   expect(recommendations.opposing).toHaveLength(3);
   expect(recommendations.opposing.every(row=>Object.keys(row).sort().join(',')==='id,publishedAt,publisher,title,url')).toBe(true);
   expect(JSON.stringify(recommendations.opposing)).not.toContain('Private source text');
+ });
+ it('keeps interval baselines as intervals and percentiles conservative when possible populations overlap',()=>{
+  const rows=population().map(row=>({...row,coordinate:null,unresolved:1,bounds:{lower:.2,upper:.4}}));
+  const result=compareAgainstIssueQuarterArticles({...input(),coordinate:.3},rows);
+  expect(result).toMatchObject({status:'ready',baseline:null,baselineBounds:{lower:.2,upper:.4},score:null,
+    scoreRange:{lower:0,upper:5},direction:'undetermined',percentile:{lower:0,upper:100},rangeCount:6,pointCount:0});
+  expect(compareAgainstIssueQuarterArticles({...input(),coordinate:0},rows))
+    .toMatchObject({scoreRange:{lower:10,upper:20},direction:'below'});
+  expect(compareAgainstIssueQuarterArticles({...input(),coordinate:.4},rows).direction).toBe('undetermined');
+  expect(compareAgainstIssueQuarterArticles({...input(),coordinate:null,unresolved:1,bounds:{lower:.3,upper:.6}},rows))
+    .toMatchObject({scoreRange:{lower:0,upper:20},direction:'undetermined'});
+ });
+ it('suppresses direction for a defensively loaded excessively wide baseline',()=>{
+  // With the same eligible population/weights, endpoint median width cannot
+  // exceed the maximum individual width. This tests an inconsistent external artifact.
+  const bundle=buildIssueQuarterBaselines(population());
+  const group=bundle.groups.find(group=>group.period.kind==='quarter')!;
+  group.baselineBounds={lower:-.4,upper:.4};group.median=null;
+  group.boundaries=group.boundaries.map(boundary=>({...boundary,coordinate:null,lower:-.4,upper:.4}));
+  expect(compareIssueQuarterBaseline({...input(),coordinate:1},bundle,{inputExcluded:true}))
+    .toMatchObject({status:'ready',baselineUncertain:true,direction:'undetermined',score:null,scoreRange:{lower:30,upper:70}});
+ });
+ it('preserves scalar results and legacy percentile boundaries when all articles are points',()=>{
+  const rows=[...population(),...Array.from({length:9},(_,index)=>article(`extra${index}`,'dailian.co.kr',-1))];
+  const group=buildIssueQuarterBaselines(rows).groups.find(group=>group.period.kind==='quarter')!;
+  expect(group).toMatchObject({median:0,baselineBounds:{lower:0,upper:0}});
+  expect(group.boundaries.every(boundary=>boundary.coordinate===boundary.lower&&boundary.lower===boundary.upper)).toBe(true);
+  expect(compareAgainstIssueQuarterArticles(input(),rows)).toMatchObject({score:30,baseline:0,direction:'above',baselineUncertain:false});
  });
 
 });

@@ -7,9 +7,10 @@ import {SEGMENTER} from '../segmentation';
 import {provider,type RuntimeConfig} from './config';
 import {AppError,providerFailure} from './errors';
 import {retrySeconds} from './providers/groq';
+import localResearchVoice,{type VoiceEmbeddingInferenceModel} from './local-research-voice';
 
-export const releasedEmbeddingVoiceModel=parseEmbeddingVoiceModel(artifact);
-type Model=NonNullable<typeof releasedEmbeddingVoiceModel>;
+export const releasedEmbeddingVoiceModel=parseEmbeddingVoiceModel(artifact)??localResearchVoice;
+type Model=VoiceEmbeddingInferenceModel;
 const ENDPOINT='https://integrate.api.nvidia.com/v1/embeddings';
 const TTL=10*60_000,MAX_CACHE=512;
 const vectors=new Map<string,{expiresAt:number;value:number[]}>();
@@ -56,7 +57,7 @@ async function embedBatch(records:{key:string;text:string}[],model:Model,config:
 
 /** Public URL bodies use short-lived memory reuse; pasted text must pass a
  * request-specific scope, so private inputs cannot share a cross-user cache. */
-export async function inferEmbeddingVoices(body:string,topic:VoiceTopic,config:RuntimeConfig,signal:AbortSignal,cacheScope:string,model:Model|null=releasedEmbeddingVoiceModel,selectedArticleIssue?:string|null){
+export async function inferEmbeddingVoices(body:string,topic:VoiceTopic,config:RuntimeConfig,signal:AbortSignal,cacheScope:string,model:Model|null=releasedEmbeddingVoiceModel,selectedArticleIssue?:string|null,timing?:(event:{stage:'embedding'|'svm';startedAt:number;durationMs:number;batchCount:number;sentenceCount:number;status:'completed'|'failed'})=>void){
   signal.throwIfAborted();
   if(!model||!model.topics[topic])return null;
   if(provider(config)!=='nvidia'||!config.NVIDIA_API_KEY||!config.onDispatch||!cacheScope)
@@ -89,17 +90,22 @@ export async function inferEmbeddingVoices(body:string,topic:VoiceTopic,config:R
   }
   if(batch.length)batches.push(batch);
   // Small groups bound provider concurrency for long articles as well.
-  for(let start=0;start<batches.length;start+=3){
+  const embeddingStarted=Date.now();
+  try{for(let start=0;start<batches.length;start+=3){
     const settled=await Promise.allSettled(batches.slice(start,start+3).map(send));
     const failed=settled.find(item=>item.status==='rejected');
     if(failed?.status==='rejected')throw failed.reason;
-  }
+  }}catch(error){timing?.({stage:'embedding',startedAt:embeddingStarted,durationMs:Date.now()-embeddingStarted,batchCount:batches.length,sentenceCount:records.size,status:'failed'});throw error;}
+  timing?.({stage:'embedding',startedAt:embeddingStarted,durationMs:Date.now()-embeddingStarted,batchCount:batches.length,sentenceCount:records.size,status:'completed'});
   signal.throwIfAborted();
+  const svmStarted=Date.now();
   const labels=units.map<VoiceLabel>(unit=>{
     if(isVoiceBoilerplate(unit.text))return {sentenceId:unit.sentenceId,issue:'none',direction:'neutral' as const,speaker:'unknown' as const,excluded:true as const};
     const value=resolved.get(keys.get(unit.sentenceId)??'');
     const result=value?inferDenseVoiceHeads(model.topics[topic].heads,value):null;
     return {sentenceId:unit.sentenceId,issue:articleIssue===undefined?result?.issue??'unknown':relatedVoiceIssue(result?.margins.issue,articleIssue),direction:result?.direction??'uncertain',speaker:result?.speaker??'unknown'};
   });
-  return validateVoiceDocument(body,{version:VOICE_VERSION,segmenter:SEGMENTER,scopeCharacters:VOICE_SCOPE,topic,method:'svm',modelVersion:model.version,labels,decisionPolicy:model.decisionPolicy,...(articleIssue===undefined?{}:{articleIssue,issuePolicy:VOICE_ARTICLE_ISSUE_POLICY})});
+  const document=validateVoiceDocument(body,{version:VOICE_VERSION,segmenter:SEGMENTER,scopeCharacters:VOICE_SCOPE,topic,method:'svm',modelVersion:model.version,labels,decisionPolicy:model.decisionPolicy,...(articleIssue===undefined?{}:{articleIssue,issuePolicy:VOICE_ARTICLE_ISSUE_POLICY})});
+  timing?.({stage:'svm',startedAt:svmStarted,durationMs:Date.now()-svmStarted,batchCount:batches.length,sentenceCount:units.length,status:document?'completed':'failed'});
+  return document;
 }

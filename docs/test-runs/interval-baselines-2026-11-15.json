@@ -1,0 +1,115 @@
+{
+  "schemaVersion": "interval-baseline-validation-1.0",
+  "generatedAt": "2026-11-15T12:38:08.441Z",
+  "researchOnly": true,
+  "usageReviewed": false,
+  "measurementKind": "Single offline aggregation of retained 711-sentence checkpoint; not accuracy evaluation or API timing.",
+  "humanAccuracyClaim": false,
+  "articleTextOrUrlsIncluded": false,
+  "modelVersion": [
+    "76907b870672d5d7aa4d6f6d"
+  ],
+  "sourceDigest": "b67da119f7ea05149bd3635034ae795791fbafe6ed987c7cae780f998fc72f1e",
+  "eligibility": {
+    "minimumDirectionalSentences": 3,
+    "maximumArticleIntervalWidth": 0.5,
+    "minimumArticlesPerPublisher": 3,
+    "minimumPublishers": 2
+  },
+  "method": {
+    "population": "eligible-point-and-interval-articles",
+    "weight": "equal publisher; within publisher equal article",
+    "baseline": "separate weighted medians of lower and upper endpoints",
+    "articleMidpointImputation": false,
+    "percentile": "lower input against upper boundaries; upper input against lower boundaries",
+    "baselineUncertaintyGuard": "width > 0.5 suppresses direction"
+  },
+  "before": {
+    "acceptedArticleCount": 57,
+    "pointArticleCount": 15,
+    "rangeArticleCount": 42,
+    "readyGroupCounts": {
+      "quarter": 0,
+      "half": 0,
+      "all": 0
+    }
+  },
+  "after": {
+    "acceptedArticleCount": 57,
+    "pointArticleCount": 15,
+    "rangeArticleCount": 42,
+    "readyGroupCounts": {
+      "quarter": 0,
+      "half": 1,
+      "all": 2
+    },
+    "baselineUncertainGroupCount": 0,
+    "readyGroups": [
+      {
+        "topic": "nuclear_energy",
+        "issue": "expansion",
+        "period": {
+          "kind": "half",
+          "key": "2026-H1",
+          "label": "2026년 상반기"
+        },
+        "count": 17,
+        "pointCount": 3,
+        "rangeCount": 14,
+        "publisherCount": 2,
+        "baselineBounds": {
+          "lower": 0,
+          "upper": 0.5
+        },
+        "median": null
+      },
+      {
+        "topic": "nuclear_energy",
+        "issue": "expansion",
+        "period": {
+          "kind": "all",
+          "key": "all",
+          "label": "전체 기간"
+        },
+        "count": 35,
+        "pointCount": 5,
+        "rangeCount": 30,
+        "publisherCount": 4,
+        "baselineBounds": {
+          "lower": 0.5,
+          "upper": 1
+        },
+        "median": null
+      },
+      {
+        "topic": "nuclear_energy",
+        "issue": "lifetime",
+        "period": {
+          "kind": "all",
+          "key": "all",
+          "label": "전체 기간"
+        },
+        "count": 12,
+        "pointCount": 6,
+        "rangeCount": 6,
+        "publisherCount": 2,
+        "baselineBounds": {
+          "lower": -1,
+          "upper": -1
+        },
+        "median": -1
+      }
+    ]
+  },
+  "validation": {
+    "targetedTypescriptTestsPassed": 48,
+    "cliTestsPassed": 1,
+    "fullSuiteDeferred": true
+  },
+  "limitations": [
+    "Original model and evaluation gates unchanged; this is no new model-quality claim.",
+    "Quarter comparison populations remain insufficient at this checkpoint.",
+    "Offline embedding continuation will generate a newer snapshot separately.",
+    "Eligible endpoint median width cannot exceed eligible article maximum width with the same weights; wide-baseline test is a defensive artifact check."
+  ]
+}

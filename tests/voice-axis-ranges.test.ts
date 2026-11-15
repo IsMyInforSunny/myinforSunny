@@ -56,13 +56,21 @@ describe('separate article voice axes and range eligibility',()=>{
     const centered=population().map(row=>({...row,coordinate:row.publisher==='a.test'?-.5:0}));
     expect(compareVoiceCoordinates(item('input','input.test',null,{lower:-.5,upper:0}),centered)).toMatchObject({status:'ready',score:null,scoreBounds:{lower:0,upper:13},direction:'undetermined',opposing:[],similar:[]});
   });
-  it('excludes range articles from the distribution while retaining their eligible counts',()=>{
+  it('includes range articles in both endpoint distributions and recommendations without imputation',()=>{
     const articles=[item('a1','a.test',-.8),item('a2','a.test',-.6),item('a3','a.test',null,{lower:-1,upper:-.5}),
       item('b1','b.test',.3),item('b2','b.test',.5),item('b3','b.test',null,{lower:.5,upper:1})];
     const result=compareVoiceCoordinates(item('input','input.test',1),articles);
-    expect(result).toMatchObject({status:'ready',count:6,publisherCount:2,rangeCount:2,distributionCount:4});
-    expect(result.baseline).toBeCloseTo(-.15);
-    expect(result.opposing.every(article=>article.coordinate!==null)).toBe(true);
+    expect(result).toMatchObject({status:'ready',count:6,publisherCount:2,rangeCount:2,distributionCount:6,baseline:null});
+    expect(result.baselineBounds!.lower).toBeCloseTo(-.15);
+    expect(result.baselineBounds!.upper).toBeCloseTo(-.1);
+    expect(result.opposing.some(article=>article.coordinate===null)).toBe(true);
+    expect(articles.filter(article=>article.bounds).every(article=>article.coordinate===null)).toBe(true);
+  });
+  it('accepts publishers whose three eligible articles are all intervals',()=>{
+    const articles=population().map(row=>({...row,coordinate:null,unresolved:1,bounds:{lower:.2,upper:.4}}));
+    expect(compareVoiceCoordinates(item('input','input.test',.3),articles)).toMatchObject({status:'ready',baseline:null,
+      baselineBounds:{lower:.2,upper:.4},score:null,scoreBounds:{lower:0,upper:5},direction:'undetermined',rangeCount:6,distributionCount:6});
+    expect(compareVoiceCoordinates(item('input','input.test',0),articles)).toMatchObject({scoreBounds:{lower:10,upper:20},direction:'oppose'});
   });
   it('does not mix axes, issue policies or unresolved legacy scalars',()=>{
     const input=item('input','input.test',1);

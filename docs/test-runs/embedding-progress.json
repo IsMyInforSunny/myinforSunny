@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "voice-embedding-progress-1.0",
+  "updatedAt": "2026-11-15T14:55:38.976Z",
+  "startedAt": "2026-11-15T12:36:41.180Z",
+  "status": "priority_complete",
+  "pid": 30216,
+  "childPid": null,
+  "researchOnly": true,
+  "usageReviewed": false,
+  "articleTextOrUrlsIncluded": false,
+  "sourceSnapshotInputDigest": "f84f2997a639b27bfc20958f853a5369bff80b9fbb4f1c5024e8d6404a97dba1",
+  "countingBasis": "Unique missing sentences at this snapshot; previously cached sentences are excluded from both numerator and denominator.",
+  "totalUniqueSentences": 50175,
+  "completedUniqueSentences": 19641,
+  "remainingUniqueSentences": 30534,
+  "excludedUnsupportedUniqueSentences": 391,
+  "priorityIssues": [
+    {
+      "issue": "housing_supply:supply",
+      "totalMissingAtStart": 4079,
+      "completedUniqueSentences": 4079,
+      "remainingUniqueSentences": 0
+    },
+    {
+      "issue": "medical_school_quota:quota",
+      "totalMissingAtStart": 10015,
+      "completedUniqueSentences": 10015,
+      "remainingUniqueSentences": 0
+    },
+    {
+      "issue": "nuclear_energy:expansion",
+      "totalMissingAtStart": 259,
+      "completedUniqueSentences": 259,
+      "remainingUniqueSentences": 0
+    },
+    {
+      "issue": "minimum_wage:increase",
+      "totalMissingAtStart": 5292,
+      "completedUniqueSentences": 5292,
+      "remainingUniqueSentences": 0
+    }
+  ],
+  "priorityComplete": true,
+  "completedChunks": 11,
+  "totalChunks": 29,
+  "currentGroup": null,
+  "rateLimitCount": 0,
+  "retryAfterAt": null,
+  "minimumDispatchIntervalMs": 20000,
+  "maximumBatchSize": 64,
+  "dailyReservationCap": null,
+  "estimatedMinimumDispatchDurationMs": 16080000,
+  "elapsedThisProcessMs": 8337796,
+  "automaticRetry": false,
+  "stopReason": null,
+  "deferredUnknownBatchCount": 2,
+  "deferredUnknownRecordCount": 128
+}
