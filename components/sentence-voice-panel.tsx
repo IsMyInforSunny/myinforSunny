@@ -16,10 +16,32 @@ function scoreText(point:number|null,bounds:Bounds|null){
 
 export default function SentenceVoicePanel({analysis,researchResults=[]}:{analysis:Analysis;researchResults?:ResearchVerification[]}){
   const body=analysis.sources.find(source=>source.kind==='body')?.text??'';
+  const units=voiceSentences(body);
   const documents=[analysis.sentenceVoices,...analysis.additionalSentenceVoices??[]].filter((item):item is NonNullable<typeof analysis.sentenceVoices>=>!!item);
   const summaries=documents.map(document=>({document,summary:summarizeVoices(body,document)})).filter((item):item is {document:NonNullable<typeof analysis.sentenceVoices>;summary:NonNullable<ReturnType<typeof summarizeVoices>>}=>!!item.summary);
   const summary=summaries[0]?.summary??null;
-  if(!summary)return <div className="studio-relative">
+  const citationBalance=analysis.citationBalance;
+  const citationLabels=citationBalance?.labels??[];
+  const relatedLabels=citationLabels.filter(label=>label.relevance==='related');
+  const unresolvedRelevance=citationLabels.filter(label=>label.relevance==='uncertain').length;
+  const citationCounts=(speaker:'journalist'|'source')=>({
+    support:relatedLabels.filter(label=>label.speaker===speaker&&label.direction==='support').length,
+    oppose:relatedLabels.filter(label=>label.speaker===speaker&&label.direction==='oppose').length,
+    neutral:relatedLabels.filter(label=>label.speaker===speaker&&label.direction==='neutral').length,
+    unresolved:relatedLabels.filter(label=>label.speaker===speaker&&label.direction==='uncertain').length,
+  });
+  const citationDirectional=relatedLabels.filter(label=>label.direction==='support'||label.direction==='oppose').length;
+  const citationSummary=citationBalance&&<section aria-label="인용 균형 AI 문장 분류">
+    <p><strong>인용 균형(AI 문장 분류)</strong></p>
+    <p>비교 명제 · {citationBalance.proposition}</p>
+    <p>관련 문장 {relatedLabels.length}개 · 무관 {citationLabels.filter(label=>label.relevance==='unrelated').length}개 · 논점 미확정 {unresolvedRelevance}개</p>
+    {(['source','journalist'] as const).map(speaker=>{const counts=citationCounts(speaker);return <p key={speaker}>{speaker==='source'?'취재원':'기자'} · 찬성 {counts.support} · 반대 {counts.oppose} · 중립 {counts.neutral} · 유보 {counts.unresolved}</p>;})}
+    <p>화자 미확정 {relatedLabels.filter(label=>label.speaker==='mixed'||label.speaker==='unknown').length}개 · 전체 찬반 문장 {citationDirectional}개{citationDirectional<3?' · 찬반 문장이 3개 미만이라 균형을 계산하지 않습니다.':' · 이 문장 분류는 기사 안의 인용·서술 구성을 나타냅니다.'}</p>
+    <details><summary>AI 문장 분류 근거</summary><ol>{citationLabels.filter(label=>label.relevance!=='unrelated').map(label=><li key={label.sentenceId}>
+      {units.find(unit=>unit.sentenceId===label.sentenceId)?.text??'원문 문장을 찾을 수 없습니다.'} <small>· {label.relevance==='uncertain'?'논점 미확정':label.direction==='support'?'찬성':label.direction==='oppose'?'반대':label.direction==='neutral'?'중립':'유보'} · {label.speaker==='journalist'?'기자':label.speaker==='source'?'취재원':label.speaker==='mixed'?'복합':'화자 미확정'}</small>
+    </li>)}</ol></details>
+  </section>;
+  if(!summary&&!citationBalance)return <div className="studio-relative">
     <p><strong>인용 균형 분석 자료 없음</strong></p>
     <p>실제 기사 AI 라벨 {trainingStatus.annotatedArticleCount}건 · 사람 평가 {trainingStatus.humanEvaluationCount}건</p>
     <p>학습 범위 · {Object.keys(trainingStatus.topics).map(topic=>VOICE_TOPICS[topic as keyof typeof VOICE_TOPICS]?.label??topic).join(' · ')}</p>
@@ -27,7 +49,7 @@ export default function SentenceVoicePanel({analysis,researchResults=[]}:{analys
     <p>이용 검토와 모델 배포 준비 상태를 확인한 뒤 실제 모델 결과를 연결합니다.</p>
     <p>비교 기사 사전 계산: 조회 경로 준비, 데이터는 이용 검토 후 연결합니다.</p>
   </div>;
-  const units=voiceSentences(body);
+  if(!summary)return <div className="studio-relative">{citationSummary}</div>;
   const event=voiceAssessmentFromResearch(analysis,researchResults);
   const quarters=(analysis.issueQuarterComparisons??(analysis.issueQuarterComparison?[analysis.issueQuarterComparison]:[])).filter(quarter=>quarter.parentAnalysisId===analysis.analysisId);
   const references=researchResults.flatMap(result=>result.references);
@@ -41,6 +63,7 @@ export default function SentenceVoicePanel({analysis,researchResults=[]}:{analys
     unresolved:labels.filter(label=>label.speaker===speaker&&label.direction==='uncertain').length,
   });
   return <details className="studio-relative" open><summary>취재원 인용 균형과 기자 서술 방향</summary>
+    {citationSummary}
     <p><strong>{methodLabel}</strong></p>
     <p>본문 앞 2,000자 · {summary.total}문장 · 본문 외 표시 제외 {summary.excluded}문장</p>
     {issueRows.map(({issue,document})=><section key={issue.issue} aria-label={issue.proposition}>
