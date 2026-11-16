@@ -1,0 +1,408 @@
+{
+  "schemaVersion": "publisher-extraction-audit-1.0",
+  "checkedAt": "2026-11-16T12:04:52.249Z",
+  "existingPassed": 5,
+  "candidatesChecked": 18,
+  "candidatesPassed": 14,
+  "minimumBodyCharacters": 300,
+  "articleSelection": "Strict publisher-specific single-article IDs; title and publication metadata retained locally where available.",
+  "results": [
+    {
+      "host": "www.pressian.com",
+      "kind": "existing",
+      "status": "allowlist_candidate",
+      "detail": null,
+      "robotsStatus": 200,
+      "bodyLength": 1199,
+      "extractionMethod": "semantic",
+      "startedAt": "2026-11-16T12:04:28.206Z",
+      "candidateCount": 90,
+      "publishedAt": "2026-11-16T11:58:30.000Z",
+      "durationMs": 1282
+    },
+    {
+      "host": "www.ohmynews.com",
+      "kind": "existing",
+      "status": "allowlist_candidate",
+      "detail": null,
+      "robotsStatus": 200,
+      "bodyLength": 2859,
+      "extractionMethod": "semantic",
+      "startedAt": "2026-11-16T12:04:28.301Z",
+      "candidateCount": 135,
+      "publishedAt": "2026-11-16T07:00:00.000Z",
+      "durationMs": 2225
+    },
+    {
+      "host": "www.dailian.co.kr",
+      "kind": "existing",
+      "status": "allowlist_candidate",
+      "detail": null,
+      "robotsStatus": 200,
+      "bodyLength": 2063,
+      "extractionMethod": "semantic",
+      "startedAt": "2026-11-16T12:04:29.494Z",
+      "candidateCount": 145,
+      "publishedAt": "2026-11-16T03:16:00.000Z",
+      "durationMs": 1547
+    },
+    {
+      "host": "www.newdaily.co.kr",
+      "kind": "existing",
+      "status": "allowlist_candidate",
+      "detail": null,
+      "robotsStatus": 200,
+      "bodyLength": 4757,
+      "extractionMethod": "semantic",
+      "startedAt": "2026-11-16T12:04:30.528Z",
+      "candidateCount": 46,
+      "durationMs": 1010
+    },
+    {
+      "host": "news.sbs.co.kr",
+      "kind": "candidate",
+      "status": "paste_guidance",
+      "detail": "no_robots_allowed_recent_article",
+      "robotsStatus": 200,
+      "bodyLength": null,
+      "extractionMethod": null,
+      "startedAt": "2026-11-16T12:04:31.540Z",
+      "candidateCount": 0,
+      "errorName": "Error",
+      "durationMs": 872
+    },
+    {
+      "host": "www.donga.com",
+      "kind": "existing",
+      "status": "allowlist_candidate",
+      "detail": null,
+      "robotsStatus": 200,
+      "bodyLength": 1543,
+      "extractionMethod": "semantic",
+      "startedAt": "2026-11-16T12:04:31.042Z",
+      "candidateCount": 89,
+      "publishedAt": "2026-11-16T09:37:00.000Z",
+      "durationMs": 1721
+    },
+    {
+      "host": "www.yonhapnewstv.co.kr",
+      "kind": "candidate",
+      "status": "allowlist_candidate",
+      "detail": null,
+      "robotsStatus": 200,
+      "bodyLength": 3050,
+      "extractionMethod": "semantic",
+      "startedAt": "2026-11-16T12:04:32.413Z",
+      "candidateCount": 46,
+      "publishedAt": "2026-11-16T06:32:21.000Z",
+      "durationMs": 1197
+    },
+    {
+      "host": "www.ichannela.com",
+      "kind": "candidate",
+      "status": "paste_guidance",
+      "detail": "external_redirect",
+      "robotsStatus": 200,
+      "bodyLength": null,
+      "extractionMethod": null,
+      "startedAt": "2026-11-16T12:04:32.765Z",
+      "errorName": "Error",
+      "durationMs": 862
+    },
+    {
+      "host": "www.hankyung.com",
+      "kind": "candidate",
+      "status": "allowlist_candidate",
+      "detail": null,
+      "robotsStatus": 200,
+      "bodyLength": 1751,
+      "extractionMethod": "semantic",
+      "startedAt": "2026-11-16T12:04:33.629Z",
+      "candidateCount": 35,
+      "publishedAt": "2026-11-16T09:09:50.000Z",
+      "durationMs": 595
+    },
+    {
+      "host": "news.tvchosun.com",
+      "kind": "candidate",
+      "status": "allowlist_candidate",
+      "detail": null,
+      "robotsStatus": 200,
+      "bodyLength": 1406,
+      "extractionMethod": "semantic",
+      "startedAt": "2026-11-16T12:04:33.612Z",
+      "candidateCount": 23,
+      "publishedAt": "2026-11-16T06:39:59.000Z",
+      "durationMs": 890
+    },
+    {
+      "host": "www.segye.com",
+      "kind": "candidate",
+      "status": "allowlist_candidate",
+      "detail": null,
+      "robotsStatus": 200,
+      "bodyLength": 2191,
+      "extractionMethod": "semantic",
+      "startedAt": "2026-11-16T12:04:34.226Z",
+      "candidateCount": 138,
+      "publishedAt": "2026-11-16T09:00:00.000Z",
+      "durationMs": 1301
+    },
+    {
+      "host": "www.seoul.co.kr",
+      "kind": "candidate",
+      "status": "allowlist_candidate",
+      "detail": null,
+      "robotsStatus": 200,
+      "bodyLength": 863,
+      "extractionMethod": "semantic",
+      "startedAt": "2026-11-16T12:04:34.504Z",
+      "candidateCount": 98,
+      "publishedAt": "2026-11-16T11:58:24.000Z",
+      "durationMs": 1328
+    },
+    {
+      "host": "www.sisain.co.kr",
+      "kind": "candidate",
+      "status": "allowlist_candidate",
+      "detail": null,
+      "robotsStatus": 200,
+      "bodyLength": 1284,
+      "extractionMethod": "semantic",
+      "startedAt": "2026-11-16T12:04:35.529Z",
+      "candidateCount": 43,
+      "publishedAt": "2026-11-13T04:19:50.000Z",
+      "durationMs": 1418
+    },
+    {
+      "host": "www.mediaus.co.kr",
+      "kind": "candidate",
+      "status": "allowlist_candidate",
+      "detail": null,
+      "robotsStatus": 200,
+      "bodyLength": 7346,
+      "extractionMethod": "semantic",
+      "startedAt": "2026-11-16T12:04:35.833Z",
+      "candidateCount": 58,
+      "publishedAt": "2026-11-15T23:27:31.000Z",
+      "durationMs": 1383
+    },
+    {
+      "host": "www.newscham.net",
+      "kind": "candidate",
+      "status": "paste_guidance",
+      "detail": "external_redirect",
+      "robotsStatus": null,
+      "bodyLength": null,
+      "extractionMethod": null,
+      "startedAt": "2026-11-16T12:04:37.218Z",
+      "errorName": "Error",
+      "durationMs": 381
+    },
+    {
+      "host": "www.redian.org",
+      "kind": "candidate",
+      "status": "allowlist_candidate",
+      "detail": null,
+      "robotsStatus": 200,
+      "bodyLength": 1453,
+      "extractionMethod": "semantic",
+      "startedAt": "2026-11-16T12:04:37.601Z",
+      "candidateCount": 34,
+      "publishedAt": "2026-11-16T03:02:29.000Z",
+      "durationMs": 1261
+    },
+    {
+      "host": "www.newsmin.co.kr",
+      "kind": "candidate",
+      "status": "paste_guidance",
+      "detail": "no_robots_allowed_recent_article",
+      "robotsStatus": 200,
+      "bodyLength": null,
+      "extractionMethod": null,
+      "startedAt": "2026-11-16T12:04:38.864Z",
+      "candidateCount": 0,
+      "errorName": "Error",
+      "durationMs": 875
+    },
+    {
+      "host": "www.labortoday.co.kr",
+      "kind": "candidate",
+      "status": "allowlist_candidate",
+      "detail": null,
+      "robotsStatus": 200,
+      "bodyLength": 3354,
+      "extractionMethod": "semantic",
+      "startedAt": "2026-11-16T12:04:36.949Z",
+      "candidateCount": 51,
+      "publishedAt": "2026-11-15T21:30:03.000Z",
+      "durationMs": 3033
+    },
+    {
+      "host": "www.idomin.com",
+      "kind": "candidate",
+      "status": "allowlist_candidate",
+      "detail": null,
+      "robotsStatus": 200,
+      "bodyLength": 2806,
+      "extractionMethod": "semantic",
+      "startedAt": "2026-11-16T12:04:39.742Z",
+      "candidateCount": 93,
+      "publishedAt": "2026-11-16T07:13:39.000Z",
+      "durationMs": 1285
+    },
+    {
+      "host": "www.ksilbo.co.kr",
+      "kind": "candidate",
+      "status": "allowlist_candidate",
+      "detail": null,
+      "robotsStatus": 200,
+      "bodyLength": 2206,
+      "extractionMethod": "semantic",
+      "startedAt": "2026-11-16T12:04:39.986Z",
+      "candidateCount": 82,
+      "publishedAt": "2026-11-15T15:00:02.000Z",
+      "durationMs": 1589
+    },
+    {
+      "host": "www.newsis.com",
+      "kind": "candidate",
+      "status": "allowlist_candidate",
+      "detail": null,
+      "robotsStatus": 200,
+      "bodyLength": 1358,
+      "extractionMethod": "semantic",
+      "startedAt": "2026-11-16T12:04:41.578Z",
+      "candidateCount": 148,
+      "publishedAt": "2026-11-16T09:03:17.000Z",
+      "durationMs": 653
+    },
+    {
+      "host": "www.kookje.co.kr",
+      "kind": "candidate",
+      "status": "allowlist_candidate",
+      "detail": null,
+      "robotsStatus": 200,
+      "bodyLength": 1300,
+      "extractionMethod": "readability",
+      "startedAt": "2026-11-16T12:04:41.030Z",
+      "candidateCount": 118,
+      "durationMs": 1624
+    },
+    {
+      "host": "www.news1.kr",
+      "kind": "candidate",
+      "status": "allowlist_candidate",
+      "detail": null,
+      "robotsStatus": 200,
+      "bodyLength": 464,
+      "extractionMethod": "semantic",
+      "startedAt": "2026-11-16T12:04:42.233Z",
+      "candidateCount": 104,
+      "publishedAt": "2026-11-16T00:04:12.000Z",
+      "durationMs": 2394
+    }
+  ],
+  "checkLinks": {
+    "checkedAt": "2026-11-16T12:04:52.244Z",
+    "count": 15,
+    "results": [
+      {
+        "host": "www.pressian.com",
+        "status": "completed",
+        "extractionMethod": "semantic",
+        "bodyLength": 1199,
+        "durationMs": 841
+      },
+      {
+        "host": "www.ohmynews.com",
+        "status": "completed",
+        "extractionMethod": "semantic",
+        "bodyLength": 2859,
+        "durationMs": 861
+      },
+      {
+        "host": "www.dailian.co.kr",
+        "status": "completed",
+        "extractionMethod": "semantic",
+        "bodyLength": 2063,
+        "durationMs": 778
+      },
+      {
+        "host": "www.newdaily.co.kr",
+        "status": "completed",
+        "extractionMethod": "semantic",
+        "bodyLength": 4757,
+        "durationMs": 604
+      },
+      {
+        "host": "www.donga.com",
+        "status": "completed",
+        "extractionMethod": "semantic",
+        "bodyLength": 1543,
+        "durationMs": 1309
+      },
+      {
+        "host": "www.yonhapnewstv.co.kr",
+        "status": "completed",
+        "extractionMethod": "semantic",
+        "bodyLength": 3050,
+        "durationMs": 518
+      },
+      {
+        "host": "www.hankyung.com",
+        "status": "completed",
+        "extractionMethod": "semantic",
+        "bodyLength": 1751,
+        "durationMs": 196
+      },
+      {
+        "host": "news.tvchosun.com",
+        "status": "completed",
+        "extractionMethod": "semantic",
+        "bodyLength": 1406,
+        "durationMs": 445
+      },
+      {
+        "host": "www.segye.com",
+        "status": "completed",
+        "extractionMethod": "semantic",
+        "bodyLength": 2191,
+        "durationMs": 652
+      },
+      {
+        "host": "www.seoul.co.kr",
+        "status": "completed",
+        "extractionMethod": "semantic",
+        "bodyLength": 863,
+        "durationMs": 669
+      },
+      {
+        "host": "www.chosun.com",
+        "status": "INVALID_URL",
+        "durationMs": 0
+      },
+      {
+        "host": "news.kbs.co.kr",
+        "status": "INVALID_URL",
+        "durationMs": 1
+      },
+      {
+        "host": "www.hani.co.kr",
+        "status": "INVALID_URL",
+        "durationMs": 0
+      },
+      {
+        "host": "n.news.naver.com",
+        "status": "ROBOTS_DISALLOWED",
+        "durationMs": 0
+      },
+      {
+        "host": "v.daum.net",
+        "status": "ACCESS_RESTRICTED",
+        "durationMs": 734
+      }
+    ],
+    "meaning": "10 discovered real article URLs and 5 negative checks (three denied publisher paths and two portal handling fixtures). Portal fixture failure is not portal article success."
+  }
+}

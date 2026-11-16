@@ -35,7 +35,7 @@ if(!existsSync(configPath))throw Error('Research build did not produce dist/serv
 const config=JSON.parse(await (await import('node:fs/promises')).readFile(configPath,'utf8'));
 config.vars={...config.vars,AI_PROVIDER:'nvidia',NVIDIA_MODEL:env.NVIDIA_MODEL??'nvidia/nemotron-3.5-lightning-30b-a3b',
   ENABLE_LIVE_ANALYSIS:'true',ENABLE_DIRECT_FETCH:'true',ENABLE_NEWS_SEARCH:'false',NEWS_TERMS_APPROVED:'true',
-  ALLOWED_RETRIEVAL_HOSTS:env.ALLOWED_RETRIEVAL_HOSTS??'www.dailian.co.kr,www.newdaily.co.kr,biz.newdaily.co.kr,www.ohmynews.com,www.pressian.com,www.donga.com'};
+  ALLOWED_RETRIEVAL_HOSTS:env.ALLOWED_RETRIEVAL_HOSTS??'www.dailian.co.kr,www.newdaily.co.kr,biz.newdaily.co.kr,www.ohmynews.com,www.pressian.com,www.donga.com,www.yonhapnewstv.co.kr,www.hankyung.com,news.tvchosun.com,www.segye.com,www.seoul.co.kr,www.sisain.co.kr,www.mediaus.co.kr,www.redian.org,www.labortoday.co.kr,www.idomin.com,www.ksilbo.co.kr,www.newsis.com,www.kookje.co.kr,www.news1.kr'};
 delete config.vars.NVIDIA_API_KEY;
 config.secrets={required:['NVIDIA_API_KEY']};
 await (await import('node:fs/promises')).writeFile(configPath,JSON.stringify(config,null,2)+'\n','utf8');
