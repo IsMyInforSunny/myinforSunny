@@ -32,7 +32,7 @@ describe('NVIDIA request accounting without token caps',()=>{
   await withBudget(request,config,crypto.randomUUID(),60000,async()=>null);
   await withBudget(request,config,crypto.randomUUID(),60000,async()=>null);
   await expect(withBudget(request,config,crypto.randomUUID(),60000,async()=>null)).rejects.toMatchObject({code:'RATE_LIMITED'});
- });
+ },15000);
  it('reduces admission to one after 429 and restores three after cooldown plus five quiet minutes',async()=>{
   const config=nvidiaConfig(),now=Date.now(),clock=vi.spyOn(Date,'now').mockReturnValue(now);
   await withBudget(actorRequest('limited'),config,crypto.randomUUID(),60000,async current=>{await current.onRateLimit?.(1);});

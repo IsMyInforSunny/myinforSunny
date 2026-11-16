@@ -22,6 +22,8 @@
     "check:local": "node scripts/check-local-runtime.mjs",
     "check:activation": "node scripts/check-activation-readiness.mjs",
     "check:record": "node scripts/check-record.mjs",
+    "bias:diagnose": "node scripts/bias-research.mjs diagnose",
+    "bias:retrain": "node scripts/bias-research.mjs retrain",
     "start:nvidia": "node scripts/start-local-nvidia.mjs",
     "start:research": "node scripts/start-local-research.mjs",
     "start:deepseek": "node scripts/start-local-deepseek.mjs"
