@@ -20,7 +20,7 @@ export default function SentenceVoicePanel({analysis,researchResults=[]}:{analys
   const summaries=documents.map(document=>({document,summary:summarizeVoices(body,document)})).filter((item):item is {document:NonNullable<typeof analysis.sentenceVoices>;summary:NonNullable<ReturnType<typeof summarizeVoices>>}=>!!item.summary);
   const summary=summaries[0]?.summary??null;
   if(!summary)return <div className="studio-relative">
-    <p><strong>문장 SVM 분석 준비 중</strong></p>
+    <p><strong>인용 균형 분석 자료 없음</strong></p>
     <p>실제 기사 AI 라벨 {trainingStatus.annotatedArticleCount}건 · 사람 평가 {trainingStatus.humanEvaluationCount}건</p>
     <p>학습 범위 · {Object.keys(trainingStatus.topics).map(topic=>VOICE_TOPICS[topic as keyof typeof VOICE_TOPICS]?.label??topic).join(' · ')}</p>
     {semanticStatus.performanceChecksPassed&&<p>문장 분류 검사 후 기사 좌표와 같은 쟁점·분기 비교 분포를 로컬에서 검증하고 있습니다.</p>}
@@ -33,16 +33,27 @@ export default function SentenceVoicePanel({analysis,researchResults=[]}:{analys
   const references=researchResults.flatMap(result=>result.references);
   const issueRows=summaries.flatMap(({document,summary:item})=>item.issues.filter(issue=>document.articleIssue
     ?issue.issue===document.articleIssue:issue.directional||issue.evidence.unresolved).map(issue=>({issue,document})));
+  const methodLabel=summary.method==='ai'?'인용 균형(AI 문장 분류)':'문장 SVM 분류(연구용)';
+  const directionCounts=(labels:typeof documents[number]['labels'],speaker:'journalist'|'source')=>({
+    support:labels.filter(label=>label.speaker===speaker&&label.direction==='support').length,
+    oppose:labels.filter(label=>label.speaker===speaker&&label.direction==='oppose').length,
+    neutral:labels.filter(label=>label.speaker===speaker&&label.direction==='neutral').length,
+    unresolved:labels.filter(label=>label.speaker===speaker&&label.direction==='uncertain').length,
+  });
   return <details className="studio-relative" open><summary>취재원 인용 균형과 기자 서술 방향</summary>
+    <p><strong>{methodLabel}</strong></p>
     <p>본문 앞 2,000자 · {summary.total}문장 · 본문 외 표시 제외 {summary.excluded}문장</p>
     {issueRows.map(({issue,document})=><section key={issue.issue} aria-label={issue.proposition}>
       {analysis.additionalSentenceVoices?.some(item=>item.articleIssue===issue.issue)&&<p><strong>두 번째 주 쟁점</strong></p>}
       <p><strong>{issue.proposition}</strong></p>
-      <p>취재원 인용 균형 · 찬성 {issue.source.support} / 반대 {issue.source.oppose}문장 · 가능한 좌표 {coordinateText(issue.source.evidence)}</p>
-      <p>기자 서술 방향 · 찬성 {issue.journalist.support} / 반대 {issue.journalist.oppose}문장 · 가능한 좌표 {coordinateText(issue.journalist.evidence)}</p>
-      <p>취재원 미확정 {issue.source.evidence.unresolved} · 기자 미확정 {issue.journalist.evidence.unresolved}문장. 방향 문장 3개 이상, 범위 폭 0.5 이하일 때 상대 비교에 사용합니다.</p>
-      <details><summary>찬반 근거 문장과 발화 주체</summary><ol>{document.labels.filter(label=>label.issue===issue.issue&&(label.direction==='support'||label.direction==='oppose')).map(label=><li key={label.sentenceId}>
-        {units.find(unit=>unit.sentenceId===label.sentenceId)?.text} <small>· {label.direction==='support'?'찬성':'반대'} · {label.speaker==='journalist'?'기자':label.speaker==='source'?'취재원':label.speaker==='mixed'?'복합':'화자 미확정'}</small>
+      {(()=>{const labels=document.labels.filter(label=>label.issue===issue.issue&&!label.excluded);const sources=directionCounts(labels,'source'),journalists=directionCounts(labels,'journalist');const classified=labels.filter(label=>label.direction==='support'||label.direction==='oppose').length;return <>
+        <p>취재원 문장 {labels.filter(label=>label.speaker==='source').length}개 · 찬성 {sources.support} · 반대 {sources.oppose} · 중립 {sources.neutral} · 유보 {sources.unresolved} · 가능한 좌표 {coordinateText(issue.source.evidence)}</p>
+        <p>기자 문장 {labels.filter(label=>label.speaker==='journalist').length}개 · 찬성 {journalists.support} · 반대 {journalists.oppose} · 중립 {journalists.neutral} · 유보 {journalists.unresolved} · 가능한 좌표 {coordinateText(issue.journalist.evidence)}</p>
+        <p>화자 미확정 {labels.filter(label=>label.speaker==='mixed'||label.speaker==='unknown').length}문장 · 비교 범위에 포함한 미확정: 취재원 {issue.source.evidence.unresolved} · 기자 {issue.journalist.evidence.unresolved} · 전체 {issue.evidence.unresolved}문장</p>
+        <p>전체 찬반 문장 {classified}개{classified<3?' · 찬반 문장이 3개 미만이라 균형을 계산하지 않습니다.':' · 범위와 유보 수를 함께 확인해 주세요.'}</p>
+      </>})()}
+      <details><summary>문장별 분류와 원문 근거</summary><ol>{document.labels.filter(label=>label.issue===issue.issue&&(label.direction==='support'||label.direction==='oppose'||label.direction==='neutral'||label.direction==='uncertain')).map(label=><li key={label.sentenceId}>
+        {units.find(unit=>unit.sentenceId===label.sentenceId)?.text} <small>· {label.direction==='support'?'찬성':label.direction==='oppose'?'반대':label.direction==='neutral'?'중립':'유보'} · {label.speaker==='journalist'?'기자':label.speaker==='source'?'취재원':label.speaker==='mixed'?'복합':'화자 미확정'}</small>
       </li>)}</ol></details>
     </section>)}
     {!issueRows.length&&<p>기사의 주 쟁점을 하나로 확인할 근거가 부족합니다.</p>}
