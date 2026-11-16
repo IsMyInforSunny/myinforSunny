@@ -29,6 +29,11 @@ describe('기사 본문을 중심으로 한 대시보드 표시',()=>{
   expect(argumentAxis(html)).not.toContain('studio-axis-marker');
   expect(html).toContain('검증된 SVM 모델 준비 중');expect(html).toContain('검색과 원문 연결 준비 중');expect(html).toContain('현재 PCA는 연구용');
  });
+ it('실시간 분석의 연구 모델 주입 여부를 capabilities 값 그대로 표시한다',()=>{
+  const analysis=article('공개 가상 기사다.');
+  expect(render(analysis,{availability:{biasModelReady:true,articleResearchReady:true,researchInjected:true}})).toContain('연구 모델 주입 사용 중');
+  expect(render(analysis,{availability:{biasModelReady:true,articleResearchReady:true,researchInjected:false}})).toContain('연구 모델 주입 꺼짐');
+ });
  it('유효한 본문 입장 인용을 화살표와 원문 근거로 표시한다',()=>{
   const analysis=article('학교 도서관 운영 시간을 늘려야 한다.');setPosition(analysis);
   const html=render(analysis);

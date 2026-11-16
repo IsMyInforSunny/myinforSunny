@@ -22,7 +22,7 @@ type Props = {
   researchResults: ResearchVerification[];
   checks?: Check[];
   researchStage?: ResearchStage;
-  availability?: {biasModelReady: boolean; articleResearchReady: boolean; biasComparisonGroup?: string | null} | null;
+  availability?: {biasModelReady: boolean; articleResearchReady: boolean; biasComparisonGroup?: string | null; researchInjected?: boolean} | null;
   biasArticleCoordinates?: BiasArticleCoordinate[];
   biasOrientationSet?: BiasOrientationSet | null;
   selectedBiasArticleId?: string;
@@ -171,7 +171,7 @@ export default function CanvaDashboard({analysis, researchResults, researchStage
           <p>논점 관점의 표시는 본문의 찬반 분류이며 막대 위치는 분류를 나타냅니다. 강도나 확률은 계산하지 않습니다. 정치 좌우 모드는 검증된 매체 좌표를 사용합니다. 현재 PCA는 연구용이며 추천은 확인한 본문 입장과 인용을 기준으로 구성합니다.</p>
           <p>추가 기사 조사는 별도 AI 계획·검색·대조를 수행합니다. 무료 호출 한도에 따른 대기 시간이 추가됩니다.</p>
           <small>{providerLabel ? `연결 서비스 ${providerLabel}` : '연결 상태 확인 중'}{analysis ? ` · 실행 모델 ${analysis.versions.model}` : ''}</small>
-          {analysis?.mode === 'live' && <p>정치 좌표 {availability?.biasModelReady ? politicalReady ? `기준선 거리 ${bias.magnitude?.toFixed(2)} · 편향 강도 ${scores.bias.value}%` : '같은 논점의 비교 표본 준비 중' : '검증된 SVM 모델 준비 중'} · 기사 연결 {availability?.articleResearchReady ? researchLabels[researchStage] : '검색과 원문 연결 준비 중'}</p>}
+          {analysis?.mode === 'live' && <p>정치 좌표 {availability?.biasModelReady ? politicalReady ? `기준선 거리 ${bias.magnitude?.toFixed(2)} · 편향 강도 ${scores.bias.value}%` : '같은 논점의 비교 표본 준비 중' : '검증된 SVM 모델 준비 중'} · 기사 연결 {availability?.articleResearchReady ? researchLabels[researchStage] : '검색과 원문 연결 준비 중'} · 연구 모델 주입 {availability?.researchInjected===undefined?'상태 확인 중':availability.researchInjected?'사용 중':'꺼짐'}</p>}
           {onCoordinates && <button type="button" className="studio-text-button" onClick={onCoordinates}>비교 좌표와 표본 보기 <ChevronRight size={14} /></button>}
         </div></details>
       </div>
