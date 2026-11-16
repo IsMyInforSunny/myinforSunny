@@ -66,7 +66,7 @@ describe('허용 출처의 문서 해독과 본문 추출 — 모의 응답만 �
  it('스크립트로만 본문을 제공하는 빈 HTML 껍데기를 취득 근거로 인정하지 않는다',async()=>{
   const html='<!DOCTYPE html><html><head><title>공개 기사</title></head><body><script>window.article={text:"실행하면 안 되는 본문"}</script></body></html>';
   expect(extractArticleDocument(html,true).text).toBe('');
-  vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(html,{headers:{'content-type':'text/html'}})));
+  vi.stubGlobal('fetch',vi.fn().mockResolvedValueOnce(new Response(null,{status:404})).mockResolvedValueOnce(new Response(html,{headers:{'content-type':'text/html'}})));
   expect(await retrieve('https://news.example/a','r1',{ALLOWED_RETRIEVAL_HOSTS:'news.example'},new AbortController().signal)).toBeNull();
  });
  it('중첩된 동명 ASP.NET form을 댓글 제외 규칙의 우회로로 쓰지 않는다',()=>{

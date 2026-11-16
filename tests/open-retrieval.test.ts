@@ -19,6 +19,7 @@ describe('open retrieval policy helpers',()=>{
  });
  it('applies denylist roots to subdomains',()=>{
   expect(isFetchDenylistedHost('www.chosun.com')).toBe(true);
+  expect(isFetchDenylistedHost('imnews.imbc.com')).toBe(true);
   expect(isFetchDenylistedHost('pressian.com')).toBe(false);
  });
  it('uses the product group or wildcard robots rules and detects AI-wide restrictions',()=>{
@@ -39,6 +40,7 @@ describe('open retrieval policy helpers',()=>{
  it('tries same-registrable-domain AMP content within the shared three-destination-request cap',async()=>{
   const short='초기 HTML 본문입니다. '.repeat(7),long='AMP 본문은 정책의 배경과 조건을 상세히 설명합니다. '.repeat(12);
   const fetch=vi.fn()
+   .mockResolvedValueOnce(new Response(null,{status:404}))
    .mockResolvedValueOnce(new Response(`<link rel="amphtml" href="https://amp.news.example/story"><article>${short}</article>`,{headers:{'content-type':'text/html'}}))
    .mockResolvedValueOnce(new Response(null,{status:404}))
    .mockResolvedValueOnce(new Response(`<article>${long}</article>`,{headers:{'content-type':'text/html'}}));
@@ -46,7 +48,22 @@ describe('open retrieval policy helpers',()=>{
   const config={ALLOWED_RETRIEVAL_HOSTS:'news.example'} as RuntimeConfig;
   const result=await retrieveDetailed('https://news.example/story','probe',config,new AbortController().signal);
   expect(result).toMatchObject({ok:true,metadata:{extractionMethod:'amp'}});if(result.ok)expect(result.reference.text).toContain('AMP 본문');
-  expect(fetch).toHaveBeenCalledTimes(3);
+  expect(fetch).toHaveBeenCalledTimes(4);
+ });
+ it('checks robots before the article request and fails closed for prohibited pages',async()=>{
+  const fetch=vi.fn().mockResolvedValueOnce(new Response('User-agent: *\nDisallow: /story',{status:200}));vi.stubGlobal('fetch',fetch);
+  const result=await retrieveDetailed('https://robots-blocked.example/story','blocked',{ALLOWED_RETRIEVAL_HOSTS:'robots-blocked.example'} as RuntimeConfig,new AbortController().signal);
+  expect(result).toMatchObject({ok:false,reason:'ROBOTS_DISALLOWED'});expect(fetch).toHaveBeenCalledTimes(1);
+ });
+ it('does not fetch the article if robots denies AI-wide crawling',async()=>{
+  const fetch=vi.fn().mockResolvedValueOnce(new Response('User-agent: GPTBot\nDisallow: /',{status:200}));vi.stubGlobal('fetch',fetch);
+  const result=await retrieveDetailed('https://ai-blocked.example/story','blocked',{ALLOWED_RETRIEVAL_HOSTS:'ai-blocked.example'} as RuntimeConfig,new AbortController().signal);
+  expect(result).toMatchObject({ok:false,reason:'ROBOTS_AI_RESTRICTED'});expect(fetch).toHaveBeenCalledTimes(1);
+ });
+ it('keeps AI-restricted publishers out even if an operator allowlist includes a subdomain',async()=>{
+  const fetch=vi.fn();vi.stubGlobal('fetch',fetch);
+  const result=await retrieveDetailed('https://imnews.imbc.com/article/1','restricted',{ALLOWED_RETRIEVAL_HOSTS:'imnews.imbc.com'} as RuntimeConfig,new AbortController().signal);
+  expect(result).toMatchObject({ok:false,reason:'ROBOTS_AI_RESTRICTED'});expect(fetch).not.toHaveBeenCalled();
  });
  it('blocks Naver before page retrieval and handles Daum robots 404 as permitted',async()=>{
   const fetch=vi.fn()

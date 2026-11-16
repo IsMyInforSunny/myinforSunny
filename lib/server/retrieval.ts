@@ -3,6 +3,7 @@ import { RuntimeConfig } from './config';
 import {scrapeFirecrawl} from './firecrawl';
 import {ARTICLE_EXTRACTION_VERSION,articleTextPrefix,decodeArticleDocument,extractArticleDocument} from './article-document';
 import {articleAmpUrl,articleRestriction,extractArticle,extractDaumPortalArticle} from './article-extraction';
+import {isFetchDenylistedHost} from './open-retrieval';
 import {getDomain} from 'tldts';
 
 // The initial web adapter deliberately supports exact, operator-approved hosts only.
@@ -30,10 +31,14 @@ export function robotsDisallowed(text:string,path:string,agent='NaeinfoClear'){
  return rules[0]?.allow?null:rules.length?'ROBOTS_DISALLOWED' as const:null;
 }
 async function ampRobotsAllowed(host:string,path:string,signal:AbortSignal){
+ return !(await robotsRestriction(host,path,signal));
+}
+async function robotsRestriction(host:string,path:string,signal:AbortSignal):Promise<'ROBOTS_DISALLOWED'|'ROBOTS_AI_RESTRICTED'|null>{
  const now=Date.now(),cached=robotsCache.get(host);let result:{status:number;body?:string};if(cached&&cached.expiresAt>now)result=cached;else{
-  try{const response=await fetch(`https://${host}/robots.txt`,{redirect:'manual',headers:{'User-Agent':'NaeinfoClear/0.1 (article analysis; user-requested fetch)'},signal});if(response.status===404){await response.body?.cancel();result={status:404};}else if(response.ok){const text=await readLimitedText(response,256*1024);if(text===null)return false;result={status:response.status,body:text};}else{await response.body?.cancel();return false;}robotsCache.set(host,{...result,expiresAt:now+60*60*1000});}catch{return false;}
+  try{const response=await fetch(`https://${host}/robots.txt`,{redirect:'manual',headers:{'User-Agent':'NaeinfoClear/0.1 (article analysis; user-requested fetch)'},signal:AbortSignal.any([signal,AbortSignal.timeout(5000)])});if(response.status===404){await response.body?.cancel();result={status:404};}else if(response.ok){const text=await readLimitedText(response,256*1024);if(text===null)return 'ROBOTS_DISALLOWED';result={status:response.status,body:text};}else{await response.body?.cancel();return 'ROBOTS_DISALLOWED';}robotsCache.set(host,{...result,expiresAt:now+60*60*1000});}catch{signal.throwIfAborted();return 'ROBOTS_DISALLOWED';}
  }
- return result.status===404||!robotsDisallowed(result.body??'',path);
+ if(result.status===404)return null;
+ return robotsDisallowed(result.body??'',path);
 }
 async function readLimitedText(response:Response,maxBytes:number){
  const reader=response.body?.getReader();if(!reader)return '';
@@ -68,6 +73,8 @@ export async function retrieveDetailed(url:string,id:string,config:RuntimeConfig
   const hosts=(config.ALLOWED_RETRIEVAL_HOSTS??'').split(',').map(s=>s.trim()).filter(Boolean);let target=allowedUrl(url,hosts);
   // Use only trusted public publisher domains configured by the operator.
   if(!target)return failure('INVALID_URL');
+  if(isFetchDenylistedHost(target.hostname))return failure('ROBOTS_AI_RESTRICTED');
+  const robotsFailure=await robotsRestriction(target.hostname,target.pathname,signal);if(robotsFailure)return failure(robotsFailure);
   const originalOrigin=target.origin,seen=new Set([target.href]);
   const fetchSignal=AbortSignal.any([signal,AbortSignal.timeout(5000)]);
   let response:Response,requestCount=0;
