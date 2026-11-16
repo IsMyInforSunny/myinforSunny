@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "bias-diagnosis-2026-11-16-after-1.0",
+  "generatedAt": "2026-11-16T06:11:10+00:00",
+  "researchOnly": true,
+  "apiCalls": 0,
+  "sourceInputDigest": "3912b1a143ca7070d32b891b666995cf7154aaa342207a7e4040a0082c9558a9",
+  "status": "not_run_no_consensus_candidate",
+  "modelChanged": false,
+  "coordinateRecalculation": "not_run",
+  "comparisonToBefore": "not_comparable_no_retrained_candidate",
+  "topics": {
+    "medical_school_quota": {
+      "reviewAArticles": 12,
+      "reviewBArticles": 30,
+      "sharedArticleIds": 0,
+      "sharedSentenceIds": 0,
+      "completeConsensusSentences": 0,
+      "frozenEvaluationArticles": 8,
+      "jointlyReviewedEvaluationSentences": 0,
+      "consensusEvaluationSentences": 0
+    },
+    "nuclear_energy": {
+      "reviewAArticles": 0,
+      "reviewBArticles": 0,
+      "sharedArticleIds": 0,
+      "sharedSentenceIds": 0,
+      "completeConsensusSentences": 0,
+      "frozenEvaluationArticles": 7,
+      "jointlyReviewedEvaluationSentences": 0,
+      "consensusEvaluationSentences": 0
+    },
+    "minimum_wage": {
+      "reviewAArticles": 28,
+      "reviewBArticles": 12,
+      "sharedArticleIds": 0,
+      "sharedSentenceIds": 0,
+      "completeConsensusSentences": 0,
+      "frozenEvaluationArticles": 8,
+      "jointlyReviewedEvaluationSentences": 0,
+      "consensusEvaluationSentences": 0
+    }
+  },
+  "beforeMetricsCopied": false,
+  "meaning": "After metrics are intentionally null; existing candidate results are not relabeled as retrained results."
+}

@@ -1,0 +1,85 @@
+{
+  "schemaVersion": "voice-retrain-preflight-2026-11-16-1.0",
+  "generatedAt": "2026-11-16T06:11:10+00:00",
+  "researchOnly": true,
+  "apiCalls": 0,
+  "inputDigest": "3912b1a143ca7070d32b891b666995cf7154aaa342207a7e4040a0082c9558a9",
+  "reviewFiles": [
+    "review-a.local.jsonl",
+    "review-a-additional.local.jsonl",
+    "review-b.local.jsonl",
+    "review-b-additional.local.jsonl"
+  ],
+  "reviewAArticles": 100,
+  "reviewBArticles": 110,
+  "reviewASentenceAnnotations": 2341,
+  "reviewBSentenceAnnotations": 2746,
+  "sharedArticleIds": 0,
+  "sharedArticleSentencePairs": 0,
+  "duplicateAnnotations": {
+    "reviewA": 0,
+    "reviewB": 0
+  },
+  "annotators": {
+    "reviewA": [
+      "{\"kind\": \"ai\", \"model\": \"Codex\", \"version\": \"voice-review-2026-11-15.1\"}"
+    ],
+    "reviewB": [
+      "{\"kind\": \"ai\", \"model\": \"Codex\", \"version\": \"voice-review-2026-11-15.1\"}"
+    ],
+    "independenceDemonstrated": false
+  },
+  "fieldAgreement": {
+    "issue": {
+      "compared": 0,
+      "agree": 0
+    },
+    "direction": {
+      "compared": 0,
+      "agree": 0
+    },
+    "speaker": {
+      "compared": 0,
+      "agree": 0
+    }
+  },
+  "completeConsensusSentences": 0,
+  "topics": {
+    "medical_school_quota": {
+      "reviewAArticles": 12,
+      "reviewBArticles": 30,
+      "sharedArticleIds": 0,
+      "sharedSentenceIds": 0,
+      "completeConsensusSentences": 0,
+      "frozenEvaluationArticles": 8,
+      "jointlyReviewedEvaluationSentences": 0,
+      "consensusEvaluationSentences": 0
+    },
+    "nuclear_energy": {
+      "reviewAArticles": 0,
+      "reviewBArticles": 0,
+      "sharedArticleIds": 0,
+      "sharedSentenceIds": 0,
+      "completeConsensusSentences": 0,
+      "frozenEvaluationArticles": 7,
+      "jointlyReviewedEvaluationSentences": 0,
+      "consensusEvaluationSentences": 0
+    },
+    "minimum_wage": {
+      "reviewAArticles": 28,
+      "reviewBArticles": 12,
+      "sharedArticleIds": 0,
+      "sharedSentenceIds": 0,
+      "completeConsensusSentences": 0,
+      "frozenEvaluationArticles": 8,
+      "jointlyReviewedEvaluationSentences": 0,
+      "consensusEvaluationSentences": 0
+    }
+  },
+  "status": "blocked_insufficient_joint_review",
+  "trainingStarted": false,
+  "candidateCreated": false,
+  "scores": null,
+  "blocker": "A and B contain no shared article-hash and sentence-ID pairs; no field consensus can be formed.",
+  "meaning": "No consensus or model-quality claim is inferred from labels on different articles."
+}
