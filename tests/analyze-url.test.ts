@@ -26,6 +26,9 @@ describe('URL article analysis — synthetic sources only',()=>{
  it('does not retrieve when direct import is disabled',async()=>{
   const fetch=vi.spyOn(retrieval,'retrieveDetailed');await expect(call(req,{...config,ENABLE_DIRECT_FETCH:'false'})).rejects.toMatchObject({code:'ARTICLE_IMPORT_UNAVAILABLE'});expect(fetch).not.toHaveBeenCalled();
  });
+ it('explains that Naver news cannot be auto-fetched without making a request',async()=>{
+  const fetch=vi.spyOn(retrieval,'retrieveDetailed');await expect(call({...req,url:'https://n.news.naver.com/mnews/article/001/1'})).rejects.toMatchObject({code:'ARTICLE_FETCH_ROBOTS_DISALLOWED',message:expect.stringContaining('본문을 직접 붙여 넣어')});expect(fetch).not.toHaveBeenCalled();
+ });
  it('uses retrieved body and preserves source metadata',async()=>{
   const model=mockBody();vi.mocked(retrieval.retrieveDetailed).mockResolvedValue({ok:true,reference:{id:'input_article',provenance:'web_fetched',url:'https://pressian.com/article/1',text:'공개 합성 기사에서 정책의 조건과 영향을 설명합니다. '.repeat(8),title:'합성 기사',fetchedAt:'2026-11-05T00:00:00Z',truncated:false,fullTextLength:200},metadata:{mode:'allowlisted',host:'pressian.com',extractionMethod:'daum_portal',publisherUrl:'https://pressian.com/article/1',publisherHost:'pressian.com'}});const result=await call({...req,url:'https://v.daum.net/v/1'});expect(model.mock.calls[0][0]).toMatchObject({kind:'text',transmissionConsent:true,comments:[]});expect(result.article).toMatchObject({url:'https://v.daum.net/v/1',title:'합성 기사',truncated:false,retrieval:{publisherUrl:'https://pressian.com/article/1',publisherHost:'pressian.com'}});expect(result.sources[0].text).toBe(model.mock.calls[0][0].body);
  });

@@ -13,6 +13,8 @@ type TextRequest=Extract<import('zod/v4').infer<typeof analyzeRequestSchema>,{ki
 export async function prepareUrlAnalysis(req:UrlRequest,config:RuntimeConfig,requestId:string,signal:AbortSignal):Promise<{input:TextRequest;article:NonNullable<Analysis['article']>;articleHash:string}>{
  const hosts=(config.ALLOWED_RETRIEVAL_HOSTS??'').split(',').map(s=>s.trim()).filter(Boolean);
  if(!capabilities(config).directFetch)throw new AppError(503,'ARTICLE_IMPORT_UNAVAILABLE','기사 링크 분석은 현재 준비 중입니다. 잠시 후 다시 시도해 주세요.');
+ try{const url=new URL(req.url);if(url.protocol==='https:'&&!url.username&&!url.password&&!url.port&&!url.hostname.endsWith('.')&&['news.naver.com','n.news.naver.com'].includes(url.hostname.toLowerCase()))
+  throw new AppError(422,'ARTICLE_FETCH_ROBOTS_DISALLOWED','네이버 뉴스는 자동 가져오기를 지원하지 않습니다. 언론사 원문 링크를 사용하거나 기사 본문을 직접 붙여 넣어 주세요.');}catch(error){if(error instanceof AppError)throw error;}
  const url=allowedUrl(req.url,hosts);
  if(!url)throw new AppError(422,'ARTICLE_URL_NOT_ALLOWED','현재 지원하는 언론사의 HTTPS 기사 링크를 입력해 주세요. 포털·단축 주소 대신 언론사 원문 링크를 사용해 주세요.');
  const retrievalStarted=Date.now();
