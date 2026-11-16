@@ -1,4 +1,4 @@
-import {execFileSync,spawn} from 'node:child_process';
+import {spawn,spawnSync} from 'node:child_process';
 import {existsSync,realpathSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -11,11 +11,9 @@ const isolatedRoot=realpathSync(path.dirname(root));
 if(path.basename(isolatedRoot).toLowerCase()!=='.sites-runtime'||!inside(isolatedRoot,root))throw Error('Research UI must run from an isolated checkout under .sites-runtime.');
 if(!process.env.NVIDIA_API_KEY?.trim())throw Error('Set NVIDIA_API_KEY in the server environment before starting research mode.');
 
-const worktrees=execFileSync('git',['worktree','list','--porcelain'],{cwd:root,encoding:'utf8'});
-const roots=[...worktrees.matchAll(/^worktree (.+)$/gm)].map(match=>match[1]);
 const canonical=process.env.LOCAL_VOICE_RESEARCH_CANONICAL_ROOT
   ?realpathSync(process.env.LOCAL_VOICE_RESEARCH_CANONICAL_ROOT)
-  :roots.find(candidate=>realpathSync(candidate)!==root&&existsSync(path.join(candidate,'docs','CODEX_COMMAND_2026-11-16B.md')));
+  :realpathSync(path.dirname(isolatedRoot));
 if(!canonical||realpathSync(canonical)===root)throw Error('Could not identify the canonical checkout; set LOCAL_VOICE_RESEARCH_CANONICAL_ROOT explicitly.');
 
 const model=process.env.LOCAL_VOICE_RESEARCH_MODEL??'.sites-runtime/voice-expansion-20261115/six-topics-candidate.local.json';
@@ -29,7 +27,20 @@ for(const [key,name] of [['LOCAL_VOICE_PRECOMPUTED','precomputed-voices.local.js
   ['LOCAL_VOICE_PROVENANCE','provenance.local.json'],['LOCAL_VOICE_RECOMMENDATIONS','recommendations.local.json']]){
   const file=path.join(comparison,name);if(existsSync(path.join(root,file)))env[key]=file;
 }
-const cli=fileURLToPath(new URL('../node_modules/vite/bin/vite.js',import.meta.url));
+const build=spawnSync('npm',['run','build'],{cwd:root,env,stdio:'inherit',shell:process.platform==='win32'});
+if(build.error)throw build.error;
+if(build.status!==0)process.exit(build.status??1);
+const configPath=path.join(root,'dist','server','wrangler.json');
+if(!existsSync(configPath))throw Error('Research build did not produce dist/server/wrangler.json.');
+const config=JSON.parse(await (await import('node:fs/promises')).readFile(configPath,'utf8'));
+config.vars={...config.vars,AI_PROVIDER:'nvidia',NVIDIA_MODEL:env.NVIDIA_MODEL??'nvidia/nemotron-3.5-lightning-30b-a3b',
+  ENABLE_LIVE_ANALYSIS:'true',ENABLE_DIRECT_FETCH:'true',ENABLE_NEWS_SEARCH:'false',NEWS_TERMS_APPROVED:'true',
+  ALLOWED_RETRIEVAL_HOSTS:env.ALLOWED_RETRIEVAL_HOSTS??'www.dailian.co.kr,www.newdaily.co.kr,biz.newdaily.co.kr,www.ohmynews.com,www.pressian.com,news.sbs.co.kr,www.donga.com'};
+delete config.vars.NVIDIA_API_KEY;
+config.secrets={required:['NVIDIA_API_KEY']};
+await (await import('node:fs/promises')).writeFile(configPath,JSON.stringify(config,null,2)+'\n','utf8');
+const cli=fileURLToPath(new URL('../node_modules/wrangler/bin/wrangler.js',import.meta.url));
 const child=spawn(process.execPath,['--import',new URL('./sites-env.mjs',import.meta.url).href,cli,
-  '--host','127.0.0.1','--port','5190','--strictPort'],{cwd:root,env,stdio:'inherit'});
+  'dev','--config',configPath,'--local','--persist-to','.wrangler/research-state','--ip','127.0.0.1','--port','5190','--inspector-port','0'],
+  {cwd:root,env,stdio:'inherit'});
 child.on('exit',code=>{process.exitCode=code??1;});

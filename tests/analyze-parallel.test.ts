@@ -25,7 +25,9 @@ function deferred<T>(){
 }
 function rawOutput(){
   const body=makeSources(request)[0],first=body.sentences[0];
+  const citationBalanceSentences=voiceAnnotationInput(request.body,'nuclear_energy').sentences;
   return {clearSentenceIds:body.sentences.map(sentence=>sentence.id),
+    citationBalanceLabels:citationBalanceSentences.map(unit=>[unit.sentenceId,'R','0','J'] as const),
     topics:[{id:'reactor',label:'원전 토론',description:'공개 가상 자료',evidence:[{sentenceId:first.id,quote:body.text.slice(first.start,first.end)}]}],
     topicAssignments:[],stances:[],bodyAssigned:body.sentences.map(sentence=>({sentenceId:sentence.id,topicIds:['reactor']})),
     bodyOtherIds:[],bodyUndeterminedIds:[],expressions:[],claims:[],perspectiveQuestions:[],counterArguments:[],searchSuggestions:[],claimsMayBeOmitted:false};
@@ -49,7 +51,7 @@ describe('parallel analysis request boundaries',()=>{
     const language=deferred<ReturnType<typeof rawOutput>>(),embedding=deferred<VoiceDocument>();
     calls.structured.mockReturnValue(language.promise);calls.embedding.mockReturnValue(embedding.promise);
     let completed=false;
-    const result=analyze(request,config,'parallel-fixture',new AbortController().signal).then(value=>{completed=true;return value;});
+    const result=analyze(request,config,'parallel-fixture',new AbortController().signal,{article:true}).then(value=>{completed=true;return value;});
     await vi.waitFor(()=>{expect(calls.structured).toHaveBeenCalledTimes(1);expect(calls.embedding).toHaveBeenCalledTimes(1);});
     expect(completed).toBe(false);
     expect(calls.embedding.mock.calls[0][6]).toBe('expansion');
@@ -57,6 +59,10 @@ describe('parallel analysis request boundaries',()=>{
     expect(completed).toBe(false);
     const voices=voiceOutput();embedding.resolve(voices);
     expect((await result).sentenceVoices).toEqual(voices);
+    expect((await result).citationBalance).toMatchObject({method:'ai',modelVersion:'nvidia/nemotron-3.5-lightning-30b-a3b',proposition:request.proposition,
+      labels:[{sentenceId:'body_s0',relevance:'related',direction:'neutral',speaker:'journalist'},
+        {sentenceId:'body_s1',relevance:'related',direction:'neutral',speaker:'journalist'},
+        {sentenceId:'body_s2',relevance:'related',direction:'neutral',speaker:'journalist'}]});
     expect(calls.attach).toHaveBeenCalledTimes(1);
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -64,7 +70,7 @@ describe('parallel analysis request boundaries',()=>{
     const language=deferred<ReturnType<typeof rawOutput>>(),embedding=deferred<VoiceDocument>();
     calls.structured.mockReturnValue(language.promise);calls.embedding.mockReturnValue(embedding.promise);
     let settled=false;
-    const observed=analyze(request,config,'cancel-parallel-fixture',new AbortController().signal)
+    const observed=analyze(request,config,'cancel-parallel-fixture',new AbortController().signal,{article:true})
       .then(value=>{settled=true;return {value,error:null};},error=>{settled=true;return {value:null,error};});
     await vi.waitFor(()=>{expect(calls.structured).toHaveBeenCalledTimes(1);expect(calls.embedding).toHaveBeenCalledTimes(1);});
     const embeddingSignal=calls.embedding.mock.calls[0][3] as AbortSignal;

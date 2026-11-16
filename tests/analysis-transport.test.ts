@@ -52,7 +52,7 @@ describe('compact evidence transport',()=>{
   const transport=compactAnalysisTransport(sources,false);
   const invalid=wire();invalid.topics[0].evidence=[{sentenceId:'unknown'}];
   const {clearSentenceIds,...raw}=transport.response.parse(invalid);
-  const result=assembleAnalysis(req,{...raw,expressions:clearSentenceIds.map(sentenceId=>({sentenceId,status:'clear',criteria:[],severity:'none',context:'direct',explanation:'',evidence:[]}))},'test','test');
+  const result=assembleAnalysis(req,{...raw,expressions:(clearSentenceIds??[]).map(sentenceId=>({sentenceId,status:'clear',criteria:[],severity:'none',context:'direct',explanation:'',evidence:[]}))},'test','test');
   expect(result.status).toBe('partial');expect(result.topics).toEqual([]);
   const legacy=wire() as unknown as Record<string,any>;legacy.claims[0].origin=[{...ref,quote:'다른 원문'}];
   expect(transport.response.parse(legacy).claims[0].origin[0].quote).toBe('다른 원문');
