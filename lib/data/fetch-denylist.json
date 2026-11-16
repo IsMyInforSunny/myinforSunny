@@ -1,0 +1,19 @@
+﻿{
+  "version": 1,
+  "reason": "ai_collection_restricted_2026-11-05",
+  "hosts": [
+    "chosun.com",
+    "joongang.co.kr",
+    "hani.co.kr",
+    "khan.co.kr",
+    "mk.co.kr",
+    "kmib.co.kr",
+    "hankookilbo.com",
+    "kbs.co.kr",
+    "mbn.co.kr",
+    "yna.co.kr",
+    "nocutnews.co.kr",
+    "newstapa.org",
+    "newstomato.com"
+  ]
+}

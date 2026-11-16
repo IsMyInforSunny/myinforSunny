@@ -137,9 +137,10 @@ describe('허용 출처의 문서 해독과 본문 추출 — 모의 응답만 �
   expect(call).not.toHaveBeenCalled();
  });
  it('같은 HTTPS 출처의 정식 기사 주소 이동을 제한적으로 허용하고 최종 URL을 기록한다',async()=>{
+  const body='본문 확인 문장입니다. '.repeat(8);
   const call=vi.fn().mockResolvedValueOnce(new Response('',{status:301,headers:{Location:'/a/title'}}))
-   .mockResolvedValueOnce(new Response('본문 확인',{headers:{'content-type':'text/plain'}}));vi.stubGlobal('fetch',call);
-  expect(await retrieve('https://news.example/a','r1',{ALLOWED_RETRIEVAL_HOSTS:'news.example'},new AbortController().signal)).toMatchObject({url:'https://news.example/a/title',text:'본문 확인'});
+   .mockResolvedValueOnce(new Response(body,{headers:{'content-type':'text/plain'}}));vi.stubGlobal('fetch',call);
+  expect(await retrieve('https://news.example/a','r1',{ALLOWED_RETRIEVAL_HOSTS:'news.example'},new AbortController().signal)).toMatchObject({url:'https://news.example/a/title',text:body.trim()});
   expect(call).toHaveBeenCalledTimes(2);
  });
  it.each(['https://other.example/a','http://news.example/a','https://user:secret@news.example/a','/a'])('안전하지 않은 이동이나 반복을 차단한다: %s',async location=>{
