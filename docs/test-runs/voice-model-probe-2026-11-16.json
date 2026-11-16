@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "voice-model-probe-1.0",
+  "testedAt": "2026-11-16",
+  "source": "local retained medical_school_quota article; sentence text and URL intentionally omitted",
+  "lightningModel": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "candidateModel": "meta/llama-3.2-90b-vision-instruct",
+  "familyRelation": "different model family",
+  "requests": [
+    {
+      "status": "completed",
+      "httpStatus": 200,
+      "targetSentences": 5,
+      "returnedLabels": 5,
+      "exactIdCoverage": true,
+      "schemaFieldsValid": true,
+      "directionAndSpeakerValues": "full-word values accepted by probe schema; symbolic output not established",
+      "usageTokens": 429
+    },
+    {
+      "status": "timeout_unknown",
+      "timeoutSeconds": 90,
+      "targetSentences": 5,
+      "requiredSymbols": {
+        "direction": ["+", "-", "0", "?"],
+        "speaker": ["J", "S", "M", "?"]
+      },
+      "result": "No response captured; no automatic retry"
+    }
+  ],
+  "apiKeyRecorded": false,
+  "articleTextRecorded": false,
+  "limitations": [
+    "A single five-sentence probe verifies response structure only, not model agreement or label quality.",
+    "Strict symbolic output remains unverified because the second request timed out."
+  ]
+}
