@@ -37,10 +37,12 @@ describe('무료 분석 입력 경계 (공급자 모의, 실제 모델 품질 �
   expect(result.coverage).toMatchObject({totalSentences:2,naturalSentences:1});expect(result.bodyTopicAssignments).toHaveLength(2);expect(fetch).toHaveBeenCalledTimes(1);
 
  });
- it('본문 분류가 빠진 모델 출력은 임의 완성 없이 거절하고 재호출하지 않는다',async()=>{
+ it('본문 분류가 빠진 모델 출력은 임의 완성하지 않고 본문 분석 실패로 남긴다',async()=>{
   const req=request(3),{bodyAssigned,bodyOtherIds,bodyUndeterminedIds,...incomplete}=clearOutput(req);void bodyAssigned;void bodyOtherIds;void bodyUndeterminedIds;
   const fetch=vi.fn().mockResolvedValue(Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify(incomplete)}}],usage:{total_tokens:3000}}));vi.stubGlobal('fetch',fetch);
-  await expect(analyze(req,config,'boundary-missing-body',new AbortController().signal)).rejects.toMatchObject({code:'INVALID_MODEL_OUTPUT'});
+  const result=await analyze(req,config,'boundary-missing-body',new AbortController().signal);
+  expect(result.status).toBe('partial');expect(result.warnings.some(w=>w.code==='PRIMARY_ANALYSIS_UNAVAILABLE')).toBe(true);
+  expect(result.coverage.totalSentences).toBe(3);
   expect(fetch).toHaveBeenCalledTimes(1);
  });
  it('accepts more than 24 sentences with NVIDIA',async()=>{
@@ -75,13 +77,15 @@ describe('무료 분석 입력 경계 (공급자 모의, 실제 모델 품질 �
   const req:TextRequest={kind:'text',body:'가나다라마바사아자차카타파하'.repeat(142),comments:Array.from({length:5},(_,i)=>({id:`c${i}`,text:'가나다라마바사아자차카타파하'.repeat(14)}))};
   expect(analyzeRequestSchema.safeParse({...req,transmissionConsent:true}).success).toBe(true);
   const fetch=vi.fn();vi.stubGlobal('fetch',fetch);
-  await expect(analyze(req,config,'boundary-tokens',new AbortController().signal)).rejects.toMatchObject({code:'INPUT_TOO_LARGE'});
+  const result=await analyze(req,config,'boundary-tokens',new AbortController().signal);
+  expect(result.status).toBe('partial');expect(result.warnings.some(w=>w.code==='PRIMARY_ANALYSIS_UNAVAILABLE')).toBe(true);
   expect(fetch).not.toHaveBeenCalled();
  });
  it('출력이 잘리면 사용량을 기록하고 실패시키며 자동 재호출하지 않는다',async()=>{
   const onUsage=vi.fn(),onDispatch=vi.fn();
   const fetch=vi.fn().mockResolvedValue(Response.json({choices:[{finish_reason:'length',message:{content:'{"expressions":['}}],usage:{total_tokens:6000}}));vi.stubGlobal('fetch',fetch);
-  await expect(analyze(request(24),{...config,onUsage,onDispatch},'boundary-truncated',new AbortController().signal)).rejects.toMatchObject({code:'INVALID_MODEL_OUTPUT'});
+  const result=await analyze(request(24),{...config,onUsage,onDispatch},'boundary-truncated',new AbortController().signal);
+  expect(result.status).toBe('partial');expect(result.warnings.some(w=>w.code==='PRIMARY_ANALYSIS_UNAVAILABLE')).toBe(true);
   expect(onUsage).toHaveBeenCalledWith(6000);expect(onDispatch).toHaveBeenCalledTimes(1);expect(fetch).toHaveBeenCalledTimes(1);
  });
 });

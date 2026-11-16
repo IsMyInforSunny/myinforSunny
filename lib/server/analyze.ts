@@ -1,3 +1,4 @@
+import {z} from 'zod/v4';
 import {selectArticleVoiceIssue,selectArticleVoiceIssues} from '../voice-article-issue';
 import {searchLanguagePrompt} from './search-language';
 import { Analysis, BodyTopicAssignment, RawAnalysis, RUBRIC, ANALYSIS_PROMPT_VERSION, TextRequest, analysisModelSchema, analysisResponseSchema, bodyPositionCandidateSchema, Expression, Span, searchQuerySchema } from '../contracts';
@@ -95,13 +96,13 @@ export function assembleAnalysis(req:TextRequest,raw:RawAnalysis,requestId:strin
 }
 const SENTENCE_OUTPUT_BATCH=40;
 async function analyzeInSentenceBatches(config:RuntimeConfig,req:TextRequest,requestId:string,signal:AbortSignal,
- sources:ReturnType<typeof makeSources>,instructions:string,input:Record<string,unknown>,hasProposition:boolean,includeCitationBalance=false){
+ sources:ReturnType<typeof makeSources>,instructions:string,input:Record<string,unknown>,hasProposition:boolean){
  const units=sources.flatMap(source=>source.sentences.map(sentence=>({source,sentence})));
  if(units.length<=SENTENCE_OUTPUT_BATCH)
-  return structured(config,analysisResponseSchema(sources,hasProposition,includeCitationBalance),searchLanguagePrompt(instructions,config),input,signal,
-   {generationSchema:analysisModelSchema(sources,hasProposition,includeCitationBalance),requestId});
- const fullSchema=analysisModelSchema(sources,hasProposition,includeCitationBalance);
- const coreSchema=fullSchema.pick({topics:true,topicAssignments:true,stances:true,bodyPosition:true,...(includeCitationBalance?{citationBalanceLabels:true}:{}),claims:true,
+  return structured(config,analysisResponseSchema(sources,hasProposition),searchLanguagePrompt(instructions,config),input,signal,
+   {generationSchema:analysisModelSchema(sources,hasProposition),requestId});
+ const fullSchema=analysisModelSchema(sources,hasProposition);
+ const coreSchema=fullSchema.pick({topics:true,topicAssignments:true,stances:true,bodyPosition:true,claims:true,
   perspectiveQuestions:true,counterArguments:true,searchSuggestions:true,claimsMayBeOmitted:true});
  const coreInput={...input};delete coreInput.requiredExpressionSentenceIds;
  const coreInstructions=instructions+' 본문 문장별 분류는 다음 단계에서 나눠 처리한다. 이 호출에서는 전체 글을 읽고 논점·작성자 입장·주장·검토 질문만 반환한다. clearSentenceIds, expressions, bodyAssigned, bodyOtherIds, bodyUndeterminedIds는 출력하지 않는다.';
@@ -122,6 +123,27 @@ async function analyzeInSentenceBatches(config:RuntimeConfig,req:TextRequest,req
   bodyOtherIds.push(...result.bodyOtherIds);bodyUndeterminedIds.push(...result.bodyUndeterminedIds);
  }
  return {...core,clearSentenceIds,expressions,bodyAssigned,bodyOtherIds,bodyUndeterminedIds} as RawAnalysis;
+}
+const citationTuple=z.tuple([z.string().regex(/^[A-Za-z0-9_-]{1,64}$/),z.enum(['R','N','?']),z.enum(['+','-','0','?']),z.enum(['J','S','M','?'])]);
+async function analyzeCitationBalance(config:RuntimeConfig,body:string,requestedProposition:string|undefined,requestId:string,signal:AbortSignal){
+ const units=voiceSentences(body),labels:ReturnType<typeof citationTuple.parse>[]=[];let proposition=requestedProposition,status:'completed'|'failed'='failed';
+ const startedAt=Date.now();
+ try{
+  for(let offset=0;offset<units.length;offset+=SENTENCE_OUTPUT_BATCH){
+   const batch=units.slice(offset,offset+SENTENCE_OUTPUT_BATCH);
+   const schema=z.object({proposition:z.string().trim().min(1).max(160),labels:z.array(citationTuple).length(batch.length)}).strict();
+   const instructions='기사의 인용 균형만 분류한다. 각 labels 항목은 [sentenceId,relevance,direction,speaker]다. relevance R=명제 관련, N=무관, ?=불확실; direction +=명제 지지, -=명제 반대, 0=중립·사실 전달, ?=판단 유보; speaker J=기자 서술, S=취재원 발언·전달, M=복합, ?=불명확. 취재원 주장을 기사 작성자 입장으로 바꾸지 말고, 단순 사실 보도는 방향 0이다. 모든 입력 sentenceId를 정확히 한 번 포함한다. 원문·설명·별도 필드는 출력하지 않는다.'+
+    (proposition?` 비교 명제는 다음을 그대로 사용한다: ${proposition}`:' 비교 명제가 제공되지 않았다. 기사 중심 쟁점을 한 문장으로 proposition에 정하고 그에 따라 분류한다. 중심 쟁점이 없으면 "비교할 논점 없음"으로 쓴다.');
+   const response=await structured(config,schema,instructions,{proposition:proposition??null,sentences:batch.map(unit=>({sentenceId:unit.sentenceId,text:unit.text}))},signal,{requestId});
+   if(proposition&&response.proposition.normalize('NFC').trim()!==proposition.normalize('NFC').trim())throw new AppError(502,'INVALID_MODEL_OUTPUT','인용 균형 분류의 비교 명제가 일치하지 않습니다.');
+   proposition=response.proposition;labels.push(...response.labels);
+  }
+  if(!units.length||!proposition||labels.length!==units.length||new Set(labels.map(([id])=>id)).size!==units.length||units.some(unit=>!labels.some(([id])=>id===unit.sentenceId)))
+   throw new AppError(502,'INVALID_MODEL_OUTPUT','인용 균형 문장 분류가 완성되지 않았습니다.');
+  const relevance={R:'related',N:'unrelated','?':'uncertain'} as const,direction={'+':'support','-':'oppose','0':'neutral','?':'uncertain'} as const,
+   speaker={J:'journalist',S:'source',M:'mixed','?':'unknown'} as const;
+  status='completed';return {method:'ai' as const,modelVersion:modelName(config),proposition,labels:labels.map(([sentenceId,r,d,s])=>({sentenceId,relevance:relevance[r],direction:direction[d],speaker:speaker[s]}))};
+ }finally{console.info(JSON.stringify({type:'article_timing',stage:'citation_balance',startedAt,durationMs:Date.now()-startedAt,status,sentenceCount:units.length,requestId}));}
 }
 export async function analyze(req:TextRequest,config:RuntimeConfig,requestId:string,signal:AbortSignal,context:{article?:boolean;articleUrl?:string;articleTitle?:string}={}){
   const canonicalProposition=!req.proposition?canonicalStanceProposition(req.body):undefined;
@@ -144,11 +166,10 @@ export async function analyze(req:TextRequest,config:RuntimeConfig,requestId:str
   const bodyPositionInstructions=' bodyPosition은 댓글을 제외한 기사 본문 자체의 입장이다. 과학·교육·경제·건강·소비·환경 등 모든 주제를 다루며 정치적 좌우로 강제하지 않는다. 사용자 proposition이 있으면 그대로 비교하고, 없으면 본문 중심의 찬반 가능한 명제를 긍정형으로 짧게 정한다. label은 그 명제에 대한 본문 입장 support/oppose/mixed/not_expressed/undetermined다. evidence에는 body 문장의 실제 인용만, reason에는 입장 판단 이유를 쓴다. 댓글 의견·취재원 인용을 기사 작성자의 지지로 바꾸지 않는다. 사실만 전달하고 입장을 드러내지 않으면 not_expressed로 두며, 비교할 논쟁이 없으면 proposition은 빈 문자열로 둔다. 수치 점수는 생성하지 않는다.';
   const compact=['nvidia','deepseek'].includes(config.AI_PROVIDER??'');
   const transport=compact&&sources.reduce((count,source)=>count+source.sentences.length,0)<=SENTENCE_OUTPUT_BATCH
-    ?compactAnalysisTransport(sources,!!req.proposition,claimsRequired,!!context.article):null;
+    ?compactAnalysisTransport(sources,!!req.proposition,claimsRequired):null;
   const articleInstructions=claimsRequired?' claims에 실제 원문에 있는 핵심 주장을 1~5개 반드시 추출한다. 사건·실험 결과·통계·연구진의 설명은 factual이다. 본문에 확인 가능한 사실이 있으면 factual을 최소 1개 포함한다. 수치나 내용을 새로 만들지 말고 실제 문장 ID에 연결한다. 사실이 없는 순수 의견 기사라면 opinion을 추출한다.':'';
   const attributionInstructions=' bodyPosition.attribution은 입장 근거의 발화 주체다: author(기사 작성자 자신의 명시적 평가·제안), reported_sources(취재원·단체·정부·연구진의 발언이나 요구만 전달), unclear(구분 불가). 한쪽 발언만 실렸거나 제목에 인용됐다는 이유로 author로 두지 않는다. 보도문에서 노동계·경영계 등의 요구를 전달하는 것은 reported_sources이며 label=not_expressed다. 사설·칼럼이라도 실제 작성자 평가 인용이 있어야 author다. not_expressed에서도 쟁점이 있으면 비교 명제는 유지한다.';
-  const citationBalanceInstructions=context.article?' citationBalanceLabels는 본문 앞 2,000자에 해당하는 자연 문장마다 정확히 한 번씩 분류하는 선택 배열이다. 첫 원문 조각의 sentenceId를 사용하고 댓글은 넣지 않는다. 각 항목은 [sentenceId,relevance,direction,speaker] 4개 값 배열이다. relevance는 R=비교 명제 관련, N=무관, ?=불확실; direction은 +=찬성, -=반대, 0=중립, ?=유보; speaker는 J=기자, S=취재원, M=혼합, ?=불명확이다. 비교 명제는 사용자 proposition이 있으면 그것을, 아니면 bodyPosition.proposition을 쓴다. 사실 전달만으로 찬성·반대를 추정하지 않는다. 직접·간접 인용과 그 전달 문장은 S, 작성자 자신의 서술·평가는 J다. 모델이 형식을 완성하지 못하면 배열을 생략.':'';
-  const instructions=(compact?COMPACT_ANALYZE_PROMPT:ANALYZE_PROMPT+coverageInstructions+bodyPositionInstructions)+articleInstructions+attributionInstructions+citationBalanceInstructions
+  const instructions=(compact?COMPACT_ANALYZE_PROMPT:ANALYZE_PROMPT+coverageInstructions+bodyPositionInstructions)+articleInstructions+attributionInstructions
     +(compact?' 찬반 비교 명제는 당위·제안 형태로 쓴다. 사실·예보·사건 요약은 비교 명제가 아니며 찬반 논점이 없으면 빈 문자열로 둔다. 작성자의 직접적인 비판·비난·반대 논증도 oppose 근거다. 찬성·반대라는 단어가 없다는 이유만으로 not_expressed로 두지 않는다. 직접 평가와 취재원 인용이 섞인 글에서는 작성자의 직접 평가 문장을 evidence로 골라 판단한다. 본문 직접 입력도 확인 가능한 사건·발표·수치가 있으면 claims에 factual을 최소 1개 추출한다. 사실·의견이 함께 있으면 사실을 생략하지 않는다.':'')
     +(canonicalProposition?` 이번 공통 비교 명제(bodyPosition.proposition)는 반드시 다음 문장을 그대로 쓴다: ${canonicalProposition} 이 명제에 대한 본문 작성자의 입장을 분류한다. 사건의 사실 서술을 비교 명제로 바꾸지 않는다.`:'');
   const voiceController=new AbortController();
@@ -158,27 +179,26 @@ export async function analyze(req:TextRequest,config:RuntimeConfig,requestId:str
       .then(value=>({value,error:null}),error=>({value:null,error}))
     :null;
   const modelStarted=Date.now();
-  let raw:RawAnalysis;
-  try{raw=(transport?await structured(config,transport.response,searchLanguagePrompt(instructions+' perspectiveQuestions와 counterArguments는 각각 최대 1개만 반환한다.',config),input,signal,{generationSchema:transport.generation,requestId})
-    :await analyzeInSentenceBatches(config,req,requestId,signal,sources,instructions+' perspectiveQuestions와 counterArguments는 각각 최대 1개만 반환한다.',input,!!req.proposition,!!context.article)) as RawAnalysis;}
-  catch(error){voiceController.abort();await embeddingWork;throw error;}
-  console.info(JSON.stringify({type:'article_timing',stage:'llm',startedAt:modelStarted,durationMs:Date.now()-modelStarted,status:'completed',requestId}));
+  const mainWork=(transport?structured(config,transport.response,searchLanguagePrompt(instructions+' perspectiveQuestions와 counterArguments는 각각 최대 1개만 반환한다.',config),input,signal,{generationSchema:transport.generation,requestId})
+    :analyzeInSentenceBatches(config,req,requestId,signal,sources,instructions+' perspectiveQuestions와 counterArguments는 각각 최대 1개만 반환한다.',input,!!req.proposition))
+    .then(value=>({value:value as RawAnalysis,error:null as unknown}),error=>({value:null,error}));
+  const citationWork=context.article?analyzeCitationBalance(config,req.body,req.proposition??canonicalProposition,requestId,signal)
+    .then(value=>({value,error:null as unknown}),error=>({value:null,error})):Promise.resolve({value:null,error:null as unknown});
+  const [mainOutcome,citationOutcome]=await Promise.all([mainWork,citationWork]);
+  if(mainOutcome.error&&signal.aborted){voiceController.abort();await embeddingWork;throw mainOutcome.error;}
+  const bodyIds=sources.filter(source=>source.kind==='body').flatMap(source=>source.sentences.map(sentence=>sentence.id));
+  const raw:RawAnalysis=mainOutcome.value??{topics:[],topicAssignments:[],stances:[],bodyPosition:undefined,bodyAssigned:[],bodyOtherIds:[],bodyUndeterminedIds:bodyIds,
+    expressions:[],claims:[],perspectiveQuestions:[],counterArguments:[],searchSuggestions:[],claimsMayBeOmitted:true};
+  console.info(JSON.stringify({type:'article_timing',stage:'llm',startedAt:modelStarted,durationMs:Date.now()-modelStarted,status:mainOutcome.error?'failed':'completed',requestId}));
   const {clearSentenceIds=[],...proposal}=raw;
   const explicitIds=new Set(proposal.expressions.map(e=>e.sentenceId));
   const overlaps=clearSentenceIds.filter(id=>explicitIds.has(id));
   // A clear shortcut must never suppress a detailed finding. That finding still needs valid evidence.
   const clear=clearSentenceIds.filter(id=>!explicitIds.has(id)).map(sentenceId=>({sentenceId,status:'clear' as const,criteria:[],severity:'none' as const,context:'direct' as const,explanation:'',evidence:[]}));
   const result=assembleAnalysis(req,{...proposal,expressions:[...proposal.expressions,...clear]},requestId,modelName(config));
-  const expectedCitationSentences=voiceSentences(req.body),citationLabels=raw.citationBalanceLabels??[],citationIds=new Set(citationLabels.map(([sentenceId])=>sentenceId));
-  if(citationLabels.length===expectedCitationSentences.length&&citationIds.size===expectedCitationSentences.length
-    &&expectedCitationSentences.every(unit=>citationIds.has(unit.sentenceId))){
-    const relevance={R:'related',N:'unrelated','?':'uncertain'} as const,direction={'+':'support','-':'oppose','0':'neutral','?':'uncertain'} as const,
-      speaker={J:'journalist',S:'source',M:'mixed','?':'unknown'} as const;
-    result.citationBalance={method:'ai',modelVersion:modelName(config),proposition:result.bodyPosition?.proposition??req.proposition??'',
-      labels:citationLabels.map(([sentenceId,r,d,s])=>({sentenceId,relevance:relevance[r],direction:direction[d],speaker:speaker[s]}))};
-  }else if(context.article){
-    result.status='partial';result.warnings.push({code:'CITATION_BALANCE_UNAVAILABLE',message:'기사 문장별 인용 균형 분류가 완성되지 않았습니다.'});
-  }
+  if(mainOutcome.error){result.status='partial';result.warnings.push({code:'PRIMARY_ANALYSIS_UNAVAILABLE',message:'본문 분석 실패. 인용 균형 등 완료된 다른 분석 항목은 별도로 표시합니다.'});}
+  if(citationOutcome.value)result.citationBalance=citationOutcome.value;
+  else if(context.article){result.status='partial';result.warnings.push({code:'CITATION_BALANCE_UNAVAILABLE',message:'인용 균형 분석 실패. 완료된 본문 분석은 계속 표시합니다.'});}
   if(storedVoices??localVoices)result.sentenceVoices=(storedVoices??localVoices)!;
   const voiceVersion=releasedEmbeddingVoiceModel?.version??releasedVoiceModel?.version;
   if(voiceVersion)result.versions.voiceModel=voiceVersion;

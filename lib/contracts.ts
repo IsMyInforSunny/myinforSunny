@@ -1,8 +1,7 @@
 import { z } from 'zod/v4';
-import {voiceSentences as importVoiceSentences} from './sentence-voice';
 
 export const RUBRIC = 'rubric-4.0';
-export const ANALYSIS_PROMPT_VERSION='analysis-4.20-citation-balance';
+export const ANALYSIS_PROMPT_VERSION='analysis-4.21-separate-citation-balance';
 export const MAX_ARTICLE_CHARACTERS = 8000;
 const id = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 const text = (max: number) => z.string().min(1).max(max).refine(v => v.trim().length > 0, '내용을 입력해 주세요.');
@@ -109,18 +108,15 @@ export const rawAnalysisSchema=z.object({
   searchSuggestions:z.array(z.unknown()),
   claimsMayBeOmitted:z.boolean(),
 }).strict();
-export type CitationBalanceLabelCode=[sentenceId:string,relevance:'R'|'N'|'?',direction:'+'|'-'|'0'|'?',speaker:'J'|'S'|'M'|'?'];
-export type RawAnalysis=z.infer<typeof rawAnalysisSchema>&{citationBalanceLabels?:CitationBalanceLabelCode[]};
-export function analysisModelSchema(sources:InputSource[],hasProposition:boolean,includeCitationBalance=false){
+export type RawAnalysis=z.infer<typeof rawAnalysisSchema>;
+export function analysisModelSchema(sources:InputSource[],hasProposition:boolean){
  const ids=sources.flatMap(s=>s.sentences.map(t=>t.id));
  const commentIds=sources.filter(s=>s.kind==='comment').map(s=>s.id);
  const sentenceId=z.enum(ids as [string,...string[]]);
  const commentId=commentIds.length?z.enum(commentIds as [string,...string[]]):id;
  const bodyUnits=sources.filter(s=>s.kind==='body').reduce((n,s)=>n+s.sentences.length,0);
- const voiceUnits=includeCitationBalance&&sources.find(s=>s.kind==='body')?importVoiceSentences(sources.find(s=>s.kind==='body')!.text):[];
  const quote=z.object({sentenceId:id,quote:text(8000)}).strict();
  return rawAnalysisSchema.extend({
-  ...(includeCitationBalance?{citationBalanceLabels:z.array(z.tuple([id,z.enum(['R','N','?']),z.enum(['+','-','0','?']),z.enum(['J','S','M','?'])])).length(voiceUnits.length).optional()}:{}) ,
   clearSentenceIds:z.array(sentenceId).max(ids.length),
   topics:z.array(rawAnalysisSchema.shape.topics.element.extend({evidence:z.array(quote).min(1).max(5)})).min(1).max(5),
   topicAssignments:z.array(rawAnalysisSchema.shape.topicAssignments.element.extend({sourceId:commentId,evidence:z.array(quote).max(5)})).length(commentIds.length),
@@ -138,8 +134,8 @@ export function analysisModelSchema(sources:InputSource[],hasProposition:boolean
  });
 }
 /** Optional discovery hints cannot invalidate otherwise usable core analysis. */
-export function analysisResponseSchema(sources:InputSource[],hasProposition:boolean,includeCitationBalance=false){
- return analysisModelSchema(sources,hasProposition,includeCitationBalance).extend({
+export function analysisResponseSchema(sources:InputSource[],hasProposition:boolean){
+ return analysisModelSchema(sources,hasProposition).extend({
   bodyPosition:bodyPositionCandidateSchema.optional().catch(undefined),
   searchSuggestions:z.unknown().optional().transform(value=>Array.isArray(value)?value:[]),
  });

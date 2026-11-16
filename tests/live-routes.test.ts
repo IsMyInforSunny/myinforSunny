@@ -67,7 +67,8 @@ describe('실제 라우트·D1·어댑터·인용 검증 통합 (공급자만 �
  });
  it('한 번의 429 이후 다른 요청도 공급자 호출 없이 중단한다',async()=>{
   const fetch=vi.fn().mockResolvedValue(new Response('not exposed',{status:429,headers:{'retry-after':'120'}}));vi.stubGlobal('fetch',fetch);
-  expect((await analyzeRoute(request('analyze',{...text,transmissionConsent:true}))).status).toBe(429);
+  const first=await analyzeRoute(request('analyze',{...text,transmissionConsent:true}));
+  expect(first.status).toBe(200);expect(await first.json()).toMatchObject({status:'partial',warnings:expect.arrayContaining([expect.objectContaining({code:'PRIMARY_ANALYSIS_UNAVAILABLE'})])});
   expect((await analyzeRoute(request('analyze',{...text,transmissionConsent:true}))).status).toBe(429);expect(fetch).toHaveBeenCalledTimes(1);
  });
 });
