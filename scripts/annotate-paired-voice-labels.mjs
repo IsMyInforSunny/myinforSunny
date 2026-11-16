@@ -4,9 +4,23 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {performance} from 'node:perf_hooks';
-import {createServer} from 'vite';
+import {registerHooks} from 'node:module';
+import ts from 'typescript';
 import {parseEnv} from 'node:util';
 await import('./sites-env.mjs');
+// Native Node module loading avoids starting a Vite development server for an
+// offline process. Match the project's TypeScript emit, including type imports.
+registerHooks({
+ resolve(specifier,context,next){try{return next(specifier,context);}catch(error){
+  if(specifier.startsWith('.')&&!path.extname(specifier)&&context.parentURL?.endsWith('.ts'))return next(specifier+'.ts',context);throw error;
+ }},
+ load(url,context,next){
+  if(url.endsWith('.ts'))return {format:'module',shortCircuit:true,source:ts.transpileModule(fs.readFileSync(new URL(url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText};
+  if(url.endsWith('.json')&&url.includes('/lib/data/'))return {format:'module',shortCircuit:true,source:'export default '+fs.readFileSync(new URL(url),'utf8')+';'};
+  return next(url,context);
+ }
+});
+const nativeLoader={ssrLoadModule:specifier=>import(new URL('..'+specifier,import.meta.url).href),close:async()=>{}};
 
 const root=fs.realpathSync(process.cwd());
 const runtime=fs.realpathSync(path.join(root,'.sites-runtime'));
@@ -189,7 +203,7 @@ if(mode==='pilot-llama'){
 }
 if(mode==='plan'){
  if(fs.existsSync(manifestPath))throw Error('Preserve the existing paired sample manifest');
- const server=await createServer({root,configFile:false,server:{middlewareMode:true,hmr:false},optimizeDeps:{noDiscovery:true},appType:'custom'});
+ const server=nativeLoader;
  try{
   const voice=await server.ssrLoadModule('/lib/sentence-voice.ts');
   const readMark=performance.now();const corpus=rows(corpusPath);const corpusReadMs=Math.round(performance.now()-readMark);
@@ -214,7 +228,7 @@ if(mode==='audit'){
  for(const old of rows(oldTrainingPath))excludedIds.add(old.id);
  for(const hash of json(candidateSnapshotPath).trainingArticleHashes??[])excludedHashes.add(hash);
  const ids=new Set(),hashes=new Set(),groups=new Set();let sentenceTotal=0;
- const server=await createServer({root,configFile:false,server:{middlewareMode:true,hmr:false},optimizeDeps:{noDiscovery:true},appType:'custom'});
+ const server=nativeLoader;
  try{
   const voice=await server.ssrLoadModule('/lib/sentence-voice.ts');
   for(const item of manifest.articles){
@@ -276,7 +290,7 @@ try{
  lockFd=fs.openSync(lock,'wx',0o600);fs.writeFileSync(lockFd,JSON.stringify({pid:process.pid,startedAt:new Date().toISOString()}));
  progress.boot={stage:'starting_server',at:new Date().toISOString()};atomic(progressPath,JSON.stringify(progress,null,2)+'\n');
  const bootStarted=Date.now();
- server=await createServer({root,configFile:false,server:{middlewareMode:true,hmr:false},optimizeDeps:{noDiscovery:true},appType:'custom'});
+ server=nativeLoader;
  progress.boot={stage:'server_ready',at:new Date().toISOString(),elapsedMs:Date.now()-bootStarted};atomic(progressPath,JSON.stringify(progress,null,2)+'\n');
  const {z}=await import('zod/v4');
  progress.boot={...progress.boot,stage:'loading_language',at:new Date().toISOString()};atomic(progressPath,JSON.stringify(progress,null,2)+'\n');
