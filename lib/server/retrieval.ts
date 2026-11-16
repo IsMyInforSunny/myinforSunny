@@ -2,7 +2,7 @@ import { Reference } from '../contracts';
 import { RuntimeConfig } from './config';
 import {scrapeFirecrawl} from './firecrawl';
 import {ARTICLE_EXTRACTION_VERSION,articleTextPrefix,decodeArticleDocument,extractArticleDocument} from './article-document';
-import {articleAmpUrl,articleRestriction,extractArticle,extractDaumPortalArticle} from './article-extraction';
+import {articleAmpUrl,articleRestriction,articleRestrictionDetail,extractArticle,extractDaumPortalArticle} from './article-extraction';
 import {isFetchDenylistedHost} from './open-retrieval';
 import {getDomain} from 'tldts';
 
@@ -17,8 +17,8 @@ export function allowedUrl(input:string,hosts:string[]):URL|null{
 }
 export type RetrievalFailureCode='INVALID_URL'|'BLOCKED_DESTINATION'|'ROBOTS_DISALLOWED'|'ROBOTS_AI_RESTRICTED'|'ACCESS_RESTRICTED'|'NOT_HTML'|'TOO_LARGE'|'TIMEOUT'|'SCRIPT_RENDERED'|'TOO_SHORT'|'HOST_RATE_LIMITED';
 export type RetrievalMetadata={mode:'allowlisted'|'open';host:string;robotsCheckedAt?:string;extractionMethod?:string;publisherUrl?:string;publisherHost?:string};
-export type RetrievalResult={ok:true;reference:Reference;metadata:RetrievalMetadata}|{ok:false;reason:RetrievalFailureCode};
-const failure=(reason:RetrievalFailureCode):RetrievalResult=>({ok:false,reason});
+export type RetrievalResult={ok:true;reference:Reference;metadata:RetrievalMetadata}|{ok:false;reason:RetrievalFailureCode;detail?:string};
+const failure=(reason:RetrievalFailureCode,detail=reason.toLowerCase()):RetrievalResult=>({ok:false,reason,detail});
 const ROBOTS_AI_BOTS=['ClaudeBot','anthropic-ai','GPTBot','CCBot','Google-Extended','PerplexityBot','Applebot-Extended','Bytespider'];
 const robotsCache=new Map<string,{expiresAt:number;status:number;body?:string}>();
 function ruleMatches(pattern:string,path:string){if(!pattern)return false;const anchored=pattern.endsWith('$');const body=pattern.replace(/[.+?^${}()|[\]\\]/g,'\\$&').replace(/\*/g,'.*').replace(/\$$/,'');try{return new RegExp(`^${body}${anchored?'$':''}`).test(path);}catch{return false;}}
@@ -55,15 +55,15 @@ async function daumPortal(url:URL,id:string,signal:AbortSignal):Promise<Retrieva
  for(let redirects=0;[301,302,303,307,308].includes(response.status);redirects++){
   const location=response.headers.get('location');await response.body?.cancel();if(redirects>=2||!location)return failure('BLOCKED_DESTINATION');let next:URL;try{next=new URL(location,url);}catch{return failure('BLOCKED_DESTINATION');}if(next.protocol!=='https:'||next.hostname!==host||next.username||next.password||next.port)return failure('BLOCKED_DESTINATION');try{response=await fetch(next,{redirect:'manual',headers:{Accept:'text/html','User-Agent':ua},signal:AbortSignal.any([signal,AbortSignal.timeout(5000)])});}catch{signal.throwIfAborted();return failure('TIMEOUT');}
  }
- if([401,402,403,429].includes(response.status)){await response.body?.cancel();return failure('ACCESS_RESTRICTED');}if(!response.ok){await response.body?.cancel();return failure('ACCESS_RESTRICTED');}
+ if([401,402,403,429].includes(response.status)){await response.body?.cancel();return failure('ACCESS_RESTRICTED',`http_${response.status}`);}if(!response.ok){await response.body?.cancel();return failure('ACCESS_RESTRICTED',`non_ok_${response.status}`);}
  if(/\b(noai|noimageai|nosnippet|noarchive)\b/i.test(response.headers.get('x-robots-tag')??'')){await response.body?.cancel();return failure('ROBOTS_AI_RESTRICTED');}
  if(!/^text\/html(?:;|$)/i.test(response.headers.get('content-type')??'')){await response.body?.cancel();return failure('NOT_HTML');}
  const reader=response.body?.getReader();if(!reader)return failure('SCRIPT_RENDERED');const chunks:Uint8Array[]=[];let size=0;while(true){let part;try{part=await reader.read();}catch{signal.throwIfAborted();return failure('TIMEOUT');}if(part.done)break;size+=part.value.length;if(size>2*1024*1024){await reader.cancel();return failure('TOO_LARGE');}chunks.push(part.value);}
- const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}const html=decodeArticleDocument(bytes,'text/html');if(html===null)return failure('SCRIPT_RENDERED');const restriction=articleRestriction(html);if(restriction)return failure(restriction);const extracted=extractDaumPortalArticle(html,url.href);if(!extracted)return failure('TOO_SHORT');
+ const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}const html=decodeArticleDocument(bytes,'text/html');if(html===null)return failure('SCRIPT_RENDERED');const restriction=articleRestrictionDetail(html);if(restriction)return failure(restriction.reason,restriction.detail);const extracted=extractDaumPortalArticle(html,url.href);if(!extracted)return failure('TOO_SHORT');
  const text=articleTextPrefix(extracted.text,8000),reference:Reference={id,provenance:'web_fetched',url:extracted.sourceUrl??url.href,text,title:extracted.title,publishedAt:extracted.publishedAt,fetchedAt:new Date().toISOString(),truncated:text.length<extracted.text.length,fullTextLength:extracted.text.length,extractionVersion:extracted.extractionVersion,publisherGroup:extracted.publisherHost};
  return {ok:true,reference,metadata:{mode:'allowlisted',host:extracted.publisherHost??host,robotsCheckedAt:checkedAt,extractionMethod:'daum_portal',publisherUrl:extracted.sourceUrl,publisherHost:extracted.publisherHost}};
 }
-export async function retrieveDetailed(url:string,id:string,config:RuntimeConfig,signal:AbortSignal):Promise<RetrievalResult>{
+async function retrieveDetailedImpl(url:string,id:string,config:RuntimeConfig,signal:AbortSignal):Promise<RetrievalResult>{
   let parsed:URL;try{parsed=new URL(url);}catch{return failure('INVALID_URL');}
   if(parsed.hostname==='n.news.naver.com'||parsed.hostname==='news.naver.com')return failure('ROBOTS_DISALLOWED');
   if(parsed.hostname==='v.daum.net')return daumPortal(parsed,id,signal);
@@ -91,8 +91,8 @@ export async function retrieveDetailed(url:string,id:string,config:RuntimeConfig
     if(!next||next.origin!==originalOrigin||seen.has(next.href))return failure('BLOCKED_DESTINATION');
     seen.add(next.href);target=next;
   }
-  if([401,403,402,429].includes(response.status)){await response.body?.cancel();return failure('ACCESS_RESTRICTED');}
-  if(!response.ok||response.status>=300){await response.body?.cancel();return failure('ACCESS_RESTRICTED');}
+  if([401,403,402,429].includes(response.status)){await response.body?.cancel();return failure('ACCESS_RESTRICTED',`http_${response.status}`);}
+  if(!response.ok||response.status>=300){await response.body?.cancel();return failure('ACCESS_RESTRICTED',`non_ok_${response.status}`);}
   if(/\b(noai|noimageai|nosnippet|noarchive)\b/i.test(response.headers.get('x-robots-tag')??'')){await response.body?.cancel();return failure('ROBOTS_AI_RESTRICTED');}
   const type=response.headers.get('content-type')??'';if(!/^(text\/html|text\/plain)(;|$)/i.test(type)){await response.body?.cancel();return failure('NOT_HTML');}
   const reader=response.body?.getReader();if(!reader)return failure('SCRIPT_RENDERED');
@@ -100,7 +100,7 @@ export async function retrieveDetailed(url:string,id:string,config:RuntimeConfig
   while(true){let part;try{part=await reader.read();}catch{signal.throwIfAborted();return failure('TIMEOUT');}const {done,value}=part;if(done)break;bytes+=value.length;if(bytes>2*1024*1024){await reader.cancel();return failure('TOO_LARGE');}chunks.push(value);}
   const data=new Uint8Array(bytes);let offset=0;for(const c of chunks){data.set(c,offset);offset+=c.length;}
   const document=decodeArticleDocument(data,type);if(document===null)return failure('SCRIPT_RENDERED');
-  const restriction=articleRestriction(document);if(restriction)return failure(restriction);
+  const restriction=articleRestrictionDetail(document);if(restriction)return failure(restriction.reason,restriction.detail);
   let extracted=/^text\/html(?:;|$)/i.test(type)?extractArticle(document,target.href):{...extractArticleDocument(document,false),extractionVersion:ARTICLE_EXTRACTION_VERSION,extractionMethod:'plain_text' as const};
   if((extracted?.text.length??0)<300&&/^text\/html(?:;|$)/i.test(type)&&requestCount<3){
    const ampHref=extracted?.ampUrl??articleAmpUrl(document,target.href);
@@ -108,7 +108,7 @@ export async function retrieveDetailed(url:string,id:string,config:RuntimeConfig
     if(root&&root===ampRoot&&approvedDomain&&amp.protocol==='https:'&&!amp.username&&!amp.password&&!amp.port&&!amp.hostname.endsWith('.')&&await ampRobotsAllowed(amp.hostname,amp.pathname,fetchSignal)){
      let ampResponse=await fetch(amp,{redirect:'manual',headers:{Accept:'text/html','User-Agent':'NaeinfoClear/0.1 (article analysis; user-requested fetch)'},signal:fetchSignal});requestCount++;
      if([301,302,303,307,308].includes(ampResponse.status)&&requestCount<3){const location=ampResponse.headers.get('location');await ampResponse.body?.cancel();if(location){const next=new URL(location,amp);if(next.protocol==='https:'&&getDomain(next.hostname)===root&&!next.username&&!next.password&&!next.port&&await ampRobotsAllowed(next.hostname,next.pathname,fetchSignal)){ampResponse=await fetch(next,{redirect:'manual',headers:{Accept:'text/html','User-Agent':'NaeinfoClear/0.1 (article analysis; user-requested fetch)'},signal:fetchSignal});requestCount++;}}}
-     if([401,402,403,429].includes(ampResponse.status)){await ampResponse.body?.cancel();return failure('ACCESS_RESTRICTED');}
+     if([401,402,403,429].includes(ampResponse.status)){await ampResponse.body?.cancel();return failure('ACCESS_RESTRICTED',`http_${ampResponse.status}`);}
      if(/\b(noai|noimageai|nosnippet|noarchive)\b/i.test(ampResponse.headers.get('x-robots-tag')??'')){await ampResponse.body?.cancel();return failure('ROBOTS_AI_RESTRICTED');}
      if(ampResponse.ok&&/^text\/html(?:;|$)/i.test(ampResponse.headers.get('content-type')??'')){const ampReader=ampResponse.body?.getReader();if(ampReader){const chunks:Uint8Array[]=[];let length=0;while(true){const part=await ampReader.read();if(part.done)break;length+=part.value.length;if(length>2*1024*1024){await ampReader.cancel();break;}chunks.push(part.value);}if(length<=2*1024*1024){const bytes=new Uint8Array(length);let pos=0;for(const chunk of chunks){bytes.set(chunk,pos);pos+=chunk.length;}const ampHtml=decodeArticleDocument(bytes,'text/html');if(ampHtml&&!articleRestriction(ampHtml)){const ampExtract=extractArticle(ampHtml,amp.href);if(ampExtract?.text&&ampExtract.text.length>(extracted?.text.length??0))extracted={...ampExtract,extractionMethod:'amp'};}}}}
     }
@@ -119,6 +119,12 @@ export async function retrieveDetailed(url:string,id:string,config:RuntimeConfig
   const text=articleTextPrefix(extracted.text,8000);
   const reference={id,provenance:'web_fetched' as const,url:target.href,text,title:extracted.title,publishedAt:extracted.publishedAt,fetchedAt:new Date().toISOString(),truncated:text.length<extracted.text.length,fullTextLength:extracted.text.length,extractionVersion:extracted.extractionVersion};
   return {ok:true,reference,metadata:{mode:'allowlisted',host:target.hostname,extractionMethod:extracted.extractionMethod}};
+}
+export async function retrieveDetailed(url:string,id:string,config:RuntimeConfig,signal:AbortSignal):Promise<RetrievalResult>{
+ const result=await retrieveDetailedImpl(url,id,config,signal);
+ if(!result.ok){let host='invalid';try{host=new URL(url).hostname;}catch{}
+  console.info(JSON.stringify({type:'article_retrieval_failure',host,reason:result.reason,detail:result.detail??result.reason.toLowerCase()}));}
+ return result;
 }
 /** Compatibility adapter for evidence pipelines that still consume Reference|null. */
 export async function retrieve(url:string,id:string,config:RuntimeConfig,signal:AbortSignal):Promise<Reference|null>{

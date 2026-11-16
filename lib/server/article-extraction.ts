@@ -44,24 +44,32 @@ function accessAllowed(document:Document){
  }
  return true;
 }
-export function articleRestriction(html:string):'ROBOTS_AI_RESTRICTED'|'ACCESS_RESTRICTED'|null{
+export type ArticleRestriction={reason:'ROBOTS_AI_RESTRICTED'|'ACCESS_RESTRICTED';detail:'meta_robots'|'jsonld_free_false'|'text_rule'};
+export function articleRestrictionDetail(html:string):ArticleRestriction|null{
  try{
   const document=new DOMParser().parseFromString(html,'text/html') as unknown as Document;
   for(const meta of Array.from(document.querySelectorAll('meta[name="robots"],meta[name="googlebot"]'))){
-   if(/\b(noai|noimageai|nosnippet|noarchive)\b/i.test(meta.getAttribute('content')??''))return 'ROBOTS_AI_RESTRICTED';
+   if(/\b(noai|noimageai|nosnippet|noarchive)\b/i.test(meta.getAttribute('content')??''))return {reason:'ROBOTS_AI_RESTRICTED',detail:'meta_robots'};
   }
   for(const script of Array.from(document.querySelectorAll('script[type="application/ld+json"]'))){
    let data:unknown;try{data=JSON.parse(script.textContent??'null');}catch{continue;}
    const pending:unknown[]=[data];let count=0;while(pending.length&&count++<15000){const value=pending.pop();if(!value||typeof value!=='object')continue;if(Array.isArray(value)){pending.push(...value);continue;}const row=value as Record<string,unknown>;
-    if(row.isAccessibleForFree===false||typeof row.isAccessibleForFree==='string'&&row.isAccessibleForFree.trim().toLowerCase()==='false')return 'ACCESS_RESTRICTED';
+    if(row.isAccessibleForFree===false||typeof row.isAccessibleForFree==='string'&&row.isAccessibleForFree.trim().toLowerCase()==='false')return {reason:'ACCESS_RESTRICTED',detail:'jsonld_free_false'};
     pending.push(...Object.values(row));
    }
   }
-  const visible=(document.body?.textContent??'').slice(0,50000);
-  if(/로그인(?:하|후)|구독(?:하고|후|해야)|회원(?:가입|로그인)|subscribe to read|sign in to read|subscriber only/i.test(visible))return 'ACCESS_RESTRICTED';
+  // Navigation account links are not evidence that the article is paywalled.
+  // Inspect only a short article candidate after removing surrounding UI.
+  const structuredBody=jsonLdBody(document);
+  for(const node of Array.from(document.querySelectorAll('header,nav,footer,aside,script,style,noscript,button,[hidden],[class*=gnb],[class*=login],[class*=member]')))node.remove();
+  const candidates=Array.from(document.querySelectorAll(`${BODY_SELECTOR},[itemprop~="articleBody"],div.article_view,article,main`))
+   .map(node=>plainText(node).trim()).filter(Boolean);
+  const visible=candidates.sort((a,b)=>b.length-a.length)[0]??'';
+  if(visible.length>0&&Math.max(visible.length,structuredBody.length)<300&&/읽으려면\s*로그인|구독자\s*전용|유료\s*회원만|로그인\s*후\s*(?:전체\s*기사|기사|이용|열람|확인|읽)|구독\s*(?:후|해야)\s*(?:전체\s*기사|기사|이용|열람|읽)|subscribe\s+to\s+read|sign\s+in\s+to\s+read|subscribers?\s+only/i.test(visible))return {reason:'ACCESS_RESTRICTED',detail:'text_rule'};
   return null;
  }catch{return null;}
 }
+export function articleRestriction(html:string):ArticleRestriction['reason']|null{return articleRestrictionDetail(html)?.reason??null;}
 
 const NOISE=/^(?:관련\s*기사|추천\s*기사|많이\s*본\s*뉴스|오늘의\s*뉴스|구독\s*신청|기자\s*구독|무단\s*전재|저작권자|Copyright|All rights reserved)/i;
 function cleanArticleText(value:string){return value.split(/\n+/).map(line=>line.trim()).filter(line=>line.length>0&&!NOISE.test(line)).join('\n').trim();}

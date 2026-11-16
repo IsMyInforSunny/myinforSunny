@@ -1,5 +1,5 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
-import {extractDaumPortalArticle,articleAmpUrl} from '../lib/server/article-extraction';
+import {extractDaumPortalArticle,articleAmpUrl,articleRestrictionDetail} from '../lib/server/article-extraction';
 import {isFetchDenylistedHost,isPublicHttpsHostname,openFetchEnabled} from '../lib/server/open-retrieval';
 import {robotsDisallowed} from '../lib/server/retrieval';
 import {retrieveDetailed} from '../lib/server/retrieval';
@@ -7,6 +7,23 @@ import type {RuntimeConfig} from '../lib/server/config';
 afterEach(()=>vi.unstubAllGlobals());
 
 describe('open retrieval policy helpers',()=>{
+ it('does not classify account navigation or long article mentions as a paywall',()=>{
+  expect(articleRestrictionDetail('<header>회원가입·로그인</header><main><p>짧은 공개 기사입니다.</p><aside>로그인 후 이용</aside></main>')).toBeNull();
+  expect(articleRestrictionDetail(`<article>${'기사의 공개 내용을 설명합니다. '.repeat(25)}로그인 후 전체 기사를 볼 수 있습니다.</article>`)).toBeNull();
+  expect(articleRestrictionDetail('<main><div class="gnb">로그인 후 이용</div><p>공개 본문</p></main>')).toBeNull();
+ });
+ it('restricts short body blocking notices and preserves explicit JSON-LD restrictions',()=>{
+  expect(articleRestrictionDetail('<article><p>로그인 후 전체 기사를 볼 수 있습니다.</p></article>')).toEqual({reason:'ACCESS_RESTRICTED',detail:'text_rule'});
+  expect(articleRestrictionDetail('<script type="application/ld+json">{"@type":"NewsArticle","isAccessibleForFree":false}</script><article>공개 요약입니다.</article>')).toEqual({reason:'ACCESS_RESTRICTED',detail:'jsonld_free_false'});
+ });
+ it('returns the precise access failure without exposing article text',async()=>{
+  const fetch=vi.fn().mockResolvedValueOnce(new Response(null,{status:404})).mockResolvedValueOnce(new Response('<article>로그인 후 전체 기사를 볼 수 있습니다.</article>',{headers:{'content-type':'text/html'}}));vi.stubGlobal('fetch',fetch);
+  expect(await retrieveDetailed('https://short-paywall.example/story','paywall',{ALLOWED_RETRIEVAL_HOSTS:'short-paywall.example'},new AbortController().signal)).toMatchObject({ok:false,reason:'ACCESS_RESTRICTED',detail:'text_rule'});
+ });
+ it.each([403,404])('returns HTTP-specific detail for status %i',async status=>{
+  const host=`http-${status}.example`,fetch=vi.fn().mockResolvedValueOnce(new Response(null,{status:404})).mockResolvedValueOnce(new Response(null,{status}));vi.stubGlobal('fetch',fetch);
+  expect(await retrieveDetailed(`https://${host}/story`,'http',{ALLOWED_RETRIEVAL_HOSTS:host},new AbortController().signal)).toMatchObject({ok:false,reason:'ACCESS_RESTRICTED',detail:`${status===403?'http':'non_ok'}_${status}`});
+ });
  it('fails closed on private, local, IP-literal and malformed hosts',()=>{
   for(const host of ['127.0.0.1','2130706433','0x7f000001','[::1]','localhost','news.local','intranet','example.com:443'])expect(isPublicHttpsHostname(host)).toBe(false);
   expect(isPublicHttpsHostname('www.pressian.com')).toBe(true);
