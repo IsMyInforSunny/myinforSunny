@@ -1,91 +1,184 @@
 {
-    "schemaVersion":  "separate-analysis-check-1.0",
-    "checkedAt":  "2026-11-16T10:49:48.4994748Z",
-    "count":  6,
-    "results":  [
-                    {
-                        "article":  "medical_school_quota",
-                        "attempt":  1,
-                        "http":  422,
-                        "analysisStatus":  "failed",
-                        "durationMs":  1350,
-                        "bodyPositionUnavailable":  false,
-                        "primaryFailed":  true,
-                        "citationFailed":  true,
-                        "citationLabelCount":  0,
-                        "failedFields":  [
-                                             "ARTICLE_FETCH_ACCESS_RESTRICTED"
-                                         ]
-                    },
-                    {
-                        "article":  "medical_school_quota",
-                        "attempt":  2,
-                        "http":  422,
-                        "analysisStatus":  "failed",
-                        "durationMs":  573,
-                        "bodyPositionUnavailable":  false,
-                        "primaryFailed":  true,
-                        "citationFailed":  true,
-                        "citationLabelCount":  0,
-                        "failedFields":  [
-                                             "ARTICLE_FETCH_ACCESS_RESTRICTED"
-                                         ]
-                    },
-                    {
-                        "article":  "minimum_wage",
-                        "attempt":  1,
-                        "http":  422,
-                        "analysisStatus":  "failed",
-                        "durationMs":  594,
-                        "bodyPositionUnavailable":  false,
-                        "primaryFailed":  true,
-                        "citationFailed":  true,
-                        "citationLabelCount":  0,
-                        "failedFields":  [
-                                             "ARTICLE_FETCH_ACCESS_RESTRICTED"
-                                         ]
-                    },
-                    {
-                        "article":  "minimum_wage",
-                        "attempt":  2,
-                        "http":  422,
-                        "analysisStatus":  "failed",
-                        "durationMs":  571,
-                        "bodyPositionUnavailable":  false,
-                        "primaryFailed":  true,
-                        "citationFailed":  true,
-                        "citationLabelCount":  0,
-                        "failedFields":  [
-                                             "ARTICLE_FETCH_ACCESS_RESTRICTED"
-                                         ]
-                    },
-                    {
-                        "article":  "nuclear_energy",
-                        "attempt":  1,
-                        "http":  422,
-                        "analysisStatus":  "failed",
-                        "durationMs":  584,
-                        "bodyPositionUnavailable":  false,
-                        "primaryFailed":  true,
-                        "citationFailed":  true,
-                        "citationLabelCount":  0,
-                        "failedFields":  [
-                                             "ARTICLE_FETCH_ACCESS_RESTRICTED"
-                                         ]
-                    },
-                    {
-                        "article":  "nuclear_energy",
-                        "attempt":  2,
-                        "http":  422,
-                        "analysisStatus":  "failed",
-                        "durationMs":  614,
-                        "bodyPositionUnavailable":  false,
-                        "primaryFailed":  true,
-                        "citationFailed":  true,
-                        "citationLabelCount":  0,
-                        "failedFields":  [
-                                             "ARTICLE_FETCH_ACCESS_RESTRICTED"
-                                         ]
-                    }
-                ]
+  "schemaVersion": "separate-analysis-check-1.1",
+  "checkedAt": "2026-11-16T12:08:58.886Z",
+  "context": "Current-source prepareUrlAnalysis + analyzePreparedUrl via native TypeScript loader, actual URL retrieval and NVIDIA Lightning calls, no cache. Initial research startup probe hit dist EPERM; integration check:full subsequently passed. This measurement did not inject the research SVM model and does not evaluate relative-score quality.",
+  "count": 6,
+  "eligibleModelRuns": 6,
+  "retrievalBlocked": 0,
+  "results": [
+    {
+      "article": "medical_school_quota",
+      "attempt": 1,
+      "retrieved": true,
+      "modelDispatches": 2,
+      "http": 200,
+      "analysisStatus": "partial",
+      "durationMs": 9203,
+      "bodyPositionUnavailable": false,
+      "primaryFailed": false,
+      "citationFailed": false,
+      "citationLabelCount": 18,
+      "failedFields": []
+    },
+    {
+      "article": "medical_school_quota",
+      "attempt": 2,
+      "retrieved": true,
+      "modelDispatches": 2,
+      "http": 200,
+      "analysisStatus": "partial",
+      "durationMs": 8909,
+      "bodyPositionUnavailable": false,
+      "primaryFailed": false,
+      "citationFailed": false,
+      "citationLabelCount": 18,
+      "failedFields": []
+    },
+    {
+      "article": "nuclear_energy",
+      "attempt": 1,
+      "retrieved": true,
+      "modelDispatches": 4,
+      "http": 200,
+      "analysisStatus": "partial",
+      "durationMs": 27178,
+      "bodyPositionUnavailable": true,
+      "primaryFailed": false,
+      "citationFailed": false,
+      "citationLabelCount": 36,
+      "failedFields": [
+        "BODY_POSITION_UNAVAILABLE"
+      ]
+    },
+    {
+      "article": "nuclear_energy",
+      "attempt": 2,
+      "retrieved": true,
+      "modelDispatches": 4,
+      "http": 200,
+      "analysisStatus": "partial",
+      "durationMs": 129649,
+      "bodyPositionUnavailable": true,
+      "primaryFailed": false,
+      "citationFailed": false,
+      "citationLabelCount": 36,
+      "failedFields": [
+        "BODY_POSITION_UNAVAILABLE"
+      ]
+    },
+    {
+      "article": "minimum_wage",
+      "attempt": 1,
+      "retrieved": true,
+      "modelDispatches": 2,
+      "http": 200,
+      "analysisStatus": "partial",
+      "durationMs": 47024,
+      "bodyPositionUnavailable": true,
+      "primaryFailed": true,
+      "citationFailed": false,
+      "citationLabelCount": 14,
+      "failedFields": [
+        "BODY_POSITION_UNAVAILABLE",
+        "PRIMARY_ANALYSIS_UNAVAILABLE",
+        "CLAIMS_UNAVAILABLE"
+      ],
+      "primaryFailureDetail": "provider_output_limit"
+    },
+    {
+      "article": "minimum_wage",
+      "attempt": 2,
+      "retrieved": true,
+      "modelDispatches": 2,
+      "http": 200,
+      "analysisStatus": "partial",
+      "durationMs": 48493,
+      "bodyPositionUnavailable": true,
+      "primaryFailed": true,
+      "citationFailed": false,
+      "citationLabelCount": 14,
+      "failedFields": [
+        "BODY_POSITION_UNAVAILABLE",
+        "PRIMARY_ANALYSIS_UNAVAILABLE",
+        "CLAIMS_UNAVAILABLE"
+      ],
+      "primaryFailureDetail": "provider_output_limit"
+    }
+  ],
+  "completedAt": "2026-11-16T12:14:07.456Z",
+  "summary": {
+    "retrievalSucceeded": 6,
+    "primarySucceeded": 4,
+    "citationSucceeded": 6,
+    "bodyPositionUnavailable": 4,
+    "completeResponses": 0,
+    "partialResponses": 6,
+    "total": 6,
+    "minDurationMs": 8909,
+    "maxDurationMs": 129649,
+    "medianDurationMs": 37101,
+    "rates": {
+      "retrieval": 1,
+      "primary": 0.6666666666666666,
+      "citation": 1,
+      "bodyPositionUnavailable": 0.6666666666666666
+    }
+  },
+  "byArticle": {
+    "medical_school_quota": {
+      "attempts": 2,
+      "retrievalSucceeded": 2,
+      "primarySucceeded": 2,
+      "citationSucceeded": 2,
+      "bodyPositionUnavailable": 0,
+      "durationMs": [
+        9203,
+        8909
+      ],
+      "citationLabelCounts": [
+        18,
+        18
+      ],
+      "failedFields": []
+    },
+    "nuclear_energy": {
+      "attempts": 2,
+      "retrievalSucceeded": 2,
+      "primarySucceeded": 2,
+      "citationSucceeded": 2,
+      "bodyPositionUnavailable": 2,
+      "durationMs": [
+        27178,
+        129649
+      ],
+      "citationLabelCounts": [
+        36,
+        36
+      ],
+      "failedFields": [
+        "BODY_POSITION_UNAVAILABLE"
+      ]
+    },
+    "minimum_wage": {
+      "attempts": 2,
+      "retrievalSucceeded": 2,
+      "primarySucceeded": 0,
+      "citationSucceeded": 2,
+      "bodyPositionUnavailable": 2,
+      "durationMs": [
+        47024,
+        48493
+      ],
+      "citationLabelCounts": [
+        14,
+        14
+      ],
+      "failedFields": [
+        "BODY_POSITION_UNAVAILABLE",
+        "PRIMARY_ANALYSIS_UNAVAILABLE",
+        "CLAIMS_UNAVAILABLE"
+      ],
+      "primaryFailureDetail": "provider_output_limit"
+    }
+  }
 }
