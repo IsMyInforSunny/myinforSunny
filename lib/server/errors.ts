@@ -8,6 +8,7 @@ export function json(data:unknown,status=200,headers:Record<string,string>={}){
 }
 export function errorResponse(error:unknown,requestId:string){
   if(error instanceof AppError)return json({requestId,error:{code:error.code,message:error.message,retryable:error.retryable,fields:error.fields}},error.status,error.status===429?{'Retry-After':'60'}:{});
+  console.error(JSON.stringify({type:'internal_request_error',requestId,name:error instanceof Error?error.name:'unknown',stack:error instanceof Error?error.stack?.split('\n').slice(0,8):undefined}));
   return json({requestId,error:{code:'INTERNAL_ERROR',message:'처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.',retryable:true}},500);
 }
 export async function readJson(request:Request){

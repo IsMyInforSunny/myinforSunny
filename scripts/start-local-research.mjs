@@ -40,6 +40,9 @@ delete config.vars.NVIDIA_API_KEY;
 config.secrets={required:['NVIDIA_API_KEY']};
 await (await import('node:fs/promises')).writeFile(configPath,JSON.stringify(config,null,2)+'\n','utf8');
 const cli=fileURLToPath(new URL('../node_modules/wrangler/bin/wrangler.js',import.meta.url));
+const migrations=spawnSync(process.execPath,[cli,'d1','migrations','apply','DB','--local','--config',path.join(root,'wrangler.local.jsonc'),'--persist-to','.wrangler/research-state'],{cwd:root,env,stdio:'inherit'});
+if(migrations.error)throw migrations.error;
+if(migrations.status!==0)process.exit(migrations.status??1);
 const child=spawn(process.execPath,['--import',new URL('./sites-env.mjs',import.meta.url).href,cli,
   'dev','--config',configPath,'--local','--persist-to','.wrangler/research-state','--ip','127.0.0.1','--port','5190','--inspector-port','0'],
   {cwd:root,env,stdio:'inherit'});
