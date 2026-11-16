@@ -3,6 +3,7 @@ import {demoAnalysis} from '../lib/fixtures';
 import {cachedPublicUrlAnalysis,type BackgroundScheduler} from '../lib/server/analysis-cache';
 import type {RuntimeConfig} from '../lib/server/config';
 import {AppError} from '../lib/server/errors';
+import type {Analysis} from '../lib/contracts';
 
 const config:RuntimeConfig={ENABLE_LIVE_ANALYSIS:'true',AI_PROVIDER:'nvidia',NVIDIA_API_KEY:'synthetic',NVIDIA_MODEL:'nvidia/nemotron-3.5-lightning-30b-a3b',ENABLE_DIRECT_FETCH:'true',NEWS_TERMS_APPROVED:'true',ALLOWED_RETRIEVAL_HOSTS:'news.example',DB:{} as D1Database};
 const request=(actor='one')=>new Request('https://site.test/api/analyze',{headers:{'cf-connecting-ip':actor}});
@@ -11,8 +12,8 @@ function setup(name:string){
  let hash='original';const tasks:Array<()=>Promise<void>>=[];
  const schedule:BackgroundScheduler=task=>{tasks.push(task);};
  const prepare=vi.fn(async(_signal:AbortSignal)=>({input:{kind:'text' as const,body:'Test-only cache lifecycle fixture.',comments:[] as Array<{id:string;text:string}>,transmissionConsent:true as const},
-  article:{url:input.url,title:undefined as string|undefined,fetchedAt:new Date().toISOString(),fullTextLength:40,analyzedCharacters:40,truncated:false},articleHash:hash}));
- const action=vi.fn(async(prepared:Awaited<ReturnType<typeof prepare>>)=>({...demoAnalysis('no_comments'),mode:'live' as const,status:'success' as const,article:prepared.article}));
+  article:{url:input.url,title:undefined as string|undefined,fetchedAt:new Date().toISOString(),fullTextLength:40,analyzedCharacters:40,truncated:false,retrieval:{mode:'allowlisted' as 'allowlisted'|'open',host:'news.example',extractionMethod:'semantic'}},articleHash:hash}));
+ const action=vi.fn(async(prepared:{article:NonNullable<Analysis['article']>})=>({...demoAnalysis('no_comments'),mode:'live' as const,status:'success' as const,article:prepared.article}));
  const call=(actor='one')=>cachedPublicUrlAnalysis(request(actor),input,config,crypto.randomUUID(),prepare,action,schedule);
  return {input,tasks,prepare,action,call,schedule,change:()=>{hash='revised';}};
 }

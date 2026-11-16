@@ -10,6 +10,9 @@ import {retrySeconds} from './providers/groq';
 import localResearchVoice,{type VoiceEmbeddingInferenceModel} from './local-research-voice';
 
 export const releasedEmbeddingVoiceModel=parseEmbeddingVoiceModel(artifact)??localResearchVoice;
+export const researchVoiceInjected=!!localResearchVoice&&releasedEmbeddingVoiceModel===localResearchVoice;
+if(researchVoiceInjected&&!Object.keys(localResearchVoice!.topics??{}).length)
+  console.warn(JSON.stringify({type:'bias_model_startup_warning',code:'RESEARCH_TOPICS_EMPTY'}));
 type Model=VoiceEmbeddingInferenceModel;
 const ENDPOINT='https://integrate.api.nvidia.com/v1/embeddings';
 const TTL=10*60_000,MAX_CACHE=512;

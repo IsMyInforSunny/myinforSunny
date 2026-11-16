@@ -16,10 +16,14 @@
     "db:local": "node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 migrations apply DB --local --config wrangler.local.jsonc --persist-to .wrangler/state",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "check:quick": "node scripts/check-quick.mjs",
+    "check:full": "node scripts/check-full.mjs",
+    "check:links": "node scripts/check-open-fetch.mjs",
     "check:local": "node scripts/check-local-runtime.mjs",
     "check:activation": "node scripts/check-activation-readiness.mjs",
     "check:record": "node scripts/check-record.mjs",
     "start:nvidia": "node scripts/start-local-nvidia.mjs",
+    "start:research": "node scripts/start-local-research.mjs",
     "start:deepseek": "node scripts/start-local-deepseek.mjs"
   },
   "dependencies": {
@@ -48,6 +52,7 @@
     "recharts": "^3.8.0",
     "sonner": "^2.0.8",
     "tailwind-merge": "3.6.0",
+    "tldts": "^7.5.4",
     "vaul": "^1.1.2",
     "zod": "^3.25.76"
   },

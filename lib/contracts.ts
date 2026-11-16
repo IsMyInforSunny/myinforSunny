@@ -43,7 +43,7 @@ export const searchQuerySchema=z.string()
 export type SearchSuggestion={label:string;query:string};
 export type Analysis = {
   cacheCheckedAt?:string;
-  article?:{url:string;title?:string;publishedAt?:string;fetchedAt:string;fullTextLength:number;analyzedCharacters:number;truncated:boolean};
+  article?:{url:string;title?:string;publishedAt?:string;fetchedAt:string;fullTextLength:number;analyzedCharacters:number;truncated:boolean;retrieval?:{mode:'open'|'allowlisted';host:string;robotsCheckedAt?:string;extractionMethod?:string;publisherUrl?:string;publisherHost?:string}};
   schemaVersion:'2.1'; analysisId:string; requestId:string; mode:'demo'|'live'; status:'success'|'partial';
   versions:{rubric:string;prompt:string;model:string;segmenter:string;voiceModel?:string};
   sources:InputSource[]; proposition?:string; topics:Topic[]; topicAssignments:TopicAssignment[]; bodyTopicAssignments?:BodyTopicAssignment[]; stances?:Stance[];
@@ -80,7 +80,7 @@ export type Outcome = z.infer<typeof outcomeSchema>;
 export type EvidenceRelation = { referenceId:string;quote:string;start:number;end:number;relation:'supports'|'contradicts'|'context';explanation:string };
 export type Check = { claimId:string;outcome:Outcome;execution:'completed'|'failed'|'skipped';relations:EvidenceRelation[];explanation:string;temporalFit:'matched'|'mismatched'|'unclear';limitations:string[] };
 export type Verification = {schemaVersion:'2.1';requestId:string;parentAnalysisId?:string;mode:'demo'|'live';status:'success'|'partial';versions:{rubric:string;prompt:string;model:string;retriever:string};scope:'provided_text'|'retrieved_documents'|'mixed';references:Reference[];checks:Check[];attempts:{url?:string;query?:string;status:string;reason?:string}[];warnings:{code:string;message:string}[];createdAt:string};
-export type Capabilities = {precomputedComparison?:{ready:boolean;reason:'usage_review_pending'|'local_research_only'|'reviewed_artifact'|'artifact_invalid'};aiModel?:string;aiProvider?:'groq'|'nvidia'|'deepseek';searchProvider?:'gdelt'|'firecrawl'|'tavily'|'publisher_feeds';live:boolean;webSearch:boolean;webFetch:boolean;directFetch?:boolean;rubricVersion:string;limits:{body:number;comments:number;comment:number;claimsPerCheck:number};reason?:string};
+export type Capabilities = {precomputedComparison?:{ready:boolean;reason:'usage_review_pending'|'local_research_only'|'reviewed_artifact'|'artifact_invalid'};biasModel?:{ready:boolean;method:'embedding_svm'|'sentence_svm'|null;version:string|null;topics:string[];researchInjected?:boolean;comparisonMinimum:{articlesPerPublisher:number;publishers:number}};supportedArticleHosts?:string[];aiModel?:string;aiProvider?:'groq'|'nvidia'|'deepseek';searchProvider?:'gdelt'|'firecrawl'|'tavily'|'publisher_feeds';live:boolean;webSearch:boolean;webFetch:boolean;directFetch?:boolean;rubricVersion:string;limits:{body:number;comments:number;comment:number;claimsPerCheck:number};reason?:string};
 
 // Model output is a proposal: offsets and final indicators are always server-owned.
 const quoteCandidate=z.object({sentenceId:id,quote:text(8000)}).strict();

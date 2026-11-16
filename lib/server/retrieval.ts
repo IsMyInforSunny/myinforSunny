@@ -11,7 +11,7 @@ import {getDomain} from 'tldts';
 // HTTPS only: plain HTTP is rejected and never silently upgraded to HTTPS.
 export function allowedUrl(input:string,hosts:string[]):URL|null{
   try{const url=new URL(input);if(url.protocol!=='https:'||url.username||url.password||url.port||url.hostname.endsWith('.')||/^(localhost|.*\.localhost)$/i.test(url.hostname))return null;
-    if(!hosts.some(h=>h.toLowerCase()===url.hostname.toLowerCase())||/^[\d.:[\]]+$/.test(url.hostname))return null;return url;
+    const host=url.hostname.toLowerCase();if((host!=='v.daum.net'&&!hosts.some(h=>h.toLowerCase()===host))||/^[\d.:[\]]+$/.test(host))return null;return url;
   }catch{return null;}
 }
 export type RetrievalFailureCode='INVALID_URL'|'BLOCKED_DESTINATION'|'ROBOTS_DISALLOWED'|'ROBOTS_AI_RESTRICTED'|'ACCESS_RESTRICTED'|'NOT_HTML'|'TOO_LARGE'|'TIMEOUT'|'SCRIPT_RENDERED'|'TOO_SHORT'|'HOST_RATE_LIMITED';
