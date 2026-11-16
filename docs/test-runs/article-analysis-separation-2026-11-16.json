@@ -1,0 +1,91 @@
+{
+    "schemaVersion":  "separate-analysis-check-1.0",
+    "checkedAt":  "2026-11-16T10:49:48.4994748Z",
+    "count":  6,
+    "results":  [
+                    {
+                        "article":  "medical_school_quota",
+                        "attempt":  1,
+                        "http":  422,
+                        "analysisStatus":  "failed",
+                        "durationMs":  1350,
+                        "bodyPositionUnavailable":  false,
+                        "primaryFailed":  true,
+                        "citationFailed":  true,
+                        "citationLabelCount":  0,
+                        "failedFields":  [
+                                             "ARTICLE_FETCH_ACCESS_RESTRICTED"
+                                         ]
+                    },
+                    {
+                        "article":  "medical_school_quota",
+                        "attempt":  2,
+                        "http":  422,
+                        "analysisStatus":  "failed",
+                        "durationMs":  573,
+                        "bodyPositionUnavailable":  false,
+                        "primaryFailed":  true,
+                        "citationFailed":  true,
+                        "citationLabelCount":  0,
+                        "failedFields":  [
+                                             "ARTICLE_FETCH_ACCESS_RESTRICTED"
+                                         ]
+                    },
+                    {
+                        "article":  "minimum_wage",
+                        "attempt":  1,
+                        "http":  422,
+                        "analysisStatus":  "failed",
+                        "durationMs":  594,
+                        "bodyPositionUnavailable":  false,
+                        "primaryFailed":  true,
+                        "citationFailed":  true,
+                        "citationLabelCount":  0,
+                        "failedFields":  [
+                                             "ARTICLE_FETCH_ACCESS_RESTRICTED"
+                                         ]
+                    },
+                    {
+                        "article":  "minimum_wage",
+                        "attempt":  2,
+                        "http":  422,
+                        "analysisStatus":  "failed",
+                        "durationMs":  571,
+                        "bodyPositionUnavailable":  false,
+                        "primaryFailed":  true,
+                        "citationFailed":  true,
+                        "citationLabelCount":  0,
+                        "failedFields":  [
+                                             "ARTICLE_FETCH_ACCESS_RESTRICTED"
+                                         ]
+                    },
+                    {
+                        "article":  "nuclear_energy",
+                        "attempt":  1,
+                        "http":  422,
+                        "analysisStatus":  "failed",
+                        "durationMs":  584,
+                        "bodyPositionUnavailable":  false,
+                        "primaryFailed":  true,
+                        "citationFailed":  true,
+                        "citationLabelCount":  0,
+                        "failedFields":  [
+                                             "ARTICLE_FETCH_ACCESS_RESTRICTED"
+                                         ]
+                    },
+                    {
+                        "article":  "nuclear_energy",
+                        "attempt":  2,
+                        "http":  422,
+                        "analysisStatus":  "failed",
+                        "durationMs":  614,
+                        "bodyPositionUnavailable":  false,
+                        "primaryFailed":  true,
+                        "citationFailed":  true,
+                        "citationLabelCount":  0,
+                        "failedFields":  [
+                                             "ARTICLE_FETCH_ACCESS_RESTRICTED"
+                                         ]
+                    }
+                ]
+}
