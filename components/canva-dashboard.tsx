@@ -95,6 +95,8 @@ export default function CanvaDashboard({analysis, researchResults, researchStage
   const sourceText = sourceScore.status === 'not_applicable' ? '해당 없음' : percentageText(sourceScore);
   const scope = includeComments ? '본문·댓글' : '본문';
   const status = !analysis ? '기사를 입력해 주세요' : stale ? '입력 변경 · 다시 분석해 주세요' : analysis.mode === 'demo' ? '가상 예시 결과' : analysis.status === 'partial' ? '분석 미완료 · 일부 결과만 표시' : analysis.warnings.some(warning=>warning.code==='CACHED_ANALYSIS') ? '최근 분석 재사용' : '본문 분석 완료';
+  const primaryFailed=!!analysis?.warnings.some(warning=>warning.code==='PRIMARY_ANALYSIS_UNAVAILABLE');
+  const hasPrimaryResults=!!analysis&&(analysis.topics.length>0||analysis.claims.length>0||analysis.expressions.length>0||!!analysis.bodyPosition);
 
   return <section className="article-studio" aria-label="기사 분석 화면">
     <div className="studio-statusbar"><span role="status"><i className={stale ? 'is-stale' : ''} />{status}</span><span>논점과 표현, 근거를 한눈에</span></div>
@@ -146,7 +148,7 @@ export default function CanvaDashboard({analysis, researchResults, researchStage
 
         <section className="studio-interpretation" aria-labelledby={`${id}-interpretation`}>
           <div className="studio-section-heading"><h2 id={`${id}-interpretation`}>이 기사는 무엇을 말하나요?</h2><button type="button" className="studio-text-button" disabled={!analysis} onClick={onEvidence}><FileSearch size={15} /> 분석 근거</button></div>
-          {!analysis ? <p className="studio-intro">주요 논점과 주장, 표현의 특징을 원문에 연결해 보여드립니다.</p> : <>
+          {!analysis ? <p className="studio-intro">주요 논점과 주장, 표현의 특징을 원문에 연결해 보여드립니다.</p> : primaryFailed&&!hasPrimaryResults ? <p className="studio-metric-note"><strong>본문 분석 실패</strong></p> : <>
             <div className="studio-topic-tags">{analysis.topics.map(topic => <span key={topic.id}>{topic.label}</span>)}</div>
             <p className="studio-main-argument">{position?.reason || analysis.claims.find(claim => claim.kind === 'opinion')?.text || analysis.topics[0]?.description || '본문의 논점과 근거를 확인해 주세요.'}</p>
             {analysis.bodyPosition?.attributionSource==='server_rule'&&<p className="studio-metric-note">발화 주체·비교 명제는 서버의 원문 규칙으로 보정했습니다. {analysis.bodyPosition.reason}</p>}

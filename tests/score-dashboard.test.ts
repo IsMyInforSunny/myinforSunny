@@ -6,6 +6,7 @@ import {demoAnalysis} from '../lib/fixtures';
 import {locate,makeSources} from '../lib/domain';
 import type {Analysis,BodyPosition} from '../lib/contracts';
 import type {BiasClassifierEvidence,BiasOrientationSet} from '../lib/bias-analysis';
+import {VOICE_ARTICLE_ISSUE,VOICE_INDEPENDENT_NEUTRAL,voiceAnnotationInput} from '../lib/sentence-voice';
 
 function article(body:string,comments:string[]=[]):Analysis{
  const analysis=structuredClone(demoAnalysis('supported'));analysis.mode='live';
@@ -28,6 +29,28 @@ describe('기사 본문을 중심으로 한 대시보드 표시',()=>{
   expect(html).toContain('논점 관점');expect(html).toContain('본문 입장 분석 대기');
   expect(argumentAxis(html)).not.toContain('studio-axis-marker');
   expect(html).toContain('검증된 SVM 모델 준비 중');expect(html).toContain('검색과 원문 연결 준비 중');expect(html).toContain('현재 PCA는 연구용');
+ });
+ it('본문 분석 결과가 없으면 실패를 알리면서 완료된 인용 균형과 SVM은 계속 표시한다',()=>{
+  const body='원전 증설을 추진해야 한다. 지역 주민은 위험을 우려한다. 정부는 관련 자료를 공개했다. 전문가들은 영향이 불확실하다고 말했다. 기자는 보완 대책도 함께 전했다.';
+  const analysis=article(body);analysis.topics=[];analysis.claims=[];analysis.expressions=[];delete analysis.bodyPosition;
+  analysis.warnings.push({code:'PRIMARY_ANALYSIS_UNAVAILABLE',message:'본문 분석 실패'});
+  const input=voiceAnnotationInput(body,'nuclear_energy');
+  analysis.citationBalance={method:'ai',modelVersion:'fixture-ai',proposition:'원전 증설을 추진해야 한다.',labels:input.sentences.map((unit,index)=>({
+   sentenceId:unit.sentenceId,relevance:'related' as const,direction:index===0?'support' as const:'neutral' as const,speaker:'journalist' as const,
+  }))};
+  analysis.sentenceVoices={...input,method:'svm',modelVersion:'fixture-svm',decisionPolicy:VOICE_INDEPENDENT_NEUTRAL,
+   articleIssue:'expansion',issuePolicy:VOICE_ARTICLE_ISSUE,labels:input.sentences.map((unit,index)=>({
+    sentenceId:unit.sentenceId,issue:'expansion',direction:index===0?'support' as const:'neutral' as const,speaker:'journalist' as const,
+   }))};
+  const html=render(analysis);
+  expect(html).toContain('본문 분석 실패');
+  expect(html).toContain('인용 균형(AI 문장 분류)');
+  expect(html).toContain('문장 SVM 분류(연구용)');
+ });
+ it('부분 본문 결과가 있으면 PRIMARY_ANALYSIS_UNAVAILABLE만으로 전체 실패를 표시하지 않는다',()=>{
+  const analysis=article('공개 가상 기사가 설명한다.');
+  analysis.warnings.push({code:'PRIMARY_ANALYSIS_UNAVAILABLE',message:'본문 분석 실패'});
+  expect(render(analysis)).not.toContain('본문 분석 실패');
  });
  it('실시간 분석의 연구 모델 주입 여부를 capabilities 값 그대로 표시한다',()=>{
   const analysis=article('공개 가상 기사다.');
