@@ -18,8 +18,7 @@ describe('open retrieval policy helpers',()=>{
   expect(openFetchEnabled({},'remote')).toBe(false);
  });
  it('applies denylist roots to subdomains',()=>{
-  expect(isFetchDenylistedHost('www.chosun.com')).toBe(true);
-  expect(isFetchDenylistedHost('imnews.imbc.com')).toBe(true);
+  for(const host of ['www.chosun.com','imnews.imbc.com','news.kbs.co.kr','www.hani.co.kr','www.khan.co.kr'])expect(isFetchDenylistedHost(host)).toBe(true);
   expect(isFetchDenylistedHost('pressian.com')).toBe(false);
  });
  it('uses the product group or wildcard robots rules and detects AI-wide restrictions',()=>{

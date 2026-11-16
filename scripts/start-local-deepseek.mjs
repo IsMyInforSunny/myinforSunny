@@ -7,7 +7,7 @@ if(process.env.FREE_ONLY!=='false'||process.env.ENABLE_PAID_PROVIDER!=='true'||p
 const configPath=fileURLToPath(new URL('../dist/server/wrangler.json',import.meta.url));
 const config=JSON.parse(readFileSync(configPath,'utf8'));
 config.vars={...config.vars,AI_PROVIDER:'deepseek',DEEPSEEK_MODEL:'deepseek-flash',FREE_ONLY:'false',ENABLE_PAID_PROVIDER:'true',PAID_ACTIVATION_CONFIRMED:'true',ENABLE_LIVE_ANALYSIS:'true',ENABLE_DIRECT_FETCH:'true',ENABLE_NEWS_SEARCH:'false',NEWS_PROVIDER:'publisher_feeds',NEWS_TERMS_APPROVED:'true',
- ALLOWED_RETRIEVAL_HOSTS:process.env.ALLOWED_RETRIEVAL_HOSTS??'www.dailian.co.kr,www.newdaily.co.kr,www.ohmynews.com,www.pressian.com,news.kbs.co.kr,imnews.imbc.com,news.sbs.co.kr,www.hani.co.kr,www.khan.co.kr,www.donga.com,www.chosun.com'};
+ ALLOWED_RETRIEVAL_HOSTS:process.env.ALLOWED_RETRIEVAL_HOSTS??'www.dailian.co.kr,www.newdaily.co.kr,www.ohmynews.com,www.pressian.com,www.donga.com'};
 delete config.vars.DEEPSEEK_API_KEY;
 config.secrets={required:['DEEPSEEK_API_KEY']};
 writeFileSync(configPath,JSON.stringify(config));
