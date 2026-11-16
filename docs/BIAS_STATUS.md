@@ -2,9 +2,9 @@
 
 | 목표 | 완료 | 막힌 것 | 다음 할 일 |
 | --- | --- | --- | --- |
-| 현재 계획 P4 · 11-19 준비 | citationBalance AI 필드 통합·quick 통과; 로컬 빌드와 홈/health 200 | 허용된 실제 기사 1건은 본문 취득 뒤 analyze에서 500 INTERNAL_ERROR, 좌표 미확인 | 예외 원인을 비민감 로그로 좁히고 실제 링크 분석 재검증 |
+| 현재 계획 P4 · 11-19 준비 | 실제 기사에 citationBalance 20문장과 SVM 좌표 2축 응답; 연구 빌드 마이그레이션 자동화 | 분석은 partial(BODY_POSITION_UNAVAILABLE, PARTIAL_EVIDENCE); 별도 호출은 출력 길이 초과 | 부분 분석 원인과 반복 안정성 보강 후 기사 링크 6건 점검 |
 
-2026-11-16 진행: P4 응답 필드를 링크 분석용 호출에 선택 연결했고 `check:quick`은 686 passed·13 skipped, build와 로컬 `/`·`/api/health`는 200이다. 새 허용 매체 기사 분석은 본문 취득 후 500 `INTERNAL_ERROR`로 실패하여 점수·좌표를 검증하지 못했다. 전체 검증은 계획 일정(11-17 밤)에 맞춰 아직 실행하지 않았다.
+2026-11-16 진행: P4 응답 필드를 링크 분석용 호출에 선택 연결했다. 연구 모드의 격리 D1에 마이그레이션을 자동 적용하도록 수정해 `provider_backoff` 누락을 해결했다. 허용 오마이뉴스 기사 1건에서 인용 분류 20문장과 SVM 두 축 응답이 왔으나 분석은 `BODY_POSITION_UNAVAILABLE`·`PARTIAL_EVIDENCE`로 partial이었다. 재호출 1회는 NVIDIA 출력 제한(49초)으로 실패했다. `check:quick` 통과; 전체 검증은 11-17 밤 일정 전이다.
 
 ## 차단 항목 (세 줄)
 
