@@ -21,6 +21,8 @@ export default function SentenceVoicePanel({analysis,researchResults=[]}:{analys
   const summaries=documents.map(document=>({document,summary:summarizeVoices(body,document)})).filter((item):item is {document:NonNullable<typeof analysis.sentenceVoices>;summary:NonNullable<ReturnType<typeof summarizeVoices>>}=>!!item.summary);
   const summary=summaries[0]?.summary??null;
   const citationBalance=analysis.citationBalance;
+  const citationFailed=analysis.warnings.some(warning=>warning.code==='CITATION_BALANCE_UNAVAILABLE');
+  const citationFailure=<p><strong>인용 균형 분석 실패</strong></p>;
   const citationLabels=citationBalance?.labels??[];
   const relatedLabels=citationLabels.filter(label=>label.relevance==='related');
   const unresolvedRelevance=citationLabels.filter(label=>label.relevance==='uncertain').length;
@@ -42,12 +44,14 @@ export default function SentenceVoicePanel({analysis,researchResults=[]}:{analys
     </li>)}</ol></details>
   </section>;
   if(!summary&&!citationBalance)return <div className="studio-relative">
-    <p><strong>인용 균형 분석 자료 없음</strong></p>
+    {citationFailed?citationFailure:<p><strong>인용 균형 분석 자료 없음</strong></p>}
+    {!citationFailed&&<>
     <p>실제 기사 AI 라벨 {trainingStatus.annotatedArticleCount}건 · 사람 평가 {trainingStatus.humanEvaluationCount}건</p>
     <p>학습 범위 · {Object.keys(trainingStatus.topics).map(topic=>VOICE_TOPICS[topic as keyof typeof VOICE_TOPICS]?.label??topic).join(' · ')}</p>
     {semanticStatus.performanceChecksPassed&&<p>문장 분류 검사 후 기사 좌표와 같은 쟁점·분기 비교 분포를 로컬에서 검증하고 있습니다.</p>}
     <p>이용 검토와 모델 배포 준비 상태를 확인한 뒤 실제 모델 결과를 연결합니다.</p>
     <p>비교 기사 사전 계산: 조회 경로 준비, 데이터는 이용 검토 후 연결합니다.</p>
+    </>}
   </div>;
   if(!summary)return <div className="studio-relative">{citationSummary}</div>;
   const event=voiceAssessmentFromResearch(analysis,researchResults);
@@ -63,7 +67,7 @@ export default function SentenceVoicePanel({analysis,researchResults=[]}:{analys
     unresolved:labels.filter(label=>label.speaker===speaker&&label.direction==='uncertain').length,
   });
   return <details className="studio-relative" open><summary>취재원 인용 균형과 기자 서술 방향</summary>
-    {citationSummary}
+    {citationSummary??(citationFailed?citationFailure:null)}
     <p><strong>{methodLabel}</strong></p>
     <p>본문 앞 2,000자 · {summary.total}문장 · 본문 외 표시 제외 {summary.excluded}문장</p>
     {issueRows.map(({issue,document})=><section key={issue.issue} aria-label={issue.proposition}>
