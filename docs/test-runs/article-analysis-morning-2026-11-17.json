@@ -1,0 +1,98 @@
+{
+  "schemaVersion": "separate-analysis-check-1.1",
+  "checkedAt": "2026-11-16T23:02:53.146Z",
+  "context": "current-source real URL analysis; NVIDIA; no cache; morning3 status/evidence/compact-output fixes; SVM not injected",
+  "count": 6,
+  "eligibleModelRuns": 6,
+  "retrievalBlocked": 0,
+  "results": [
+    {
+      "article": "medical_school_quota",
+      "attempt": 1,
+      "retrieved": true,
+      "modelDispatches": 2,
+      "http": 200,
+      "analysisStatus": "success",
+      "durationMs": 6081,
+      "bodyPositionUnavailable": false,
+      "primaryFailed": false,
+      "citationFailed": false,
+      "citationLabelCount": 18,
+      "failedFields": []
+    },
+    {
+      "article": "medical_school_quota",
+      "attempt": 2,
+      "retrieved": true,
+      "modelDispatches": 2,
+      "http": 200,
+      "analysisStatus": "partial",
+      "durationMs": 51706,
+      "bodyPositionUnavailable": true,
+      "primaryFailed": true,
+      "citationFailed": false,
+      "citationLabelCount": 18,
+      "failedFields": [
+        "BODY_POSITION_UNAVAILABLE",
+        "PRIMARY_ANALYSIS_UNAVAILABLE",
+        "CLAIMS_UNAVAILABLE"
+      ]
+    },
+    {
+      "article": "nuclear_energy",
+      "attempt": 1,
+      "retrieved": true,
+      "modelDispatches": 4,
+      "http": 200,
+      "analysisStatus": "partial",
+      "durationMs": 9903,
+      "bodyPositionUnavailable": false,
+      "primaryFailed": false,
+      "citationFailed": false,
+      "citationLabelCount": 36,
+      "failedFields": []
+    },
+    {
+      "article": "nuclear_energy",
+      "attempt": 2,
+      "retrieved": true,
+      "modelDispatches": 4,
+      "http": 200,
+      "analysisStatus": "partial",
+      "durationMs": 5725,
+      "bodyPositionUnavailable": false,
+      "primaryFailed": false,
+      "citationFailed": false,
+      "citationLabelCount": 36,
+      "failedFields": []
+    },
+    {
+      "article": "minimum_wage",
+      "attempt": 1,
+      "retrieved": true,
+      "modelDispatches": 2,
+      "http": 200,
+      "analysisStatus": "success",
+      "durationMs": 5160,
+      "bodyPositionUnavailable": false,
+      "primaryFailed": false,
+      "citationFailed": false,
+      "citationLabelCount": 14,
+      "failedFields": []
+    },
+    {
+      "article": "minimum_wage",
+      "attempt": 2,
+      "retrieved": true,
+      "modelDispatches": 2,
+      "http": 200,
+      "analysisStatus": "success",
+      "durationMs": 5210,
+      "bodyPositionUnavailable": false,
+      "primaryFailed": false,
+      "citationFailed": false,
+      "citationLabelCount": 14,
+      "failedFields": []
+    }
+  ]
+}
