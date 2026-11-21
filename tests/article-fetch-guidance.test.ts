@@ -24,11 +24,17 @@ describe('기사 링크 가져오기 안내',()=>{
  });
  it('375px 이하 화면에서 지원 매체 문자열과 결과 카드가 그리드 밖으로 밀려나지 않도록 폭을 제한한다',()=>{
   const css=readFileSync(new URL('../app/article-studio.css',import.meta.url),'utf8');
-  const mobile=css.match(/@media \(max-width: 720px\) \{([^}]+)\}/)?.[1]??'';
+  const mobile=css.slice(css.indexOf('@media (max-width: 720px)'));
   expect(mobile).toContain('.studio-layout { grid-template-columns: minmax(0, 1fr)');
   expect(mobile).toContain('.studio-supported-hosts,.studio-supported-host-list li { min-width: 0;');
   expect(mobile).toContain('.studio-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr));');
   expect(css).toContain('.studio-supported-host-list li span { min-width: 0;');
   expect(css).toContain('overflow-wrap: anywhere;');
+ });
+ it('검증된 20개 호스트를 주소 수와 언론사 이름으로 표시하며 미등록 매체를 끼워 넣지 않는다',()=>{
+  const hosts=['www.dailian.co.kr','www.newdaily.co.kr','biz.newdaily.co.kr','www.ohmynews.com','www.pressian.com','www.donga.com','www.yonhapnewstv.co.kr','www.hankyung.com','news.tvchosun.com','www.segye.com','www.seoul.co.kr','www.sisain.co.kr','www.mediaus.co.kr','www.redian.org','www.labortoday.co.kr','www.idomin.com','www.ksilbo.co.kr','www.newsis.com','www.kookje.co.kr','www.news1.kr'];
+  const markup=renderToStaticMarkup(createElement(SupportedArticleHosts,{hosts}));
+  expect(markup).toContain('20개 주소');expect(markup).toContain('연합뉴스TV');expect(markup).toContain('뉴데일리 경제판');expect(markup).toContain('경남도민일보');
+  expect(markup).not.toContain('www.chosun.com');expect(markup.match(/<li>/g)).toHaveLength(20);
  });
 });

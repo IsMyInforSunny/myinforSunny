@@ -1,9 +1,7 @@
 ﻿import type {Analysis} from '@/lib/contracts';
-import {summarizeVoices,voiceSentences,VOICE_TOPICS} from '@/lib/sentence-voice';
+import {summarizeVoices,voiceEvidenceBounds,voiceSentences,VOICE_TOPICS} from '@/lib/sentence-voice';
 import type {ResearchVerification} from '@/lib/research-contract';
 import {voiceAssessmentFromResearch} from '@/lib/voice-model-adapter';
-import trainingStatus from '@/lib/data/voice-model-status.json';
-import semanticStatus from '@/lib/data/voice-embedding-status.json';
 
 type Bounds={lower:number|null;upper:number|null};
 function coordinateText(evidence:Bounds){
@@ -37,7 +35,18 @@ export default function SentenceVoicePanel({analysis,researchResults=[]}:{analys
     <p><strong>인용 균형(AI 문장 분류)</strong></p>
     <p>비교 명제 · {citationBalance.proposition}</p>
     <p>관련 문장 {relatedLabels.length}개 · 무관 {citationLabels.filter(label=>label.relevance==='unrelated').length}개 · 논점 미확정 {unresolvedRelevance}개</p>
-    {(['source','journalist'] as const).map(speaker=>{const counts=citationCounts(speaker);return <p key={speaker}>{speaker==='source'?'취재원':'기자'} · 찬성 {counts.support} · 반대 {counts.oppose} · 중립 {counts.neutral} · 유보 {counts.unresolved}</p>;})}
+    {(['source','journalist'] as const).map(speaker=>{const counts=citationCounts(speaker),name=speaker==='source'?'취재원':'기자';
+      const total=Object.values(counts).reduce((sum,count)=>sum+count,0);
+      const possibleUnresolved=counts.unresolved+relatedLabels.filter(label=>label.speaker==='mixed'||label.speaker==='unknown').length+unresolvedRelevance;
+      const bounds=voiceEvidenceBounds(counts.support,counts.oppose,possibleUnresolved);
+      return <div className="studio-citation-row" key={speaker}>
+        <p>{name} · 찬성 {counts.support} · 반대 {counts.oppose} · 중립 {counts.neutral} · 유보 {counts.unresolved}</p>
+        <div className="studio-citation-bar" role="img" aria-label={`${name} 문장 구성: 전체 ${total}개, 찬성 ${counts.support}, 반대 ${counts.oppose}, 중립 ${counts.neutral}, 유보 ${counts.unresolved}`}>
+          {(['support','oppose','neutral','unresolved'] as const).map(key=>counts[key]>0&&<span key={key} className={`is-${key}`} style={{width:`${counts[key]/total*100}%`}}/>)}
+        </div>
+        <p className="studio-citation-range">{name} {total}문장 중 찬반 {counts.support+counts.oppose}개 · {bounds.directional>=3?`미확정 문장 ${possibleUnresolved}개를 포함한 가능한 좌표 ${coordinateText(bounds)}`:'찬반 근거 3개 미만 · 좌표 계산 대기'}</p>
+      </div>;})}
+    <p className="studio-citation-legend"><span className="is-support">찬성</span><span className="is-oppose">반대</span><span className="is-neutral">중립</span><span className="is-unresolved">유보</span></p>
     <p>화자 미확정 {relatedLabels.filter(label=>label.speaker==='mixed'||label.speaker==='unknown').length}개 · 전체 찬반 문장 {citationDirectional}개{citationDirectional<3?' · 찬반 문장이 3개 미만이라 균형을 계산하지 않습니다.':' · 이 문장 분류는 기사 안의 인용·서술 구성을 나타냅니다.'}</p>
     <details><summary>AI 문장 분류 근거</summary><ol>{citationLabels.filter(label=>label.relevance!=='unrelated').map(label=><li key={label.sentenceId}>
       {units.find(unit=>unit.sentenceId===label.sentenceId)?.text??'원문 문장을 찾을 수 없습니다.'} <small>· {label.relevance==='uncertain'?'논점 미확정':label.direction==='support'?'찬성':label.direction==='oppose'?'반대':label.direction==='neutral'?'중립':'유보'} · {label.speaker==='journalist'?'기자':label.speaker==='source'?'취재원':label.speaker==='mixed'?'복합':'화자 미확정'}</small>
@@ -45,15 +54,9 @@ export default function SentenceVoicePanel({analysis,researchResults=[]}:{analys
   </section>;
   if(!summary&&!citationBalance)return <div className="studio-relative">
     {citationFailed?citationFailure:<p><strong>인용 균형 분석 자료 없음</strong></p>}
-    {!citationFailed&&<>
-    <p>실제 기사 AI 라벨 {trainingStatus.annotatedArticleCount}건 · 사람 평가 {trainingStatus.humanEvaluationCount}건</p>
-    <p>학습 범위 · {Object.keys(trainingStatus.topics).map(topic=>VOICE_TOPICS[topic as keyof typeof VOICE_TOPICS]?.label??topic).join(' · ')}</p>
-    {semanticStatus.performanceChecksPassed&&<p>문장 분류 검사 후 기사 좌표와 같은 쟁점·분기 비교 분포를 로컬에서 검증하고 있습니다.</p>}
-    <p>이용 검토와 모델 배포 준비 상태를 확인한 뒤 실제 모델 결과를 연결합니다.</p>
-    <p>비교 기사 사전 계산: 조회 경로 준비, 데이터는 이용 검토 후 연결합니다.</p>
-    </>}
+    <p>상대 비교는 준비 중</p>
   </div>;
-  if(!summary)return <div className="studio-relative">{citationSummary}</div>;
+  if(!summary)return <div className="studio-relative">{citationSummary}<p>상대 비교는 준비 중</p></div>;
   const event=voiceAssessmentFromResearch(analysis,researchResults);
   const quarters=(analysis.issueQuarterComparisons??(analysis.issueQuarterComparison?[analysis.issueQuarterComparison]:[])).filter(quarter=>quarter.parentAnalysisId===analysis.analysisId);
   const references=researchResults.flatMap(result=>result.references);

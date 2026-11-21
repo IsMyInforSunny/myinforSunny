@@ -20,16 +20,21 @@ export function articleFetchMessage(code:string|undefined,fallback:string){
 }
 
 const PUBLISHER_NAMES:Record<string,string>={
- 'pressian.com':'프레시안','m.pressian.com':'프레시안',
+ 'pressian.com':'프레시안','www.pressian.com':'프레시안','m.pressian.com':'프레시안',
  'ohmynews.com':'오마이뉴스','www.ohmynews.com':'오마이뉴스',
  'dailian.co.kr':'데일리안','www.dailian.co.kr':'데일리안',
  'newdaily.co.kr':'뉴데일리','www.newdaily.co.kr':'뉴데일리','biz.newdaily.co.kr':'뉴데일리 경제판',
+ 'www.donga.com':'동아일보','www.yonhapnewstv.co.kr':'연합뉴스TV','www.hankyung.com':'한국경제',
+ 'news.tvchosun.com':'TV조선','www.segye.com':'세계일보','www.seoul.co.kr':'서울신문','www.sisain.co.kr':'시사IN',
+ 'www.mediaus.co.kr':'미디어스','www.redian.org':'레디앙','www.labortoday.co.kr':'매일노동뉴스',
+ 'www.idomin.com':'경남도민일보','www.ksilbo.co.kr':'경상일보','www.newsis.com':'뉴시스',
+ 'www.kookje.co.kr':'국제신문','www.news1.kr':'뉴스1',
 };
 
 export function SupportedArticleHosts({hosts,children}:{hosts?:string[];children?:ReactNode}){
  const clean=[...new Set((hosts??[]).map(host=>host.trim().toLowerCase()).filter(host=>/^(?:[a-z0-9-]+\.)+[a-z]{2,}$/.test(host)))].sort();
  return <details className="studio-supported-hosts">
-  <summary>링크 가져오기 지원 매체</summary>
+  <summary>링크 가져오기 지원 매체{clean.length?` · ${clean.length}개 주소`:''}</summary>
   {clean.length?<ul className="studio-supported-host-list">{clean.map(host=><li key={host}><strong>{PUBLISHER_NAMES[host]??host}</strong><span>{host}</span></li>)}</ul>:<p>현재 서버 설정에 등록된 매체가 없거나 목록을 불러오지 못했습니다.</p>}
   {children??<p>표시된 주소도 robots·AI 수집 제한·공개 접근 여부를 확인해 가져옵니다. 로그인·구독 제한은 우회하지 않습니다.</p>}
  </details>;

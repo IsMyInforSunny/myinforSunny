@@ -24,6 +24,13 @@ const render=(analysis:Analysis,extra:Partial<Parameters<typeof CanvaDashboard>[
 const argumentAxis=(html:string)=>html.match(/<div[^>]*role="img"[\s\S]*?<\/div>/)?.[0]??'';
 
 describe('기사 본문을 중심으로 한 대시보드 표시',()=>{
+ it('논점은 있어도 작성자 입장 근거가 없으면 입장 표명 없음과 상대 비교 안내를 표시한다',()=>{
+  const analysis=article('정부가 정책 논의 결과를 발표했다.');analysis.status='success';
+  analysis.bodyPosition={proposition:'새 정책을 시행해야 한다.',label:'not_expressed',evidence:[],reason:'취재원 발언을 전달하며 작성자 평가를 드러내지 않는다.'};
+  const html=render(analysis);
+  expect(html).toContain('작성자 입장 표명 없음');expect(html).toContain('상대 비교는 준비 중');
+  expect(argumentAxis(html)).not.toContain('studio-axis-marker');expect(html).not.toContain('분석 미완료');
+ });
  it('기본 논점 관점과 준비되지 않은 정치 모델을 구분하며 좌표를 만들지 않는다',()=>{
   const html=render(article('공개 가상 기사다.'),{availability:{biasModelReady:false,articleResearchReady:false}});
   expect(html).toContain('논점 관점');expect(html).toContain('본문 입장 분석 대기');

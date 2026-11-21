@@ -41,7 +41,7 @@ type Props = {
   onQuote?: (span: Span) => void;
 };
 
-const stanceLabels = {support: '찬성 관점', oppose: '반대 관점', mixed: '복합 관점', not_expressed: '입장 표현 없음', undetermined: '입장 판단 유보'};
+const stanceLabels = {support: '찬성 관점', oppose: '반대 관점', mixed: '복합 관점', not_expressed: '작성자 입장 표명 없음', undetermined: '입장 판단 유보'};
 const researchLabels: Record<ResearchStage, string> = {not_started: '추가 조사 전', planning: '조사 계획 중', searching: '관련 기사 검색 중', fetching: '기사 본문 수집 중', waiting: '다음 조사 대기 중', comparing: '자료 대조 중', completed: '자료 조사 완료', partial: '일부 자료 대조', unavailable: '조사 연결 준비 중', failed: '조사 연결 확인 필요', cancelled: '조사 중단'};
 function percentageText(metric: {value: number | null; upperBound?: number | null} | null | undefined) {
   if (!metric || metric.value === null) return '분석 대기';
@@ -71,7 +71,7 @@ export default function CanvaDashboard({analysis, researchResults, researchStage
   const groundedProposition = analysis ? researchProposition({bodyPosition: analysis.bodyPosition, sources: analysis.sources}) : undefined;
   const normal = (text: string) => text.normalize('NFC').trim().replace(/\s+/g, ' ');
   const position = proposition && groundedProposition && normal(groundedProposition) === normal(proposition) ? analysis!.bodyPosition! : null;
-  const unexpressed = analysis?.bodyPosition?.label === 'not_expressed' && !analysis.bodyPosition.proposition.trim();
+  const unexpressed = analysis?.bodyPosition?.label === 'not_expressed';
   const politicalReady = bias.status === 'ready' && bias.selectedCoordinate !== null && bias.classifierAxisSign !== null;
   const voiceBody=analysis?.sources.find(source=>source.kind==='body')?.text??'';
   const voiceIssue=analysis?.sentenceVoices?mainVoiceIssue(voiceBody,analysis.sentenceVoices):null;
@@ -81,7 +81,7 @@ export default function CanvaDashboard({analysis, researchResults, researchStage
     ? politicalReady ? (bias.selectedCoordinate! + 1) * 50 : null
     : analysis?.sentenceVoices ? voiceReady&&voiceIssue!.coordinate!==null ? (voiceIssue!.coordinate!+1)*50 : null : positionReady ? position!.label === 'support' ? 83 : position!.label === 'oppose' ? 17 : 50 : null;
   const voiceRange=axisMode==='argument'&&voiceReady&&voiceIssue?.coordinate===null?voiceIssue.bounds:null;
-  const biasLabel = axisMode === 'political' ? politicalReady ? bias.directionLabel ?? '기준선 부근' : '비교 모델 준비 중' : analysis?.sentenceVoices ? voiceReady ? voiceRange?`인용 균형 ${voiceRange.lower.toFixed(2)} ~ ${voiceRange.upper.toFixed(2)}`:`인용 균형 ${voiceIssue!.coordinate!.toFixed(2)}` : '인용 방향 근거 부족' : position ? stanceLabels[position.label] : unexpressed ? '입장 표현 없음' : analysis ? '본문 입장 분석 대기' : '분석 대기';
+  const biasLabel = axisMode === 'political' ? politicalReady ? bias.directionLabel ?? '기준선 부근' : '비교 모델 준비 중' : analysis?.sentenceVoices ? voiceReady ? voiceRange?`인용 균형 ${voiceRange.lower.toFixed(2)} ~ ${voiceRange.upper.toFixed(2)}`:`인용 균형 ${voiceIssue!.coordinate!.toFixed(2)}` : '인용 방향 근거 부족' : position ? stanceLabels[position.label] : unexpressed ? '작성자 입장 표명 없음' : analysis ? '본문 입장 분석 대기' : '분석 대기';
   const biasNote = axisMode === 'political'
     ? politicalReady ? `검증된 비교 기준선과의 거리 ${bias.magnitude?.toFixed(2)} · ${bias.eligiblePublisherCount}개 매체` : '좌우 위치는 검증된 매체 좌표 모델과 비교 표본이 준비되어야 표시합니다.'
     : analysis?.sentenceVoices ? `${voiceIssue?.proposition??'기사의 주 쟁점을 확인합니다.'} · 취재원 인용 균형을 같은 쟁점·분기와 비교하며 기자 서술 방향은 별도로 표시합니다.`
@@ -167,7 +167,7 @@ export default function CanvaDashboard({analysis, researchResults, researchStage
         </section>
 
         <details className="studio-method"><summary>분석 기준과 AI 처리 과정</summary><div>
-          <p>AI가 한 번의 본문 분석에서 논점·사실과 의견·본문 입장·표현 후보와 인용을 추출합니다. 화면의 문장 비율은 원문과 대조한 결과로 계산합니다.</p>
+          <p>AI가 본문 분석에서 논점·사실과 의견·본문 입장·표현 후보를 추출하고, 인용 균형은 별도 호출로 함께 분류합니다. 화면의 문장 비율은 원문과 대조한 결과로 계산합니다.</p>
           <p>자극은 공포 유도·과도한 단정, 공격은 인신공격·집단 일반화·조롱·위협을 따로 집계합니다. 같은 문장이 두 기준에 해당할 수 있습니다.</p>
           <p>신뢰 칸은 사실 주장에 출처가 명시된 비율을 보여줍니다. 자료 대조를 실행하면 출처 원문·시점·뒷받침과 상충을 추가로 확인합니다.</p>
           <p>논점 관점의 표시는 본문의 찬반 분류이며 막대 위치는 분류를 나타냅니다. 강도나 확률은 계산하지 않습니다. 정치 좌우 모드는 검증된 매체 좌표를 사용합니다. 현재 PCA는 연구용이며 추천은 확인한 본문 입장과 인용을 기준으로 구성합니다.</p>
