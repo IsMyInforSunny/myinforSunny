@@ -30,7 +30,8 @@ export function assembleAnalysis(req:TextRequest,raw:RawAnalysis,requestId:strin
     const matchesUser=!expectedProposition||proposition===normalizePosition(expectedProposition);
     const hasDimension=!!proposition||['not_expressed','undetermined'].includes(candidate.label);
     if(matchesUser&&hasDimension&&evidence.every((span):span is Span=>!!span&&span.sourceId==='body')){
-      bodyPosition=guardBodyPosition({proposition,label:candidate.label,evidence,reason:candidate.reason,
+      bodyPosition=guardBodyPosition({proposition,label:evidence.length?candidate.label:'not_expressed',evidence,
+        reason:evidence.length?candidate.reason:'작성자 입장 표명 없음',
         ...(candidate.attribution?{attribution:candidate.attribution}:{})},sources,!expectedProposition);
     }
   }
@@ -98,10 +99,14 @@ const SENTENCE_OUTPUT_BATCH=40;
 async function analyzeInSentenceBatches(config:RuntimeConfig,req:TextRequest,requestId:string,signal:AbortSignal,
  sources:ReturnType<typeof makeSources>,instructions:string,input:Record<string,unknown>,hasProposition:boolean){
  const units=sources.flatMap(source=>source.sentences.map(sentence=>({source,sentence})));
+ const expectedProposition=req.proposition??canonicalStanceProposition(req.body);
+ const originalSchema=analysisModelSchema(sources,hasProposition);
+ const baseSchema=expectedProposition?originalSchema.extend({bodyPosition:originalSchema.shape.bodyPosition.extend({proposition:z.literal(expectedProposition)})}):originalSchema;
+ const fullSchema=units.length>25?baseSchema.extend({topics:baseSchema.shape.topics.max(3),claims:baseSchema.shape.claims.max(3),
+  perspectiveQuestions:baseSchema.shape.perspectiveQuestions.max(0),counterArguments:baseSchema.shape.counterArguments.max(0)}):baseSchema;
  if(units.length<=SENTENCE_OUTPUT_BATCH)
   return structured(config,analysisResponseSchema(sources,hasProposition),searchLanguagePrompt(instructions,config),input,signal,
-   {generationSchema:analysisModelSchema(sources,hasProposition),requestId});
- const fullSchema=analysisModelSchema(sources,hasProposition);
+   {generationSchema:fullSchema,requestId});
  const coreSchema=fullSchema.pick({topics:true,topicAssignments:true,stances:true,bodyPosition:true,claims:true,
   perspectiveQuestions:true,counterArguments:true,searchSuggestions:true,claimsMayBeOmitted:true});
  const coreInput={...input};delete coreInput.requiredExpressionSentenceIds;
@@ -165,11 +170,14 @@ export async function analyze(req:TextRequest,config:RuntimeConfig,requestId:str
   const coverageInstructions=' 출력은 간결하게 작성한다. 자극적이지 않은 clear 문장은 ID만 clearSentenceIds에 넣고 expressions 객체는 만들지 않는다. flagged 또는 undetermined 문장만 expressions에 넣는다. 두 배열을 합쳐 requiredExpressionSentenceIds의 모든 ID가 정확히 한 번씩 있어야 한다. topicAssignments에는 requiredTopicAssignmentSourceIds의 댓글만 각 1개씩 반환하며 본문 body는 여기에 넣지 않는다. 댓글이 없어도 본문 body의 모든 문장 ID를 bodyAssigned({sentenceId,topicIds}: 해당 논점 있음)·bodyOtherIds(해당 논점 없음)·bodyUndeterminedIds(유보) 중 정확히 한 곳에 한 번씩 넣는다. topicIds는 topics의 id만 쓰며 여러 개 가능하다. topics 근거 인용은 예시일 뿐 분포에 쓰이지 않는다. stances는 proposition이 없으면 빈 배열이다.';
   const bodyPositionInstructions=' bodyPosition은 댓글을 제외한 기사 본문 자체의 입장이다. 과학·교육·경제·건강·소비·환경 등 모든 주제를 다루며 정치적 좌우로 강제하지 않는다. 사용자 proposition이 있으면 그대로 비교하고, 없으면 본문 중심의 찬반 가능한 명제를 긍정형으로 짧게 정한다. label은 그 명제에 대한 본문 입장 support/oppose/mixed/not_expressed/undetermined다. evidence에는 body 문장의 실제 인용만, reason에는 입장 판단 이유를 쓴다. 댓글 의견·취재원 인용을 기사 작성자의 지지로 바꾸지 않는다. 사실만 전달하고 입장을 드러내지 않으면 not_expressed로 두며, 비교할 논쟁이 없으면 proposition은 빈 문자열로 둔다. 수치 점수는 생성하지 않는다.';
   const compact=['nvidia','deepseek'].includes(config.AI_PROVIDER??'');
-  const transport=compact&&sources.reduce((count,source)=>count+source.sentences.length,0)<=SENTENCE_OUTPUT_BATCH
-    ?compactAnalysisTransport(sources,!!req.proposition,claimsRequired):null;
+  const reduced=sentenceIds.length>25;
+  const transport=compact&&sentenceIds.length<=SENTENCE_OUTPUT_BATCH
+    ?compactAnalysisTransport(sources,!!req.proposition,claimsRequired,reduced,req.proposition??canonicalProposition):null;
   const articleInstructions=claimsRequired?' claims에 실제 원문에 있는 핵심 주장을 1~5개 반드시 추출한다. 사건·실험 결과·통계·연구진의 설명은 factual이다. 본문에 확인 가능한 사실이 있으면 factual을 최소 1개 포함한다. 수치나 내용을 새로 만들지 말고 실제 문장 ID에 연결한다. 사실이 없는 순수 의견 기사라면 opinion을 추출한다.':'';
   const attributionInstructions=' bodyPosition.attribution은 입장 근거의 발화 주체다: author(기사 작성자 자신의 명시적 평가·제안), reported_sources(취재원·단체·정부·연구진의 발언이나 요구만 전달), unclear(구분 불가). 한쪽 발언만 실렸거나 제목에 인용됐다는 이유로 author로 두지 않는다. 보도문에서 노동계·경영계 등의 요구를 전달하는 것은 reported_sources이며 label=not_expressed다. 사설·칼럼이라도 실제 작성자 평가 인용이 있어야 author다. not_expressed에서도 쟁점이 있으면 비교 명제는 유지한다.';
   const instructions=(compact?COMPACT_ANALYZE_PROMPT:ANALYZE_PROMPT+coverageInstructions+bodyPositionInstructions)+articleInstructions+attributionInstructions
+    +(compact?' JSON은 들여쓰기와 빈 줄 없이 한 줄로 출력한다. 작성자 입장의 실제 근거가 없으면 bodyPosition.label=not_expressed, evidence=[], reason="작성자 입장 표명 없음"으로 반환한다. 실제 원문 인용을 만들지 않는다.':'')
+    +(reduced?' 이번 요청은 25문장 초과 축약 형식이다. 논점 최대 3개, 주장 최대 3개, perspectiveQuestions=[]와 counterArguments=[]로 반환한다. 모든 문장의 표현·논점 분류는 그대로 완성한다.':'')
     +(compact?' 찬반 비교 명제는 당위·제안 형태로 쓴다. 사실·예보·사건 요약은 비교 명제가 아니며 찬반 논점이 없으면 빈 문자열로 둔다. 작성자의 직접적인 비판·비난·반대 논증도 oppose 근거다. 찬성·반대라는 단어가 없다는 이유만으로 not_expressed로 두지 않는다. 직접 평가와 취재원 인용이 섞인 글에서는 작성자의 직접 평가 문장을 evidence로 골라 판단한다. 본문 직접 입력도 확인 가능한 사건·발표·수치가 있으면 claims에 factual을 최소 1개 추출한다. 사실·의견이 함께 있으면 사실을 생략하지 않는다.':'')
     +(canonicalProposition?` 이번 공통 비교 명제(bodyPosition.proposition)는 반드시 다음 문장을 그대로 쓴다: ${canonicalProposition} 이 명제에 대한 본문 작성자의 입장을 분류한다. 사건의 사실 서술을 비교 명제로 바꾸지 않는다.`:'');
   const voiceController=new AbortController();
@@ -205,7 +213,7 @@ export async function analyze(req:TextRequest,config:RuntimeConfig,requestId:str
   let embeddingSucceeded=false;
   if(embeddingWork){
     try{const outcome=await embeddingWork;if(outcome.error)throw outcome.error;embeddingSucceeded=true;result.sentenceVoices=outcome.value??undefined;}
-    catch(error){if(signal.aborted)throw error;delete result.sentenceVoices;result.status='partial';result.warnings.push({code:'VOICE_MODEL_UNAVAILABLE',message:'편향 SVM 분석에 연결하지 못했습니다. 표시된 본문 검토와 편향 점수의 완료 여부를 구분해 주세요.'});}
+    catch(error){if(signal.aborted)throw error;delete result.sentenceVoices;}
   }
   const selectedIssues=voiceTopic?selectArticleVoiceIssues(req.body,voiceTopic,req.proposition??(proposedArticleIssue?canonicalProposition:undefined),context.articleTitle,
     proposedArticleIssue?undefined:result.bodyPosition?.proposition):{issues:[],source:'unassigned' as const,scores:[]};
@@ -226,13 +234,6 @@ export async function analyze(req:TextRequest,config:RuntimeConfig,requestId:str
       if(document)docs.push(document);
     }
     if(docs.length){result.sentenceVoices=docs[0];result.additionalSentenceVoices=docs.slice(1);}
-  }
-  if(!result.sentenceVoices){
-    result.status='partial';
-    if(!result.warnings.some(warning=>warning.code==='VOICE_MODEL_UNAVAILABLE'))result.warnings.push({
-      code:voiceVersion?'VOICE_TOPIC_UNSUPPORTED':'VOICE_MODEL_UNAVAILABLE',
-      message:voiceVersion?'이 기사의 주제를 지원하는 운영 편향 SVM이 없어 편향 점수는 미완료입니다.':'운영 편향 SVM이 활성화되지 않아 편향 점수는 미완료입니다. 본문·표현 분석 결과와 구분해 주세요.',
-    });
   }
   if(claimsRequired&&!result.claims.length){result.status='partial';result.coverage.claimsMayBeOmitted=true;result.warnings.push({code:'CLAIMS_UNAVAILABLE',message:'기사의 핵심 주장 추출이 누락되어 출처 명시 비율을 계산하지 못했습니다. 완성된 분석이 아닙니다.'});}
   if(overlaps.length){result.status='partial';result.warnings.push({code:'CLASSIFICATION_CONFLICT',message:'일부 문장이 정상 목록과 상세 검토에 중복되었습니다. 원문 근거가 있는 상세 결과를 우선 표시했으니 직접 확인해 주세요.'});}

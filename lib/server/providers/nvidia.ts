@@ -20,7 +20,8 @@ export const nvidiaProvider:StructuredProvider={id:'nvidia',async generate(reque
    // request is constrained structured extraction; disabling hidden reasoning
    // reduces idle latency without changing article input or evidence checks.
    body:JSON.stringify({model:request.model,...(request.model===NVIDIA_FAST_MODEL?{chat_template_kwargs:{enable_thinking:false},max_tokens:8192,response_format:{type:'json_schema',json_schema:{name:'article_analysis',strict:true,schema:request.schema}}}:{reasoning_effort:'none'}),messages:[
-    {role:'system',content:request.instructions+'\nReturn only one JSON object matching this JSON Schema. Do not include Markdown or explanations.\n'+JSON.stringify(request.schema)},
+    {role:'system',content:request.instructions+'\nReturn only one compact JSON object without indentation, Markdown or explanations.'+
+     (request.model===NVIDIA_FAST_MODEL?' Follow the provided response_format JSON Schema.':'\nMatch this JSON Schema:\n'+JSON.stringify(request.schema))},
     {role:'user',content:JSON.stringify(request.input)}],temperature:request.model===NVIDIA_FAST_MODEL?0:1,top_p:request.model===NVIDIA_FAST_MODEL?1:0.95,stream:true}),signal,
   });
  }catch{throw new AppError(signal.aborted?504:503,signal.aborted?'TIMEOUT':'PROVIDER_UNAVAILABLE',signal.aborted?'분석 시간이 초과되었거나 취소되었습니다.':'NVIDIA AI 서비스에 연결하지 못했습니다.',true);}

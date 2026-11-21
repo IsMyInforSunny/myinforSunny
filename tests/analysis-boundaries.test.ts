@@ -57,6 +57,7 @@ describe('무료 분석 입력 경계 (공급자 모의, 실제 모델 품질 �
   const req=request(41),raw=clearOutput(req);
   const core=Object.fromEntries(['topics','topicAssignments','stances','bodyPosition','claims','perspectiveQuestions','counterArguments','searchSuggestions','claimsMayBeOmitted'].filter(key=>key in raw).map(key=>[key,(raw as Record<string,unknown>)[key]]));
   core.bodyPosition={proposition:'문장의 주제',label:'not_expressed',evidence:[{sentenceId:'body_s0',quote:'공개 문장 1입니다.'}],reason:'작성자 입장이 드러나지 않는다.',attribution:'author'};
+  core.counterArguments=[];
   const units=makeSources(req)[0].sentences;
   const sentencePass=(batch:typeof units)=>({clearSentenceIds:batch.map(unit=>unit.id),expressions:[],bodyAssigned:batch[0].id==='body_s0'?[raw.bodyAssigned[0]]:[],bodyOtherIds:batch.filter(unit=>unit.id!=='body_s0').map(unit=>unit.id),bodyUndeterminedIds:[]});
   const fetch=vi.fn().mockResolvedValueOnce(Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify(core)}}]}))

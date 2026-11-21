@@ -12,26 +12,27 @@ topicAssignments는 댓글만 sourceId별 한 개, stances는 proposition이 있
 searchSuggestions는 한국어 기사 검색 핵심어 2~5단어 query와 짧은 label 최대 2개다. URL·연산자·개인 연락처는 쓰지 않는다. 모든 설명은 간결한 한국어다. 출력 예산을 지키기 위해 description·reason·explanation은 40자 이내, claims.text는 90자 이내, 반론의 text·reasoning·evidenceNeeded는 각각 60자 이내로 요약한다. clear 문장은 status와 topics 두 필드만 쓴다. 원문을 설명에 반복하지 않는다.`;
 
 /** One required, mutually exclusive decision for every actual sentence. */
-export function compactAnalysisTransport(sources:InputSource[],hasProposition:boolean,article=false){
+export function compactAnalysisTransport(sources:InputSource[],hasProposition:boolean,article=false,reduced=false,expectedProposition?:string){
  const base=analysisModelSchema(sources,hasProposition);
  const ref=z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
  const topicCode=z.string().regex(/^(?:[1-5]{1,5}|-|\?)$/);
  const decision=z.discriminatedUnion('status',[
   z.object({status:z.literal('clear'),topics:topicCode}).strict(),
-  z.object({status:z.literal('undetermined'),topics:topicCode,reason:z.string().min(1).max(180)}).strict(),
-  z.object({status:z.literal('flagged'),topics:topicCode,criteria:base.shape.expressions.element.shape.criteria.min(1),severity:z.enum(['moderate','strong']),context:base.shape.expressions.element.shape.context,explanation:z.string().min(1).max(180)}).strict(),
+  z.object({status:z.literal('undetermined'),topics:topicCode,reason:z.string().min(1).max(40)}).strict(),
+  z.object({status:z.literal('flagged'),topics:topicCode,criteria:base.shape.expressions.element.shape.criteria.min(1),severity:z.enum(['moderate','strong']),context:base.shape.expressions.element.shape.context,explanation:z.string().min(1).max(40)}).strict(),
  ]);
  const units=sources.flatMap(source=>source.sentences);
  const sentenceSchema=z.object(Object.fromEntries(units.map(unit=>[unit.id,decision]))).strict();
  const generation=base.omit({bodyAssigned:true,bodyOtherIds:true,bodyUndeterminedIds:true,clearSentenceIds:true,expressions:true}).extend({
   sentences:sentenceSchema,
-  topics:z.array(base.shape.topics.element.extend({evidence:z.array(ref).min(1).max(5)})).min(1).max(5),
+  topics:z.array(base.shape.topics.element.extend({description:z.string().min(1).max(40),evidence:z.array(ref).min(1).max(5)})).min(1).max(reduced?3:5),
   topicAssignments:z.array(base.shape.topicAssignments.element.extend({evidence:z.array(ref).max(5)})).length(sources.filter(s=>s.kind==='comment').length),
   stances:z.array(base.shape.stances.element.extend({evidence:z.array(ref).max(5)})).length(hasProposition?sources.filter(s=>s.kind==='comment').length:0),
-  bodyPosition:base.shape.bodyPosition.extend({evidence:z.array(ref).min(1).max(3),reason:z.string().min(1).max(180)}),
-  claims:z.array(base.shape.claims.element.extend({text:z.string().min(1).max(300),origin:z.array(ref).min(1).max(5)})).min(article?1:0).max(5),
-  perspectiveQuestions:z.array(base.shape.perspectiveQuestions.element.extend({basis:z.array(ref).min(1).max(5)})).max(1),
-  counterArguments:z.array(base.shape.counterArguments.element.extend({kind:z.enum(['counterpoint','qualification']),basis:z.array(ref).min(1).max(2)})).max(1),
+  bodyPosition:base.shape.bodyPosition.extend({evidence:z.array(ref).max(3),reason:z.string().min(1).max(80),
+   ...(expectedProposition?{proposition:z.literal(expectedProposition)}:{})}),
+  claims:z.array(base.shape.claims.element.extend({text:z.string().min(1).max(90),origin:z.array(ref).min(1).max(5)})).min(article?1:0).max(reduced?3:5),
+  perspectiveQuestions:z.array(base.shape.perspectiveQuestions.element.extend({basis:z.array(ref).min(1).max(5)})).max(reduced?0:1),
+  counterArguments:z.array(base.shape.counterArguments.element.extend({kind:z.enum(['counterpoint','qualification']),basis:z.array(ref).min(1).max(2)})).max(reduced?0:1),
  });
  const quotes=new Map(sources.flatMap(source=>source.sentences.map(unit=>[unit.id,source.text.slice(unit.start,unit.end)] as const)));
  const expand=(value:unknown):unknown=>{

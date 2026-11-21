@@ -1,7 +1,7 @@
 import { z } from 'zod/v4';
 
 export const RUBRIC = 'rubric-4.0';
-export const ANALYSIS_PROMPT_VERSION='analysis-4.21-separate-citation-balance';
+export const ANALYSIS_PROMPT_VERSION='analysis-4.22-author-evidence-compact25';
 export const MAX_ARTICLE_CHARACTERS = 8000;
 const id = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 const text = (max: number) => z.string().min(1).max(max).refine(v => v.trim().length > 0, '내용을 입력해 주세요.');
@@ -87,7 +87,7 @@ export type Capabilities = {precomputedComparison?:{ready:boolean;reason:'usage_
 const quoteCandidate=z.object({sentenceId:id,quote:text(8000)}).strict();
 export const bodyPositionCandidateSchema=z.object({
   proposition:z.string().trim().max(160),label:stanceLabelSchema,
-  evidence:z.array(quoteCandidate).min(1).max(3),reason:text(300),
+  evidence:z.array(quoteCandidate).max(3),reason:text(300),
   attribution:z.enum(['author','reported_sources','unclear']).optional(),
 }).strict();
 export const rawAnalysisSchema=z.object({

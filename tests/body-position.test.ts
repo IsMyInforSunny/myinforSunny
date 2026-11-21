@@ -26,6 +26,14 @@ function proposal(req:TextRequest=request):RawAnalysis{
 afterEach(()=>vi.unstubAllGlobals());
 
 describe('기사 본문 입장의 명제와 원문 근거',()=>{
+  it('작성자 근거가 없는 정상 응답은 입장 표명 없음으로 처리하고 위조 인용은 계속 거절한다',()=>{
+    const raw=proposal();raw.bodyPosition!.evidence=[];
+    const result=assembleAnalysis(request,raw,'no-author-evidence','mock');
+    expect(result.status).toBe('success');expect(result.bodyPosition).toMatchObject({label:'not_expressed',evidence:[]});
+    expect(result.warnings).toEqual([]);
+    raw.bodyPosition!.evidence=[{sentenceId:'body_s0',quote:'실제 본문에 없는 인용'}];
+    expect(assembleAnalysis(request,raw,'false-evidence','mock').warnings.map(w=>w.code)).toContain('BODY_POSITION_UNAVAILABLE');
+  });
   it.each(['reported_sources','unclear'] as const)('발화 주체 %s인 찬성 제안을 작성자 찬성으로 확정하지 않는다',attribution=>{
     const raw=proposal();raw.bodyPosition!.attribution=attribution;
     const result=assembleAnalysis(request,raw,'attribution','mock');
