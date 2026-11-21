@@ -1,0 +1,1134 @@
+{
+  "schemaVersion": "baze-nano-quality-1.0",
+  "startedAt": "2026-11-18T03:15:25.832Z",
+  "status": "completed",
+  "reference": "two-AI-consensus; not human accuracy",
+  "thresholdsFrozenBeforeInference": {
+    "primary": {
+      "directionAgreement": 0.85,
+      "supportRecall": 0.75,
+      "opposeRecall": 0.75,
+      "speakerAgreement": 0.85,
+      "repeatConsistency": 0.9,
+      "formatErrorRate": 0.02
+    },
+    "auxiliary": {
+      "directionAgreement": 0.75,
+      "supportRecall": 0.6,
+      "opposeRecall": 0.6,
+      "formatErrorRate": 0.05
+    }
+  },
+  "promptSha256": "ac2391a628de4f0158a9818f959696b69418fba629b2d78208000ac15bedc8ce",
+  "selection": {
+    "articles": 18,
+    "sentences": 210,
+    "directional": 104,
+    "byTopic": {
+      "medical_school_quota": {
+        "articles": 6,
+        "sentences": 79
+      },
+      "minimum_wage": {
+        "articles": 6,
+        "sentences": 85
+      },
+      "nuclear_energy": {
+        "articles": 6,
+        "sentences": 46
+      }
+    },
+    "byDirection": {
+      "neutral": 106,
+      "oppose": 62,
+      "support": 42
+    },
+    "bySpeaker": {
+      "journalist": 104,
+      "source": 105,
+      "unknown": 1
+    }
+  },
+  "model": {
+    "id": "gpt-5.4-nano",
+    "owned_by": "openai",
+    "lifecycle": "legacy",
+    "shutdown_at": null,
+    "endpoints": [
+      "/v1/gateway/chat/completions/",
+      "/v1/gateway/responses/"
+    ]
+  },
+  "connection": {
+    "status": "success",
+    "sentences": 5
+  },
+  "metrics": {
+    "denominator": 210,
+    "fieldAgreement": {
+      "issue": 0.5380952380952381,
+      "direction": 0.5047619047619047,
+      "speaker": 0.4523809523809524
+    },
+    "supportRecall": 0.6428571428571429,
+    "opposeRecall": 0.27419354838709675,
+    "confusion": {
+      "issue": {
+        "quota": {
+          "quota": 24,
+          "none": 10,
+          "regional": 2,
+          "missing": 33
+        },
+        "none": {
+          "none": 57,
+          "missing": 23,
+          "unknown": 2,
+          "expansion": 2
+        },
+        "regional": {
+          "regional": 1
+        },
+        "increase": {
+          "increase": 21,
+          "none": 4,
+          "missing": 9
+        },
+        "expansion": {
+          "expansion": 10,
+          "none": 1,
+          "missing": 8
+        },
+        "public_support": {
+          "expansion": 2,
+          "lifetime": 1
+        }
+      },
+      "direction": {
+        "neutral": {
+          "uncertain": 10,
+          "neutral": 62,
+          "missing": 32,
+          "support": 2
+        },
+        "oppose": {
+          "uncertain": 7,
+          "oppose": 17,
+          "neutral": 6,
+          "missing": 32
+        },
+        "support": {
+          "support": 27,
+          "neutral": 3,
+          "missing": 9,
+          "oppose": 1,
+          "uncertain": 2
+        }
+      },
+      "speaker": {
+        "journalist": {
+          "journalist": 39,
+          "missing": 31,
+          "mixed": 1,
+          "unknown": 32,
+          "source": 1
+        },
+        "source": {
+          "journalist": 8,
+          "source": 56,
+          "missing": 41
+        },
+        "unknown": {
+          "missing": 1
+        }
+      }
+    },
+    "byTopic": {
+      "medical_school_quota": {
+        "sentences": 79,
+        "correct": {
+          "issue": 27,
+          "direction": 17,
+          "speaker": 32
+        },
+        "agreement": {
+          "issue": 0.34177215189873417,
+          "direction": 0.21518987341772153,
+          "speaker": 0.4050632911392405
+        }
+      },
+      "minimum_wage": {
+        "sentences": 85,
+        "correct": {
+          "issue": 56,
+          "direction": 57,
+          "speaker": 27
+        },
+        "agreement": {
+          "issue": 0.6588235294117647,
+          "direction": 0.6705882352941176,
+          "speaker": 0.3176470588235294
+        }
+      },
+      "nuclear_energy": {
+        "sentences": 46,
+        "correct": {
+          "issue": 30,
+          "direction": 32,
+          "speaker": 36
+        },
+        "agreement": {
+          "issue": 0.6521739130434783,
+          "direction": 0.6956521739130435,
+          "speaker": 0.782608695652174
+        }
+      }
+    },
+    "repeat": {
+      "articles": 5,
+      "comparisons": 104,
+      "exact": 34,
+      "consistency": 0.3269230769230769,
+      "fieldConsistency": {
+        "issue": 0.5384615384615384,
+        "direction": 0.5096153846153846,
+        "speaker": 0.46153846153846156
+      }
+    },
+    "errors": {
+      "formatError": 10,
+      "emptyResponse": 0,
+      "timeout": 0,
+      "incompleteOutput": 0,
+      "providerError": 0
+    },
+    "calls": 24,
+    "formatErrorRate": 0.4166666666666667,
+    "invalidResponseRate": 0.4166666666666667,
+    "meanResponseMs": 3445.2083333333335,
+    "tokensPerCall": [
+      {
+        "articleId": "article_164d11ebed9575a8d55c",
+        "kind": "connection",
+        "usage": {
+          "input_tokens": 357,
+          "input_tokens_details": {
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_12h_tokens": 0,
+              "ttl_30m_tokens": 0
+            },
+            "cached_tokens": 0
+          },
+          "output_tokens": 67,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 424
+        }
+      },
+      {
+        "articleId": "article_164d11ebed9575a8d55c",
+        "kind": "quality",
+        "usage": {
+          "input_tokens": 1669,
+          "input_tokens_details": {
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_12h_tokens": 0,
+              "ttl_30m_tokens": 0
+            },
+            "cached_tokens": 0
+          },
+          "output_tokens": 395,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 2064
+        }
+      },
+      {
+        "articleId": "article_da76471ef5ccd3724143",
+        "kind": "quality",
+        "usage": {
+          "input_tokens": 1317,
+          "input_tokens_details": {
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_12h_tokens": 0,
+              "ttl_30m_tokens": 0
+            },
+            "cached_tokens": 0
+          },
+          "output_tokens": 208,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 1525
+        }
+      },
+      {
+        "articleId": "article_9caaf04f86de7677d0ac",
+        "kind": "quality",
+        "usage": null
+      },
+      {
+        "articleId": "article_3ed6ba198c877320da29",
+        "kind": "quality",
+        "usage": null
+      },
+      {
+        "articleId": "article_4605dd6b8328f6f4a7f1",
+        "kind": "quality",
+        "usage": null
+      },
+      {
+        "articleId": "article_7c80628a8dec8732be86",
+        "kind": "quality",
+        "usage": null
+      },
+      {
+        "articleId": "article_e185d994e4a1eb31e63e",
+        "kind": "quality",
+        "usage": {
+          "input_tokens": 1612,
+          "input_tokens_details": {
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_12h_tokens": 0,
+              "ttl_30m_tokens": 0
+            },
+            "cached_tokens": 0
+          },
+          "output_tokens": 192,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 1804
+        }
+      },
+      {
+        "articleId": "article_52547292750f7cf0a366",
+        "kind": "quality",
+        "usage": {
+          "input_tokens": 1154,
+          "input_tokens_details": {
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_12h_tokens": 0,
+              "ttl_30m_tokens": 0
+            },
+            "cached_tokens": 0
+          },
+          "output_tokens": 223,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 1377
+        }
+      },
+      {
+        "articleId": "article_fa16f0ea81893dbf9e31",
+        "kind": "quality",
+        "usage": {
+          "input_tokens": 1717,
+          "input_tokens_details": {
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_12h_tokens": 0,
+              "ttl_30m_tokens": 0
+            },
+            "cached_tokens": 0
+          },
+          "output_tokens": 444,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 2161
+        }
+      },
+      {
+        "articleId": "article_cc1bfdb45337e8afb78c",
+        "kind": "quality",
+        "usage": {
+          "input_tokens": 1674,
+          "input_tokens_details": {
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_12h_tokens": 0,
+              "ttl_30m_tokens": 0
+            },
+            "cached_tokens": 0
+          },
+          "output_tokens": 200,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 1874
+        }
+      },
+      {
+        "articleId": "article_d665059ce429f2b043c6",
+        "kind": "quality",
+        "usage": null
+      },
+      {
+        "articleId": "article_de1203af17afdb9ccbd4",
+        "kind": "quality",
+        "usage": null
+      },
+      {
+        "articleId": "article_ee54f915fc822d793b2e",
+        "kind": "quality",
+        "usage": {
+          "input_tokens": 1283,
+          "input_tokens_details": {
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_12h_tokens": 0,
+              "ttl_30m_tokens": 0
+            },
+            "cached_tokens": 0
+          },
+          "output_tokens": 277,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 1560
+        }
+      },
+      {
+        "articleId": "article_21270070ec5fb9965c20",
+        "kind": "quality",
+        "usage": {
+          "input_tokens": 1451,
+          "input_tokens_details": {
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_12h_tokens": 0,
+              "ttl_30m_tokens": 0
+            },
+            "cached_tokens": 0
+          },
+          "output_tokens": 303,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 1754
+        }
+      },
+      {
+        "articleId": "article_968a53ec64924c34cc18",
+        "kind": "quality",
+        "usage": null
+      },
+      {
+        "articleId": "article_f7e25e828c249c1ef701",
+        "kind": "quality",
+        "usage": {
+          "input_tokens": 1649,
+          "input_tokens_details": {
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_12h_tokens": 0,
+              "ttl_30m_tokens": 0
+            },
+            "cached_tokens": 0
+          },
+          "output_tokens": 300,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 1949
+        }
+      },
+      {
+        "articleId": "article_420fa0219d353d8e2fda",
+        "kind": "quality",
+        "usage": null
+      },
+      {
+        "articleId": "article_d72d0c8fd96b4733f66e",
+        "kind": "quality",
+        "usage": {
+          "input_tokens": 1569,
+          "input_tokens_details": {
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_12h_tokens": 0,
+              "ttl_30m_tokens": 0
+            },
+            "cached_tokens": 0
+          },
+          "output_tokens": 248,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 1817
+        }
+      },
+      {
+        "articleId": "article_164d11ebed9575a8d55c",
+        "kind": "repeat",
+        "usage": {
+          "input_tokens": 1669,
+          "input_tokens_details": {
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_12h_tokens": 0,
+              "ttl_30m_tokens": 0
+            },
+            "cached_tokens": 0
+          },
+          "output_tokens": 386,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 2055
+        }
+      },
+      {
+        "articleId": "article_e185d994e4a1eb31e63e",
+        "kind": "repeat",
+        "usage": {
+          "input_tokens": 1612,
+          "input_tokens_details": {
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_12h_tokens": 0,
+              "ttl_30m_tokens": 0
+            },
+            "cached_tokens": 0
+          },
+          "output_tokens": 194,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 1806
+        }
+      },
+      {
+        "articleId": "article_ee54f915fc822d793b2e",
+        "kind": "repeat",
+        "usage": {
+          "input_tokens": 1283,
+          "input_tokens_details": {
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_12h_tokens": 0,
+              "ttl_30m_tokens": 0
+            },
+            "cached_tokens": 0
+          },
+          "output_tokens": 273,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 1556
+        }
+      },
+      {
+        "articleId": "article_da76471ef5ccd3724143",
+        "kind": "repeat",
+        "usage": null
+      },
+      {
+        "articleId": "article_52547292750f7cf0a366",
+        "kind": "repeat",
+        "usage": null
+      }
+    ],
+    "missingOutputsCountAsDisagreement": true,
+    "tokenUsageAvailableCalls": 14,
+    "tokenUsageMissingCalls": 10,
+    "tokenUsageLimitation": "The initial runner discarded usage for responses rejected by field validation. These calls remain null; no token estimates or extra model calls were substituted. The runner now preserves received usage on validation errors."
+  },
+  "calls": [
+    {
+      "articleId": "article_164d11ebed9575a8d55c",
+      "topic": "medical_school_quota",
+      "kind": "connection",
+      "status": "success",
+      "usage": {
+        "input_tokens": 357,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 0
+          },
+          "cached_tokens": 0
+        },
+        "output_tokens": 67,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 424
+      },
+      "durationMs": 3396,
+      "sentences": 5
+    },
+    {
+      "articleId": "article_164d11ebed9575a8d55c",
+      "topic": "medical_school_quota",
+      "kind": "quality",
+      "status": "success",
+      "usage": {
+        "input_tokens": 1669,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 0
+          },
+          "cached_tokens": 0
+        },
+        "output_tokens": 395,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 2064
+      },
+      "durationMs": 4131,
+      "sentences": 31
+    },
+    {
+      "articleId": "article_da76471ef5ccd3724143",
+      "topic": "medical_school_quota",
+      "kind": "quality",
+      "status": "success",
+      "usage": {
+        "input_tokens": 1317,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 0
+          },
+          "cached_tokens": 0
+        },
+        "output_tokens": 208,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 1525
+      },
+      "durationMs": 4002,
+      "sentences": 17
+    },
+    {
+      "articleId": "article_9caaf04f86de7677d0ac",
+      "topic": "medical_school_quota",
+      "kind": "quality",
+      "status": "failed",
+      "category": "formatError",
+      "errorCode": "INVALID_LABEL_FIELDS",
+      "usage": null,
+      "durationMs": 2692,
+      "sentences": 20
+    },
+    {
+      "articleId": "article_3ed6ba198c877320da29",
+      "topic": "medical_school_quota",
+      "kind": "quality",
+      "status": "failed",
+      "category": "formatError",
+      "errorCode": "INVALID_LABEL_FIELDS",
+      "usage": null,
+      "durationMs": 3576,
+      "sentences": 27
+    },
+    {
+      "articleId": "article_4605dd6b8328f6f4a7f1",
+      "topic": "medical_school_quota",
+      "kind": "quality",
+      "status": "failed",
+      "category": "formatError",
+      "errorCode": "INVALID_LABEL_FIELDS",
+      "usage": null,
+      "durationMs": 3225,
+      "sentences": 15
+    },
+    {
+      "articleId": "article_7c80628a8dec8732be86",
+      "topic": "medical_school_quota",
+      "kind": "quality",
+      "status": "failed",
+      "category": "formatError",
+      "errorCode": "INVALID_LABEL_FIELDS",
+      "usage": null,
+      "durationMs": 3772,
+      "sentences": 19
+    },
+    {
+      "articleId": "article_e185d994e4a1eb31e63e",
+      "topic": "minimum_wage",
+      "kind": "quality",
+      "status": "success",
+      "usage": {
+        "input_tokens": 1612,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 0
+          },
+          "cached_tokens": 0
+        },
+        "output_tokens": 192,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 1804
+      },
+      "durationMs": 2784,
+      "sentences": 16
+    },
+    {
+      "articleId": "article_52547292750f7cf0a366",
+      "topic": "minimum_wage",
+      "kind": "quality",
+      "status": "success",
+      "usage": {
+        "input_tokens": 1154,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 0
+          },
+          "cached_tokens": 0
+        },
+        "output_tokens": 223,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 1377
+      },
+      "durationMs": 3240,
+      "sentences": 18
+    },
+    {
+      "articleId": "article_fa16f0ea81893dbf9e31",
+      "topic": "minimum_wage",
+      "kind": "quality",
+      "status": "success",
+      "usage": {
+        "input_tokens": 1717,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 0
+          },
+          "cached_tokens": 0
+        },
+        "output_tokens": 444,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 2161
+      },
+      "durationMs": 4566,
+      "sentences": 39
+    },
+    {
+      "articleId": "article_cc1bfdb45337e8afb78c",
+      "topic": "minimum_wage",
+      "kind": "quality",
+      "status": "success",
+      "usage": {
+        "input_tokens": 1674,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 0
+          },
+          "cached_tokens": 0
+        },
+        "output_tokens": 200,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 1874
+      },
+      "durationMs": 2849,
+      "sentences": 17
+    },
+    {
+      "articleId": "article_d665059ce429f2b043c6",
+      "topic": "minimum_wage",
+      "kind": "quality",
+      "status": "failed",
+      "category": "formatError",
+      "errorCode": "INVALID_LABEL_FIELDS",
+      "usage": null,
+      "durationMs": 3981,
+      "sentences": 30
+    },
+    {
+      "articleId": "article_de1203af17afdb9ccbd4",
+      "topic": "minimum_wage",
+      "kind": "quality",
+      "status": "failed",
+      "category": "formatError",
+      "errorCode": "INVALID_LABEL_FIELDS",
+      "usage": null,
+      "durationMs": 4517,
+      "sentences": 24
+    },
+    {
+      "articleId": "article_ee54f915fc822d793b2e",
+      "topic": "nuclear_energy",
+      "kind": "quality",
+      "status": "success",
+      "usage": {
+        "input_tokens": 1283,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 0
+          },
+          "cached_tokens": 0
+        },
+        "output_tokens": 277,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 1560
+      },
+      "durationMs": 2935,
+      "sentences": 22
+    },
+    {
+      "articleId": "article_21270070ec5fb9965c20",
+      "topic": "nuclear_energy",
+      "kind": "quality",
+      "status": "success",
+      "usage": {
+        "input_tokens": 1451,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 0
+          },
+          "cached_tokens": 0
+        },
+        "output_tokens": 303,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 1754
+      },
+      "durationMs": 4120,
+      "sentences": 25
+    },
+    {
+      "articleId": "article_968a53ec64924c34cc18",
+      "topic": "nuclear_energy",
+      "kind": "quality",
+      "status": "failed",
+      "category": "formatError",
+      "errorCode": "INVALID_LABEL_FIELDS",
+      "usage": null,
+      "durationMs": 2693,
+      "sentences": 12
+    },
+    {
+      "articleId": "article_f7e25e828c249c1ef701",
+      "topic": "nuclear_energy",
+      "kind": "quality",
+      "status": "success",
+      "usage": {
+        "input_tokens": 1649,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 0
+          },
+          "cached_tokens": 0
+        },
+        "output_tokens": 300,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 1949
+      },
+      "durationMs": 3692,
+      "sentences": 24
+    },
+    {
+      "articleId": "article_420fa0219d353d8e2fda",
+      "topic": "nuclear_energy",
+      "kind": "quality",
+      "status": "failed",
+      "category": "formatError",
+      "errorCode": "INVALID_LABEL_FIELDS",
+      "usage": null,
+      "durationMs": 2831,
+      "sentences": 14
+    },
+    {
+      "articleId": "article_d72d0c8fd96b4733f66e",
+      "topic": "nuclear_energy",
+      "kind": "quality",
+      "status": "success",
+      "usage": {
+        "input_tokens": 1569,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 0
+          },
+          "cached_tokens": 0
+        },
+        "output_tokens": 248,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 1817
+      },
+      "durationMs": 3468,
+      "sentences": 20
+    },
+    {
+      "articleId": "article_164d11ebed9575a8d55c",
+      "topic": "medical_school_quota",
+      "kind": "repeat",
+      "status": "success",
+      "usage": {
+        "input_tokens": 1669,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 0
+          },
+          "cached_tokens": 0
+        },
+        "output_tokens": 386,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 2055
+      },
+      "durationMs": 3928,
+      "sentences": 31
+    },
+    {
+      "articleId": "article_e185d994e4a1eb31e63e",
+      "topic": "minimum_wage",
+      "kind": "repeat",
+      "status": "success",
+      "usage": {
+        "input_tokens": 1612,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 0
+          },
+          "cached_tokens": 0
+        },
+        "output_tokens": 194,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 1806
+      },
+      "durationMs": 3186,
+      "sentences": 16
+    },
+    {
+      "articleId": "article_ee54f915fc822d793b2e",
+      "topic": "nuclear_energy",
+      "kind": "repeat",
+      "status": "success",
+      "usage": {
+        "input_tokens": 1283,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 0
+          },
+          "cached_tokens": 0
+        },
+        "output_tokens": 273,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 1556
+      },
+      "durationMs": 3296,
+      "sentences": 22
+    },
+    {
+      "articleId": "article_da76471ef5ccd3724143",
+      "topic": "medical_school_quota",
+      "kind": "repeat",
+      "status": "failed",
+      "category": "formatError",
+      "errorCode": "INVALID_LABEL_FIELDS",
+      "usage": null,
+      "durationMs": 3006,
+      "sentences": 17
+    },
+    {
+      "articleId": "article_52547292750f7cf0a366",
+      "topic": "minimum_wage",
+      "kind": "repeat",
+      "status": "failed",
+      "category": "formatError",
+      "errorCode": "INVALID_LABEL_FIELDS",
+      "usage": null,
+      "durationMs": 2799,
+      "sentences": 18
+    }
+  ],
+  "incorrectExamples": [
+    {
+      "sentenceId": "article_164d11ebed9575a8d55c:body_s1",
+      "expected": {
+        "issue": "quota",
+        "direction": "neutral",
+        "speaker": "journalist"
+      },
+      "nano": {
+        "issue": "quota",
+        "direction": "uncertain",
+        "speaker": "journalist"
+      }
+    },
+    {
+      "sentenceId": "article_164d11ebed9575a8d55c:body_s2",
+      "expected": {
+        "issue": "quota",
+        "direction": "oppose",
+        "speaker": "source"
+      },
+      "nano": {
+        "issue": "none",
+        "direction": "uncertain",
+        "speaker": "journalist"
+      }
+    },
+    {
+      "sentenceId": "article_164d11ebed9575a8d55c:body_s6",
+      "expected": {
+        "issue": "quota",
+        "direction": "neutral",
+        "speaker": "journalist"
+      },
+      "nano": {
+        "issue": "quota",
+        "direction": "uncertain",
+        "speaker": "journalist"
+      }
+    },
+    {
+      "sentenceId": "article_164d11ebed9575a8d55c:body_s7",
+      "expected": {
+        "issue": "quota",
+        "direction": "neutral",
+        "speaker": "journalist"
+      },
+      "nano": {
+        "issue": "quota",
+        "direction": "uncertain",
+        "speaker": "journalist"
+      }
+    },
+    {
+      "sentenceId": "article_164d11ebed9575a8d55c:body_s8",
+      "expected": {
+        "issue": "quota",
+        "direction": "oppose",
+        "speaker": "source"
+      },
+      "nano": {
+        "issue": "quota",
+        "direction": "uncertain",
+        "speaker": "journalist"
+      }
+    },
+    {
+      "sentenceId": "article_164d11ebed9575a8d55c:body_s9",
+      "expected": {
+        "issue": "quota",
+        "direction": "neutral",
+        "speaker": "journalist"
+      },
+      "nano": {
+        "issue": "none",
+        "direction": "neutral",
+        "speaker": "journalist"
+      }
+    },
+    {
+      "sentenceId": "article_164d11ebed9575a8d55c:body_s13",
+      "expected": {
+        "issue": "quota",
+        "direction": "neutral",
+        "speaker": "journalist"
+      },
+      "nano": {
+        "issue": "quota",
+        "direction": "uncertain",
+        "speaker": "journalist"
+      }
+    },
+    {
+      "sentenceId": "article_164d11ebed9575a8d55c:body_s15",
+      "expected": {
+        "issue": "quota",
+        "direction": "neutral",
+        "speaker": "journalist"
+      },
+      "nano": {
+        "issue": "quota",
+        "direction": "uncertain",
+        "speaker": "journalist"
+      }
+    },
+    {
+      "sentenceId": "article_164d11ebed9575a8d55c:body_s16",
+      "expected": {
+        "issue": "quota",
+        "direction": "neutral",
+        "speaker": "journalist"
+      },
+      "nano": {
+        "issue": "quota",
+        "direction": "uncertain",
+        "speaker": "journalist"
+      }
+    },
+    {
+      "sentenceId": "article_164d11ebed9575a8d55c:body_s17",
+      "expected": {
+        "issue": "quota",
+        "direction": "oppose",
+        "speaker": "source"
+      },
+      "nano": {
+        "issue": "none",
+        "direction": "uncertain",
+        "speaker": "journalist"
+      }
+    }
+  ],
+  "provider": {
+    "baseUrl": "https://api.baze.co/v1/gateway",
+    "configSource": "factchat provider configuration",
+    "credentialSource": "configured env_key; value never logged"
+  },
+  "grade": "reject",
+  "allowedUse": "none",
+  "finishedAt": "2026-11-18T03:17:13.946Z"
+}
