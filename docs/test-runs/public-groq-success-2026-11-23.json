@@ -1,0 +1,142 @@
+{
+  "schemaVersion": "public-groq-success-1.0",
+  "publicSite": "https://naeinfo-clear-code2026.mseohyeon190.chatgpt.site",
+  "startedAt": "2026-11-22T23:50:05.480Z",
+  "criteria": {
+    "http": 200,
+    "mode": "live",
+    "model": "openai/gpt-oss-120b",
+    "status": "success",
+    "claimsAtLeast": 1,
+    "citationLabelsAtLeast": 1,
+    "bodyPositionRequired": true
+  },
+  "results": [
+    {
+      "case": "paju",
+      "name": "Paju living-wage announcement",
+      "url": "https://www.pressian.com/pages/articles/2026091808555217839",
+      "checkedAt": "2026-11-22T23:50:05.880Z",
+      "finishedAt": "2026-11-22T23:50:11.398Z",
+      "http": 200,
+      "requestId": "8d809706-fe9f-4f53-ac2f-f4caf7534b31",
+      "analysisId": "56cc2a8d-f2dc-4c4f-a834-cc008d90d6b4",
+      "cache": "miss",
+      "success": true,
+      "status": "success",
+      "mode": "live",
+      "model": "openai/gpt-oss-120b",
+      "prompt": "analysis-4.23-groq-compact",
+      "durationMs": 5518,
+      "bodyCharacters": 309,
+      "claims": 1,
+      "factualClaims": 1,
+      "topics": 1,
+      "expressionDecisions": 7,
+      "citationLabels": 7,
+      "bodyPositionLabel": "not_expressed",
+      "warnings": [],
+      "relativeBiasModelReady": false
+    },
+    {
+      "case": "gimpo",
+      "name": "Gimpo living-wage announcement",
+      "url": "https://www.pressian.com/pages/articles/2024091915534500547",
+      "checkedAt": "2026-11-22T23:51:45.375Z",
+      "finishedAt": "2026-11-22T23:51:50.416Z",
+      "http": 422,
+      "requestId": "3de3c375-cba1-4198-80b2-8b18a60cb6cc",
+      "cache": null,
+      "success": false,
+      "status": "failed",
+      "durationMs": 5041,
+      "bodyCharacters": 0,
+      "claims": 0,
+      "factualClaims": 0,
+      "topics": 0,
+      "expressionDecisions": 0,
+      "citationLabels": 0,
+      "warnings": [],
+      "errorCode": "ARTICLE_FETCH_TIMEOUT",
+      "relativeBiasModelReady": false
+    },
+    {
+      "case": "medical",
+      "name": "Medical-school selection review report",
+      "url": "https://www.pressian.com/pages/articles/2026110509224063406",
+      "checkedAt": "2026-11-22T23:53:01.824Z",
+      "finishedAt": "2026-11-22T23:53:07.224Z",
+      "http": 200,
+      "requestId": "fdc510f1-1b92-40b6-ad9d-2ec5aa83ddbe",
+      "analysisId": "1174d7a1-557c-492b-bbef-973500b468f3",
+      "cache": "miss",
+      "success": true,
+      "status": "success",
+      "mode": "live",
+      "model": "openai/gpt-oss-120b",
+      "prompt": "analysis-4.23-groq-compact",
+      "durationMs": 5400,
+      "bodyCharacters": 1562,
+      "claims": 1,
+      "factualClaims": 1,
+      "topics": 1,
+      "expressionDecisions": 18,
+      "citationLabels": 18,
+      "bodyPositionLabel": "not_expressed",
+      "warnings": [],
+      "relativeBiasModelReady": false
+    }
+  ],
+  "updatedAt": "2026-11-22T23:53:07.225Z",
+  "successes": 2,
+  "deployment": {
+    "version": 45,
+    "environmentRevision": 12,
+    "sourceCommit": "12e75e6984a6c87803feb91c62b10573eb2c2b79",
+    "deploymentId": "appgdep_6b037f8344908191995e8f67b5c3a596",
+    "status": "succeeded"
+  },
+  "checks": {
+    "workingSource": {
+      "typecheck": true,
+      "testsPassed": 1120,
+      "testsSkipped": 13,
+      "build": true,
+      "diff": true
+    },
+    "deploymentCheckout": {
+      "typecheck": true,
+      "testsPassed": 1119,
+      "testsSkipped": 14,
+      "build": true,
+      "diff": true
+    }
+  },
+  "scope": {
+    "primaryArticleAnalysis": true,
+    "relativeSvmBiasScore": false,
+    "automatedFactVerification": false,
+    "existingGroqLimitsPreserved": true,
+    "unreviewedResearchArtifactsPublished": false
+  },
+  "browserCheck": {
+    "checked": true,
+    "providerConsent": "Groq",
+    "article": "paju",
+    "resultStatus": "cached-success-visible",
+    "freshAnalysisVerifiedSeparately": true,
+    "screenshot": "output/playwright/public-groq-paju-20261123.png",
+    "bodyPosition": "not_expressed",
+    "stimulationPercent": 0,
+    "sourceAttributionPercent": 0,
+    "relativeBias": "pending",
+    "medical": {
+      "checked": true,
+      "resultStatus": "cached-success-visible",
+      "freshAnalysisVerifiedSeparately": true,
+      "screenshot": "output/playwright/public-groq-medical-20261123.png"
+    }
+  },
+  "timezone": "Asia/Seoul",
+  "finishedAt": "2026-11-22T23:54:19.547Z"
+}
