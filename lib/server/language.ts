@@ -32,7 +32,7 @@ export async function structured<T>(config:RuntimeConfig,schema:z.ZodType<T>,ins
   }
   if(provider(config)==='deepseek'&&!paidProviderAllowed(config))throw new AppError(503,'PAID_PROVIDER_DISABLED','DeepSeek 공식 API는 사용량에 따라 과금됩니다. 유료 제공자 설정을 명시적으로 활성화해야 합니다.');
   if(!providerReady(config))throw new AppError(503,'FEATURE_UNAVAILABLE','AI 제공자의 키·모델 설정을 먼저 확인해야 합니다.');
-  const schemaJson=z.toJSONSchema(options?.generationSchema??schema,{target:'draft-7',reused:provider(config)==='nvidia'&&modelName(config)===NVIDIA_FAST_MODEL?'ref':'inline'});
+  const schemaJson=z.toJSONSchema(options?.generationSchema??schema,{target:'draft-7',reused:provider(config)==='groq'||provider(config)==='nvidia'&&modelName(config)===NVIDIA_FAST_MODEL?'ref':'inline'});
   if(provider(config)==='groq')await requestTokenBudget(instructions,input,schemaJson);
   const requestId=options?.requestId&&requestIdPattern.test(options.requestId)?options.requestId:undefined;
   const call={model:modelName(config),instructions,input,schema:schemaJson,signal,requestId};

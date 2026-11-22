@@ -1,7 +1,7 @@
 import { z } from 'zod/v4';
 
 export const RUBRIC = 'rubric-4.0';
-export const ANALYSIS_PROMPT_VERSION='analysis-4.22-author-evidence-compact25';
+export const ANALYSIS_PROMPT_VERSION='analysis-4.23-groq-compact';
 export const MAX_ARTICLE_CHARACTERS = 8000;
 const id = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 const text = (max: number) => z.string().min(1).max(max).refine(v => v.trim().length > 0, '내용을 입력해 주세요.');

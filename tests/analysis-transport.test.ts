@@ -2,7 +2,7 @@ import {describe,it,expect,vi,afterEach} from 'vitest';
 import {z} from 'zod/v4';
 import {analysisModelSchema} from '../lib/contracts';
 import {makeSources} from '../lib/domain';
-import {compactAnalysisTransport} from '../lib/server/analysis-transport';
+import {compactAnalysisTransport,groqAnalysisTransport} from '../lib/server/analysis-transport';
 import {analyze,assembleAnalysis} from '../lib/server/analyze';
 import {buildAnalysisScores} from '../lib/analysis-scores';
 afterEach(()=>vi.unstubAllGlobals());
@@ -12,6 +12,19 @@ const sources=makeSources(req),ref={sentenceId:'body_s0'};
 function wire(){return {topics:[{id:'toothbrush',label:'칫솔모 개발',description:'압전 칫솔모',evidence:[ref]}],topicAssignments:[],stances:[],bodyPosition:{proposition:'압전 칫솔모는 세균 제거에 효과적이다.',label:'not_expressed',evidence:[ref],reason:'개발 사실을 전달한다.'},bodyAssigned:[{sentenceId:'body_s0',topicIds:['toothbrush']}],bodyOtherIds:[],bodyUndeterminedIds:[],clearSentenceIds:['body_s0'],expressions:[],claims:[{id:'c1',kind:'factual',text:req.body,origin:[ref],targetTime:''}],perspectiveQuestions:[],counterArguments:[],searchSuggestions:[],claimsMayBeOmitted:true};}
 function grouped(){const {bodyAssigned,bodyOtherIds,bodyUndeterminedIds,clearSentenceIds,expressions,...raw}=wire();return {...raw,topics:raw.topics.map(t=>({...t,evidence:['body_s0']})),bodyPosition:{...raw.bodyPosition,attribution:'reported_sources',evidence:['body_s0']},claims:raw.claims.map(c=>({...c,origin:['body_s0']})),sentences:{body_s0:{status:'clear',topics:'1'}}};}
 describe('compact evidence transport',()=>{
+ it('validates every Groq sentence once while sharing one decision grammar',()=>{
+  const transport=groqAnalysisTransport(sources,false);
+  const {clearSentenceIds,expressions,bodyAssigned,bodyOtherIds,bodyUndeterminedIds,...core}=wire();
+  void clearSentenceIds;void expressions;void bodyAssigned;void bodyOtherIds;void bodyUndeterminedIds;
+  const value={...core,sentences:[{sentenceId:'body_s0',decision:{status:'clear',topics:'1'}}]};
+  const result=transport.response.parse(value);
+  expect(result.clearSentenceIds).toEqual(['body_s0']);
+  expect(result.bodyAssigned).toEqual([{sentenceId:'body_s0',topicIds:['toothbrush']}]);
+  expect(result.claims[0].origin[0].quote).toBe(req.body);
+  expect(transport.response.safeParse({...value,sentences:[]}).success).toBe(false);
+  expect(transport.response.safeParse({...value,sentences:[{sentenceId:'unknown',decision:{status:'clear',topics:'1'}}]}).success).toBe(false);
+  expect(transport.response.safeParse({...value,sentences:[...value.sentences,...value.sentences]}).success).toBe(false);
+ });
  it('fixes the known proposition in generation while retaining mismatch checks on returned proposals',()=>{
   const expected='의대 정원을 확대해야 한다.';
   const transport=compactAnalysisTransport(sources,false,true,false,expected);

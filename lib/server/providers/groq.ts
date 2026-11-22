@@ -9,7 +9,7 @@ export async function requestTokenBudget(instructions:string,input:unknown,schem
   const {encode}=await import('gpt-tokenizer/encoding/o200k_harmony');
   // Count the actual fixed encoder plus a conservative allowance for server chat/schema wrappers.
   const tokens=encode(instructions,{disallowedSpecial:new Set()}).length+encode(JSON.stringify(input),{disallowedSpecial:new Set()}).length+encode(JSON.stringify(schemaJson),{disallowedSpecial:new Set()}).length+512+MAX_COMPLETION_TOKENS;
-  if(tokens>RESERVATION)throw new AppError(422,'INPUT_TOO_LARGE','무료 분석의 토큰 한도를 넘었습니다. 본문·댓글·자료를 줄여 주세요.');
+  if(tokens>RESERVATION){console.info(JSON.stringify({type:'provider_input_budget',provider:'groq',tokens,reservation:RESERVATION,instructions:encode(instructions,{disallowedSpecial:new Set()}).length,input:encode(JSON.stringify(input),{disallowedSpecial:new Set()}).length,schema:encode(JSON.stringify(schemaJson),{disallowedSpecial:new Set()}).length}));throw new AppError(422,'INPUT_TOO_LARGE','무료 분석의 토큰 한도를 넘었습니다. 본문·댓글·자료를 줄여 주세요.');}
   return tokens;
 }
 export function retrySeconds(headers:Headers){
@@ -34,12 +34,19 @@ export const groqProvider:StructuredProvider={id:'groq',async generate(request,c
         response_format:{type:'json_schema',json_schema:{name:'information_ingredients',strict:true,schema:request.schema}},
         max_completion_tokens:MAX_COMPLETION_TOKENS,reasoning_effort:'low',stream:false}),signal:callSignal,
     });
-  }catch{throw new AppError(callSignal.aborted?504:503,callSignal.aborted?'TIMEOUT':'PROVIDER_UNAVAILABLE',callSignal.aborted?'분석 시간이 초과되었거나 취소되었습니다.':'무료 AI 서비스에 연결하지 못했습니다.',true);}
+  }catch(error){
+    const failure=error as {name?:string;cause?:{code?:string}};
+    console.info(JSON.stringify({type:'provider_connection_failure',provider:'groq',name:failure.name,causeCode:failure.cause?.code,aborted:callSignal.aborted}));
+    throw new AppError(callSignal.aborted?504:503,callSignal.aborted?'TIMEOUT':'PROVIDER_UNAVAILABLE',callSignal.aborted?'분석 시간이 초과되었거나 취소되었습니다.':'무료 AI 서비스에 연결하지 못했습니다.',true);
+  }
   if(!response.ok){
+   console.info(JSON.stringify({type:'provider_http_failure',provider:'groq',status:response.status,retrySeconds:response.status===429?retrySeconds(response.headers):undefined}));
    try{
     if(response.status===429){await config.onRateLimit?.(retrySeconds(response.headers));throw new AppError(429,'RATE_LIMITED','무료 AI 요청·토큰 한도에 도달했습니다. 안내된 시간이 지난 뒤 다시 이용해 주세요.',true);}
     if(response.status===400){
-      const error=await response.json().catch(()=>null) as {error?:{code?:unknown;failed_generation?:unknown}}|null;
+      const error=await response.json().catch(()=>null) as {error?:{code?:unknown;message?:unknown;failed_generation?:unknown}}|null;
+      const message=typeof error?.error?.message==='string'?error.error.message:'';
+      console.info(JSON.stringify({type:'provider_request_failure',provider:'groq',http:response.status,code:typeof error?.error?.code==='string'&&/^[a-zA-Z0-9_.-]{1,80}$/.test(error.error.code)?error.error.code:undefined,schema: /schema/i.test(message),reference:/\$ref|definitions|\$defs/i.test(message),unsupported:/not supported|unsupported/i.test(message),constraints:['additionalProperties','minItems','maxItems','minLength','maxLength','pattern','anyOf','oneOf'].filter(x=>message.includes(x))}));
       if(error?.error?.code==='json_validate_failed'){
         logFailure('provider_json_validation');
         // Groq can reject its generated object while still returning complete JSON.
