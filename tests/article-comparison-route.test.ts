@@ -5,10 +5,10 @@ function request(value:unknown){return new Request('https://local.test/api/artic
   method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(value)});}
 
 describe('article comparison endpoint',()=>{
-  it('returns an explicit missing-date state without searching or calling a model',async()=>{
+  it('withholds event ranks when the saved baseline uses older attribution rules',async()=>{
     const response=await POST(request({body:'국민연금 보험료율 인상 관련 기사 본문. '.repeat(20),title:'연금 개혁 논의'}));
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({status:'date_missing',event:null,
+    expect(await response.json()).toMatchObject({status:'incompatible',event:null,
       fomo:{value:0,total:20},attribution:{value:0,total:20}});
   });
 

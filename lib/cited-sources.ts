@@ -6,7 +6,7 @@
  */
 import type {Analysis} from './contracts';
 
-export const CITED_SOURCES_VERSION = 'cited-sources-0.2';
+export const CITED_SOURCES_VERSION = 'cited-sources-0.3';
 
 export type CitedSourceType =
   | 'official_statistics' // 통계청·한국은행 등 공식 통계
@@ -30,7 +30,7 @@ export type CitedSource = {
   quote: string;
   name: string | null;
   type: CitedSourceType;
-  signals: {named: boolean; primary: boolean; documentNamed: boolean; dated: boolean; quantified: boolean};
+  signals: {named: boolean; primary: boolean; documentNamed: boolean; dated: boolean; quantified: boolean;administrativeDecision?:boolean};
   tier: SourceTier;
   reasons: string[];
 };
@@ -67,11 +67,20 @@ const TYPE_RULES: {type: CitedSourceType; pattern: RegExp}[] = [
 ];
 const PRIMARY_TYPES = new Set<CitedSourceType>(['official_statistics', 'public_agency', 'research']);
 /* Names that point to a kind of institution rather than a specific one a reader could look up. */
-const GENERIC_NAME = /^(?:연구팀|연구진|정부|당국|학계|전문가|경찰|검찰|위원회|학교\s?측|시\s?당국|관련\s?기관|해외\s?연구|한\s?연구)$/;
+const GENERIC_NAME = /^(?:연구팀|연구진|정부|당국|학계|전문가|경찰|검찰|위원회|시|도|군|구|의회|시의회|도의회|군의회|구의회|학교\s?측|시\s?당국|관련\s?기관|해외\s?연구|한\s?연구)$/;
 
 /* Attribution phrases. Each yields the cited name (or none) and the phrase span. */
 const ACCORDING_TO = /([^\s,.“”"'‘’「」(){}][^,.。“”"]{0,30}?)\s*(?:에\s?따르면|에\s?의하면|에\s?의해\s?발표된)/g;
 const SAYING_VERB = /(?:밝혔다|발표했다|말했다|설명했다|전했다|강조했다|주장했다|덧붙였다|지적했다|공개했다|집계했다|추산했다|분석했다|예상했다|보도했다)(?=[.\s”"]|$)/;
+/* A named government decision maker is also a traceable origin of its own
+ * administrative decision. Keep this narrower than speech attribution: require
+ * an explicit subject and a direct, final active predicate, not an institution
+ * mentioned as the object, a generic "시", or an inferred earlier speaker. */
+const ADMIN_AGENCY_NAME = '(?:교육부|보건복지부|국토교통부|기획재정부|행정안전부|고용노동부|산업통상자원부|환경부|문화체육관광부|과학기술정보통신부|농림축산식품부|해양수산부|중소벤처기업부|여성가족부|외교부|통일부|법무부|국방부|인사혁신처|국가보훈부|통계청|국가데이터처|국세청|관세청|조달청|경찰청|소방청|질병관리청|공정거래위원회|금융위원회|방송통신위원회|중앙선거관리위원회|[가-힣]{2,8}(?:시청|도청|군청|구청|시의회|도의회|군의회|구의회)|[가-힣]{2,8}시)';
+const ADMIN_SUBJECT = new RegExp('^\\s*(?:(?:앞서|한편|또한|이날)\\s+)?('+ADMIN_AGENCY_NAME+'(?:\\s*(?:와|과|및)\\s*'+ADMIN_AGENCY_NAME+')*)(?:은|는|이|가)\\s+');
+const ADMIN_DECISION = /(?:결정|확정|배정|선정|고시)했다[.!。]?\s*$/;
+const NONSPECIFIC_ADMIN_NAME = /^(?:해당|이번|이|그|저|우리)(?:시|도|군|구)(?:의회)?$/;
+const NONADMIN_NAME = /회사|기업|그룹|협회|조합|재단|병원|대학교|대학입시|감시|표시|전시|게시|제시/;
 /* Speech verbs whose subject is a speaker even when the name is not in a dictionary (e.g. a company). */
 const SPEECH_VERB = /(?:밝혔다|발표했다|말했다|설명했다|전했다|강조했다|주장했다|덧붙였다|공개했다)(?=[.\s”"]|$)/;
 /* "X에서 확인됐다/나타났다": the article points at a document as its basis. */
@@ -155,7 +164,7 @@ export function reviewCitedSources(analysis: Pick<Analysis, 'sources' | 'claims'
     for (const sentence of source.sentences) {
       const text = source.text.slice(sentence.start, sentence.end);
       const signals = {documentNamed: DOCUMENT.test(text), dated: DATED.test(text), quantified: QUANTIFIED.test(text)};
-      const found: {name: string | null; at: number; length: number; type: CitedSourceType}[] = [];
+      const found: {name: string | null; at: number; length: number; type: CitedSourceType; administrativeDecision?:boolean}[] = [];
 
       const sentenceKey = `${source.id}\u0000${sentence.id}`;
       let referenced = false;
@@ -188,6 +197,13 @@ export function reviewCitedSources(analysis: Pick<Analysis, 'sources' | 'claims'
           if (type) found.push({name, at: subject!.index + subject![0].indexOf(subject![1]!), length: subject![1]!.length, type});
         }
       }
+      if (!found.length && !referenced && ADMIN_DECISION.test(text) && !/[“”"‘’']/.test(text)) {
+        const subject=ADMIN_SUBJECT.exec(text);
+        const name=subject?cleanName(subject[1]!):'';
+        if (subject&&name&&!NONSPECIFIC_ADMIN_NAME.test(name)&&!NONADMIN_NAME.test(name)) {
+          found.push({name,at:subject.index+subject[0].indexOf(subject[1]!),length:subject[1]!.length,type:'public_agency',administrativeDecision:true});
+        }
+      }
       const passive = UNATTRIBUTED_PASSIVE.exec(text);
       if (!found.length && !referenced && passive) found.push({name: null, at: passive.index, length: passive[0].length, type: 'anonymous'});
 
@@ -204,9 +220,10 @@ export function reviewCitedSources(analysis: Pick<Analysis, 'sources' | 'claims'
           quote: source.text.slice(start, start + item.length),
           name: item.name,
           type: item.type,
-          signals: {named: item.type !== 'anonymous' && !!item.name && !generic, primary: PRIMARY_TYPES.has(item.type), ...signals},
+          signals: {named: item.type !== 'anonymous' && !!item.name && !generic, primary: PRIMARY_TYPES.has(item.type), ...signals,...(item.administrativeDecision?{administrativeDecision:true}:{})},
           tier,
-          reasons: item.name === null ? ['출처 없이 전해 들은 형태의 서술'] : reasons,
+          reasons: item.name === null ? ['출처 없이 전해 들은 형태의 서술'] : item.administrativeDecision
+            ? [...reasons,'같은 문장에 이름 있는 행정기관과 직접적인 결정·고시가 명시됨 · 원 행정자료는 별도 확인 필요'] : reasons,
         });
       }
     }

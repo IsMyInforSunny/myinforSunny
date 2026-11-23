@@ -16,6 +16,56 @@ function review(body: string, factualSentences: number[] = [0]) {
 }
 
 describe('reviewCitedSources', () => {
+  describe('explicit administrative decision makers',()=>{
+    it.each([
+      ['파주시가 2027년 파주시 생활임금을 1만2620원으로 결정했다.','파주시'],
+      ['앞서 교육부와 보건복지부는 지난 4일 의료 접근성, 의료취약도, 정책 효과성 등을 종합 평가해 국립순천대학교를 전남 의과대학 신설 대학으로 확정하고 정원 60명을 배정했다.','교육부와 보건복지부'],
+    ])('links the named administrative actor in the actual article sentence: %s',(body,name)=>{
+      const r=review(body),source=r.sources[0]!;
+      expect(r.sources).toHaveLength(1);
+      expect(source).toMatchObject({name,type:'public_agency',tier:'traceable_primary',signals:{named:true,primary:true,dated:true}});
+      expect(body.slice(source.start,source.end)).toBe(source.quote);
+      expect(source.quote).toBe(name);
+      expect(r.claims[0]).toMatchObject({status:'traceable_primary',sourceIds:[source.id]});
+      expect(source.reasons.join(' ')).toContain('원 행정자료는 별도 확인 필요');
+    });
+    it.each([
+      '기자는 교육부의 배정 기준을 조사한 뒤 후보를 선정했다.',
+      '교육부의 방침에 따라 대학이 정원 60명을 확정했다.',
+      '국립순천대학교를 후보로 선정했다.',
+      '시가 2027년 생활임금을 결정했다.',
+      '군의회는 올해 지원액을 확정했다.',
+      '해당시는 내년도 생활임금을 확정했다.',
+      '삼성전자는 올해 생산량을 확정했다.',
+      '남자친구가 여행 후보지를 선정했다.',
+      '정부는 정원 60명을 배정했다.',
+      '교육부는 "민간 기업이 학교를 선정했다"는 설명을 부인했다.',
+    ])('does not promote a mention, unnamed actor, private action or nested quotation: %s',body=>{
+      const r=review(body);
+      expect(r.sources).toHaveLength(0);
+      expect(r.claims[0]).toMatchObject({status:'unattributed',sourceIds:[]});
+    });
+    it('links the administrative subject rather than an institution mentioned as the object',()=>{
+      const r=review('서울시는 2027년 지원 기관으로 교육부를 선정했다.');
+      expect(r.sources.map(source=>source.name)).toEqual(['서울시']);
+    });
+    it('keeps passive hearsay weak without inventing its administrative source',()=>{
+      const r=review('파주시 생활임금이 인상된 것으로 알려졌다.');
+      expect(r.sources[0]).toMatchObject({name:null,type:'anonymous',signals:{named:false}});
+      expect(r.claims[0]!.status).toBe('weak');
+    });
+    it.each(['시는 올해 지원액을 확정했다고 밝혔다.','군의회는 올해 지원액을 확정했다고 밝혔다.'])('does not count the generic reporting actor as a named institution: %s',body=>{
+      const r=review(body);
+      expect(r.sources).toHaveLength(1);
+      expect(r.sources[0]!.signals.named).toBe(false);
+      expect(r.sources[0]!.tier).toBe('traceable_secondary');
+    });
+    it('does not copy the earlier named decision maker into a later pronoun decision',()=>{
+      const r=review('파주시는 2027년 생활임금을 결정했다. 시는 대상자를 선정했다.',[1]);
+      expect(r.sources.map(source=>source.name)).toEqual(['파주시']);
+      expect(r.claims[0]).toMatchObject({status:'unattributed',sourceIds:[]});
+    });
+  });
   it('treats a named statistics agency with a dated survey as a traceable primary source', () => {
     const r = review('통계청이 2026년 3월 발표한 사회조사에 따르면 청소년 독서율은 52%로 집계됐다.');
     expect(r.sources).toHaveLength(1);

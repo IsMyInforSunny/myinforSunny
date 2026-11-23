@@ -46,7 +46,7 @@ describe('same-method topic comparison',()=>{
   expect(percentilePosition(30,boundaries)).toEqual({lower:100,upper:100,ties:null});
  });
  it('withholds ranks for small groups and mismatched rule versions',()=>{
-  const small=structuredClone(reference) as RelativeBaselines;
+  const small={...structuredClone(reference),metricVersions:{...relativeMetricVersions}} as RelativeBaselines;
   small.topics.find(topic=>topic.id==='minimum_wage')!.n=99;
   expect(compareRelativeBaseline(body,'',small).fomo.position).toBeNull();
   expect(compareRelativeBaseline(body,'',small).status).toBe('insufficient');
@@ -54,9 +54,12 @@ describe('same-method topic comparison',()=>{
   expect(compareRelativeBaseline(body,'',stale).status).toBe('incompatible');
   expect(compareRelativeBaseline(body,'',stale).attribution.position).toBeNull();
  });
- it('shows absolute values, ranks and population metadata without naming publisher scores',()=>{
+ it('shows absolute values and withholds stale ranks after attribution rules change',()=>{
   const html=renderToStaticMarkup(createElement(RelativeTopicComparison,{body}));
-  expect(html).toContain('25점');expect(html).toContain('백분위');
+  expect(html).toContain('25점');expect(html).toContain('기준 버전 확인 필요');
+  expect(html).not.toContain('백분위');
+  expect(compareRelativeBaseline(body).status).toBe('incompatible');
+  expect(compareRelativeBaseline(body).attribution.position).toBeNull();
   expect(html).toContain('416');expect(html).toContain('4개 매체');
   expect(html).toContain('2,000');expect(html).toContain('2024-01-01');
   expect(html).toContain('relative-baselines-2026-11-12.2');
