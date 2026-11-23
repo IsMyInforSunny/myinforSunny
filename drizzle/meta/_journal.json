@@ -50,6 +50,13 @@
       "when": 1794700000000,
       "tag": "0006_analysis_budget_groups",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1795435272595,
+      "tag": "0007_publisher_robots_cache",
+      "breakpoints": true
     }
   ]
 }

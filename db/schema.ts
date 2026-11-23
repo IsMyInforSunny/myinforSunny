@@ -17,3 +17,8 @@ export const firecrawlCreditBudget=sqliteTable('firecrawl_credit_budget',{
 export const searchMonthlyBudget=sqliteTable('search_monthly_budget',{
   id:text('id').primaryKey(),reserved:integer('reserved').notNull(),
 });
+
+// Public publisher rules only. The stored timestamp controls the outage fallback.
+export const publisherRobotsCache=sqliteTable('publisher_robots_cache',{
+  host:text('host').primaryKey(),body:text('body').notNull(),checkedAt:integer('checked_at').notNull(),
+});

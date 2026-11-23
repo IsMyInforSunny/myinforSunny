@@ -3,6 +3,7 @@ import type {ReactNode} from 'react';
 const FETCH_MESSAGES:Record<string,string>={
  INVALID_URL:'HTTPS 기사 주소를 확인해 주세요.',
  BLOCKED_DESTINATION:'안전하지 않은 네트워크 주소로 연결되어 가져오기를 중단했습니다.',
+ ROBOTS_UNAVAILABLE:'매체 사이트 확인에 실패했습니다. 잠시 후 다시 시도하거나 본문을 붙여 넣어 주세요',
  ROBOTS_DISALLOWED:'이 페이지는 자동 수집을 허용하지 않습니다. 기사 본문을 직접 붙여 넣어 주세요.',
  ROBOTS_AI_RESTRICTED:'이 매체는 AI 자동 수집을 제한하고 있어 링크로 가져오지 않습니다. 본문을 직접 붙여 넣어 주세요.',
  ACCESS_RESTRICTED:'로그인·구독 또는 접근 제한 기사는 링크로 가져오지 않습니다. 공개 본문을 직접 붙여 넣어 주세요.',

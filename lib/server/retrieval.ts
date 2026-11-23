@@ -15,12 +15,14 @@ export function allowedUrl(input:string,hosts:string[]):URL|null{
     const host=url.hostname.toLowerCase();if((host!=='v.daum.net'&&!hosts.some(h=>h.toLowerCase()===host))||/^[\d.:[\]]+$/.test(host))return null;return url;
   }catch{return null;}
 }
-export type RetrievalFailureCode='INVALID_URL'|'BLOCKED_DESTINATION'|'ROBOTS_DISALLOWED'|'ROBOTS_AI_RESTRICTED'|'ACCESS_RESTRICTED'|'NOT_HTML'|'TOO_LARGE'|'TIMEOUT'|'SCRIPT_RENDERED'|'TOO_SHORT'|'HOST_RATE_LIMITED';
+export type RetrievalFailureCode='INVALID_URL'|'BLOCKED_DESTINATION'|'ROBOTS_DISALLOWED'|'ROBOTS_AI_RESTRICTED'|'ROBOTS_UNAVAILABLE'|'ACCESS_RESTRICTED'|'NOT_HTML'|'TOO_LARGE'|'TIMEOUT'|'SCRIPT_RENDERED'|'TOO_SHORT'|'HOST_RATE_LIMITED';
 export type RetrievalMetadata={mode:'allowlisted'|'open';host:string;robotsCheckedAt?:string;extractionMethod?:string;publisherUrl?:string;publisherHost?:string};
 export type RetrievalResult={ok:true;reference:Reference;metadata:RetrievalMetadata}|{ok:false;reason:RetrievalFailureCode;detail?:string};
 const failure=(reason:RetrievalFailureCode,detail=reason.toLowerCase()):RetrievalResult=>({ok:false,reason,detail});
 const ROBOTS_AI_BOTS=['ClaudeBot','anthropic-ai','GPTBot','CCBot','Google-Extended','PerplexityBot','Applebot-Extended','Bytespider'];
-const robotsCache=new Map<string,{expiresAt:number;status:number;body?:string}>();
+const HOUR=60*60*1000;
+type RobotsSnapshot={body:string;checkedAt:number};
+const robotsCache=new Map<string,RobotsSnapshot>();
 function ruleMatches(pattern:string,path:string){if(!pattern)return false;const anchored=pattern.endsWith('$');const body=pattern.replace(/[.+?^${}()|[\]\\]/g,'\\$&').replace(/\*/g,'.*').replace(/\$$/,'');try{return new RegExp(`^${body}${anchored?'$':''}`).test(path);}catch{return false;}}
 function robotsGroups(text:string){const groups:{agents:string[];rules:{allow:boolean;path:string}[]}[]=[];let current:{agents:string[];rules:{allow:boolean;path:string}[]}|null=null;for(const raw of text.split(/\r?\n/)){const line=raw.replace(/#.*/,'').trim();if(!line)continue;const at=line.indexOf(':');if(at<0)continue;const key=line.slice(0,at).trim().toLowerCase(),value=line.slice(at+1).trim();if(key==='user-agent'){if(!current||current.rules.length){current={agents:[],rules:[]};groups.push(current);}current.agents.push(value.toLowerCase());}else if((key==='allow'||key==='disallow')&&current&&value)current.rules.push({allow:key==='allow',path:value});}return groups;}
 export function robotsDisallowed(text:string,path:string,agent='NaeinfoClear'){
@@ -30,15 +32,42 @@ export function robotsDisallowed(text:string,path:string,agent='NaeinfoClear'){
  const rules=selected.flatMap(g=>g.rules).filter(r=>ruleMatches(r.path,path)).sort((a,b)=>b.path.length-a.path.length);
  return rules[0]?.allow?null:rules.length?'ROBOTS_DISALLOWED' as const:null;
 }
-async function ampRobotsAllowed(host:string,path:string,signal:AbortSignal){
- return !(await robotsRestriction(host,path,signal));
-}
-async function robotsRestriction(host:string,path:string,signal:AbortSignal):Promise<'ROBOTS_DISALLOWED'|'ROBOTS_AI_RESTRICTED'|null>{
- const now=Date.now(),cached=robotsCache.get(host);let result:{status:number;body?:string};if(cached&&cached.expiresAt>now)result=cached;else{
-  try{const response=await fetch(`https://${host}/robots.txt`,{redirect:'manual',headers:{'User-Agent':'NaeinfoClear/0.1 (article analysis; user-requested fetch)'},signal:AbortSignal.any([signal,AbortSignal.timeout(5000)])});if(response.status===404){await response.body?.cancel();result={status:404};}else if(response.ok){const text=await readLimitedText(response,256*1024);if(text===null)return 'ROBOTS_DISALLOWED';result={status:response.status,body:text};}else{await response.body?.cancel();return 'ROBOTS_DISALLOWED';}robotsCache.set(host,{...result,expiresAt:now+60*60*1000});}catch{signal.throwIfAborted();return 'ROBOTS_DISALLOWED';}
+async function robotsRestriction(host:string,path:string,signal:AbortSignal,db?:RuntimeConfig['DB']){
+ signal.throwIfAborted();
+ const memory=robotsCache.get(host);
+ if(memory&&Date.now()-memory.checkedAt<HOUR)return robotsDisallowed(memory.body,path);
+ for(let attempt=0;attempt<2;attempt++){
+  let body:string|null;
+  try{
+   const response=await fetch(`https://${host}/robots.txt`,{redirect:'manual',headers:{'User-Agent':'NaeinfoClear/0.1 (article analysis; user-requested fetch)'},signal:AbortSignal.any([signal,AbortSignal.timeout(5000)])});
+   if(response.status===404){await response.body?.cancel();body='';}
+   else if(response.ok)body=await readLimitedText(response,256*1024);
+   else{await response.body?.cancel();return 'ROBOTS_UNAVAILABLE' as const;}
+  }catch{
+   signal.throwIfAborted();
+   continue;
+  }
+  if(body===null)return 'ROBOTS_UNAVAILABLE' as const;
+  const checkedAt=Date.now();
+  if(robotsCache.size>=128&&!robotsCache.has(host))robotsCache.delete(robotsCache.keys().next().value!);
+  robotsCache.set(host,{body,checkedAt});
+  if(db){
+   try{
+    await db.prepare('INSERT INTO publisher_robots_cache (host,body,checked_at) VALUES (?,?,?) ON CONFLICT(host) DO UPDATE SET body=excluded.body, checked_at=excluded.checked_at WHERE excluded.checked_at > publisher_robots_cache.checked_at').bind(host,body,checkedAt).run();
+   }catch{console.warn('publisher_robots_cache write failed');}
+  }
+  return robotsDisallowed(body,path);
  }
- if(result.status===404)return null;
- return robotsDisallowed(result.body??'',path);
+ // Fallback never grants access on an HTTP rejection and is limited to exact allowlist entries.
+ if(db){
+  try{
+   const now=Date.now();
+   const saved=await db.prepare('SELECT body, checked_at AS checkedAt FROM publisher_robots_cache WHERE host=? AND checked_at>? AND checked_at<=?').bind(host,now-24*HOUR,now).first<RobotsSnapshot>();
+   signal.throwIfAborted();
+   if(saved)return robotsDisallowed(saved.body,path);
+  }catch{signal.throwIfAborted();console.warn('publisher_robots_cache read failed');}
+ }
+ return 'ROBOTS_UNAVAILABLE' as const;
 }
 async function readLimitedText(response:Response,maxBytes:number){
  const reader=response.body?.getReader();if(!reader)return '';
@@ -48,9 +77,10 @@ async function readLimitedText(response:Response,maxBytes:number){
 }
 async function daumPortal(url:URL,id:string,signal:AbortSignal):Promise<RetrievalResult>{
  const host=url.hostname.toLowerCase();if(host!=='v.daum.net')return failure('ROBOTS_DISALLOWED');
- const ua='NaeinfoClear/0.1 (article analysis; user-requested fetch)';let robots:Response;
- try{robots=await fetch(`${url.origin}/robots.txt`,{redirect:'manual',headers:{'User-Agent':ua},signal:AbortSignal.any([signal,AbortSignal.timeout(5000)])});}catch{signal.throwIfAborted();return failure('ROBOTS_DISALLOWED');}
-  const checkedAt=new Date().toISOString();if(robots.status!==404){if(!robots.ok){await robots.body?.cancel();return failure('ROBOTS_DISALLOWED');}const rules=await readLimitedText(robots,256*1024);if(rules===null)return failure('ROBOTS_DISALLOWED');const restricted=robotsDisallowed(rules,url.pathname);if(restricted)return failure(restricted);}
+ const ua='NaeinfoClear/0.1 (article analysis; user-requested fetch)';
+ const restricted=await robotsRestriction(host,url.pathname,signal);
+ if(restricted)return failure(restricted);
+ const checkedAt=new Date().toISOString();
  let response:Response;try{response=await fetch(url,{redirect:'manual',headers:{Accept:'text/html','User-Agent':ua},signal:AbortSignal.any([signal,AbortSignal.timeout(5000)])});}catch{signal.throwIfAborted();return failure('TIMEOUT');}
  for(let redirects=0;[301,302,303,307,308].includes(response.status);redirects++){
   const location=response.headers.get('location');await response.body?.cancel();if(redirects>=2||!location)return failure('BLOCKED_DESTINATION');let next:URL;try{next=new URL(location,url);}catch{return failure('BLOCKED_DESTINATION');}if(next.protocol!=='https:'||next.hostname!==host||next.username||next.password||next.port)return failure('BLOCKED_DESTINATION');try{response=await fetch(next,{redirect:'manual',headers:{Accept:'text/html','User-Agent':ua},signal:AbortSignal.any([signal,AbortSignal.timeout(5000)])});}catch{signal.throwIfAborted();return failure('TIMEOUT');}
@@ -74,7 +104,8 @@ async function retrieveDetailedImpl(url:string,id:string,config:RuntimeConfig,si
   // Use only trusted public publisher domains configured by the operator.
   if(!target)return failure('INVALID_URL');
   if(isFetchDenylistedHost(target.hostname))return failure('ROBOTS_AI_RESTRICTED');
-  const robotsFailure=await robotsRestriction(target.hostname,target.pathname,signal);if(robotsFailure)return failure(robotsFailure);
+  const robotsDb=(host:string)=>hosts.some(entry=>entry.toLowerCase()===host)?config.DB:undefined;
+  const robotsFailure=await robotsRestriction(target.hostname,target.pathname,signal,robotsDb(target.hostname));if(robotsFailure)return failure(robotsFailure);
   const originalOrigin=target.origin,seen=new Set([target.href]);
   const fetchSignal=AbortSignal.any([signal,AbortSignal.timeout(5000)]);
   let response:Response,requestCount=0;
@@ -105,9 +136,9 @@ async function retrieveDetailedImpl(url:string,id:string,config:RuntimeConfig,si
   if((extracted?.text.length??0)<300&&/^text\/html(?:;|$)/i.test(type)&&requestCount<3){
    const ampHref=extracted?.ampUrl??articleAmpUrl(document,target.href);
    if(ampHref){try{const amp=new URL(ampHref),root=getDomain(target.hostname),ampRoot=getDomain(amp.hostname);const approvedDomain=hosts.some(host=>getDomain(host)===root);
-    if(root&&root===ampRoot&&approvedDomain&&amp.protocol==='https:'&&!amp.username&&!amp.password&&!amp.port&&!amp.hostname.endsWith('.')&&await ampRobotsAllowed(amp.hostname,amp.pathname,fetchSignal)){
+    if(root&&root===ampRoot&&approvedDomain&&amp.protocol==='https:'&&!amp.username&&!amp.password&&!amp.port&&!amp.hostname.endsWith('.')&&!(await robotsRestriction(amp.hostname,amp.pathname,fetchSignal,robotsDb(amp.hostname)))){
      let ampResponse=await fetch(amp,{redirect:'manual',headers:{Accept:'text/html','User-Agent':'NaeinfoClear/0.1 (article analysis; user-requested fetch)'},signal:fetchSignal});requestCount++;
-     if([301,302,303,307,308].includes(ampResponse.status)&&requestCount<3){const location=ampResponse.headers.get('location');await ampResponse.body?.cancel();if(location){const next=new URL(location,amp);if(next.protocol==='https:'&&getDomain(next.hostname)===root&&!next.username&&!next.password&&!next.port&&await ampRobotsAllowed(next.hostname,next.pathname,fetchSignal)){ampResponse=await fetch(next,{redirect:'manual',headers:{Accept:'text/html','User-Agent':'NaeinfoClear/0.1 (article analysis; user-requested fetch)'},signal:fetchSignal});requestCount++;}}}
+     if([301,302,303,307,308].includes(ampResponse.status)&&requestCount<3){const location=ampResponse.headers.get('location');await ampResponse.body?.cancel();if(location){const next=new URL(location,amp);if(next.protocol==='https:'&&getDomain(next.hostname)===root&&!next.username&&!next.password&&!next.port&&!(await robotsRestriction(next.hostname,next.pathname,fetchSignal,robotsDb(next.hostname)))){ampResponse=await fetch(next,{redirect:'manual',headers:{Accept:'text/html','User-Agent':'NaeinfoClear/0.1 (article analysis; user-requested fetch)'},signal:fetchSignal});requestCount++;}}}
      if([401,402,403,429].includes(ampResponse.status)){await ampResponse.body?.cancel();return failure('ACCESS_RESTRICTED',`http_${ampResponse.status}`);}
      if(/\b(noai|noimageai|nosnippet|noarchive)\b/i.test(ampResponse.headers.get('x-robots-tag')??'')){await ampResponse.body?.cancel();return failure('ROBOTS_AI_RESTRICTED');}
      if(ampResponse.ok&&/^text\/html(?:;|$)/i.test(ampResponse.headers.get('content-type')??'')){const ampReader=ampResponse.body?.getReader();if(ampReader){const chunks:Uint8Array[]=[];let length=0;while(true){const part=await ampReader.read();if(part.done)break;length+=part.value.length;if(length>2*1024*1024){await ampReader.cancel();break;}chunks.push(part.value);}if(length<=2*1024*1024){const bytes=new Uint8Array(length);let pos=0;for(const chunk of chunks){bytes.set(chunk,pos);pos+=chunk.length;}const ampHtml=decodeArticleDocument(bytes,'text/html');if(ampHtml&&!articleRestriction(ampHtml)){const ampExtract=extractArticle(ampHtml,amp.href);if(ampExtract?.text&&ampExtract.text.length>(extracted?.text.length??0))extracted={...ampExtract,extractionMethod:'amp'};}}}}

@@ -71,6 +71,37 @@ describe('open retrieval policy helpers',()=>{
   const result=await retrieveDetailed('https://robots-blocked.example/story','blocked',{ALLOWED_RETRIEVAL_HOSTS:'robots-blocked.example'} as RuntimeConfig,new AbortController().signal);
   expect(result).toMatchObject({ok:false,reason:'ROBOTS_DISALLOWED'});expect(fetch).toHaveBeenCalledTimes(1);
  });
+ it('retries a robots connection error and uses the new response',async()=>{
+  const host='robots-retry.example';
+  const fetch=vi.fn().mockRejectedValueOnce(new TypeError('network'))
+   .mockResolvedValueOnce(new Response('User-agent: *\nDisallow: /story'));
+  vi.stubGlobal('fetch',fetch);
+  const result=await retrieveDetailed(`https://${host}/story`,'probe',{ALLOWED_RETRIEVAL_HOSTS:host},AbortSignal.timeout(3000));
+  expect(result).toMatchObject({ok:false,reason:'ROBOTS_DISALLOWED'});
+  expect(fetch).toHaveBeenCalledTimes(2);
+ });
+ it.each([false,true])('only falls back to a recent stored policy after two connection failures (cached: %s)',async cached=>{
+  const host=`robots-cache-${cached}.example`;
+  const fetch=vi.fn().mockRejectedValue(new TypeError('network'));
+  const first=vi.fn().mockResolvedValue(cached?{body:'User-agent: GPTBot\nDisallow: /',checkedAt:Date.now()-2*3600000}:null);
+  const bind=vi.fn().mockReturnValue({first});
+  const DB={prepare:vi.fn().mockReturnValue({bind})} as unknown as RuntimeConfig['DB'];
+  vi.stubGlobal('fetch',fetch);
+  const result=await retrieveDetailed(`https://${host}/story`,'probe',{ALLOWED_RETRIEVAL_HOSTS:host,DB},AbortSignal.timeout(3000));
+  expect(result).toMatchObject({ok:false,reason:cached?'ROBOTS_AI_RESTRICTED':'ROBOTS_UNAVAILABLE'});
+  expect(fetch).toHaveBeenCalledTimes(2);
+  expect(bind).toHaveBeenCalledWith(host,expect.any(Number),expect.any(Number));
+ });
+ it('does not consult a saved allow policy after an explicit HTTP rejection',async()=>{
+  const host='robots-http-denial.example';
+  const fetch=vi.fn().mockResolvedValueOnce(new Response(null,{status:403}));
+  const prepare=vi.fn();
+  vi.stubGlobal('fetch',fetch);
+  const result=await retrieveDetailed(`https://${host}/story`,'probe',{ALLOWED_RETRIEVAL_HOSTS:host,DB:{prepare} as unknown as RuntimeConfig['DB']},AbortSignal.timeout(3000));
+  expect(result).toMatchObject({ok:false,reason:'ROBOTS_UNAVAILABLE'});
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(prepare).not.toHaveBeenCalled();
+ });
  it('does not fetch the article if robots denies AI-wide crawling',async()=>{
   const fetch=vi.fn().mockResolvedValueOnce(new Response('User-agent: GPTBot\nDisallow: /',{status:200}));vi.stubGlobal('fetch',fetch);
   const result=await retrieveDetailed('https://ai-blocked.example/story','blocked',{ALLOWED_RETRIEVAL_HOSTS:'ai-blocked.example'} as RuntimeConfig,new AbortController().signal);
