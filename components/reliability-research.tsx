@@ -15,6 +15,7 @@ const coverageLabel:Record<ClaimCoverage,string>={pending:'대기',reviewing:'�
 export default function ReliabilityResearch({analysis,cap,onChange,researchConsent}:{analysis:Analysis;cap:Capabilities|null;onChange:(results:ResearchVerification[],stage:ResearchStage)=>void;researchConsent?:boolean}){
  const [consent,setConsent]=useState(false),[started,setStarted]=useState(false),[stage,setStage]=useState<ResearchStage>('not_started'),[message,setMessage]=useState(''),[results,setResults]=useState<ResearchVerification[]>([]);
  const [directActive,setDirectActive]=useState(false);
+ const [running,setRunning]=useState(false);
  const [autoStarted,setAutoStarted]=useState(false);
  const [coverage,setCoverage]=useState<Record<string,ClaimCoverage>>({}),[batchInfo,setBatchInfo]=useState<{batch:number;batches:number}|null>(null);
  const autoTried=useRef(false);
@@ -27,15 +28,15 @@ export default function ReliabilityResearch({analysis,cap,onChange,researchConse
  useEffect(()=>{
   if(!started)return;
   if(!consent||!ready||!hasTargets||(autoStarted&&researchConsent!==true)){
-   control.current?.abort();setStarted(false);setConsent(false);setStage('cancelled');
+   control.current?.abort();setRunning(false);setStarted(false);setConsent(false);setStage('cancelled');
    setMessage('입력이 바뀌었거나 조사 기능을 사용할 수 없어 중단했어요. 다시 조사하려면 동의를 확인하고 시작해 주세요.');callback.current([...results],'cancelled');return;
   }
-  const c=new AbortController();control.current=c;const found:ResearchVerification[]=[];
+  const c=new AbortController();control.current=c;setRunning(true);const found:ResearchVerification[]=[];
   const modelIntervalMs=cap?.aiProvider==='nvidia'?0:61000;
   void runResearch({sources:analysis.sources,claims:factual,position,proposition,articleContextToken:analysis.articleContextToken,analysisContextToken:analysis.analysisContextToken,transmissionConsent:true,researchConsent:true},c.signal,{
    now:Date.now,wait:researchWait,modelIntervalMs,firstModelCallAt:Date.parse(analysis.createdAt)+modelIntervalMs,
    post:async<T,>(body:unknown,signal:AbortSignal)=>{const response=await fetch('/api/research',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.any([signal,AbortSignal.timeout(researchRequestTimeout(cap))])});const data=await response.json() as {error?:{message?:string;code?:string}};if(!response.ok)throw Object.assign(new Error(data.error?.message??'자동 조사에 연결하지 못했어요.'),{code:data.error?.code});return data as T;},
-  },p=>{if(!c.signal.aborted){setStage(p.stage);setMessage(p.message);setCoverage(p.coverage);setBatchInfo({batch:p.batch,batches:p.batches});callback.current(found,p.stage);}},v=>{if(!c.signal.aborted){found.push({...v,parentAnalysisId:analysis.analysisId});setResults([...found]);callback.current([...found],'comparing');}}).catch(e=>{if(!c.signal.aborted){settleCoverage();setStage('failed');setMessage(e instanceof Error?e.message:'자동 조사에 연결하지 못했어요.');callback.current([...found],'failed');}});
+  },p=>{if(!c.signal.aborted){setStage(p.stage);setMessage(p.message);setCoverage(p.coverage);setBatchInfo({batch:p.batch,batches:p.batches});callback.current(found,p.stage);}},v=>{if(!c.signal.aborted){found.push({...v,parentAnalysisId:analysis.analysisId});setResults([...found]);callback.current([...found],'comparing');}}).catch(e=>{if(!c.signal.aborted){settleCoverage();setStage('failed');setMessage(e instanceof Error?e.message:'자동 조사에 연결하지 못했어요.');callback.current([...found],'failed');}}).finally(()=>{if(control.current===c){control.current=null;setRunning(false);}});
   return ()=>c.abort();
   // The parent remounts this component for each immutable analysis id.
  },[started,consent,ready,researchConsent]);
@@ -44,7 +45,7 @@ export default function ReliabilityResearch({analysis,cap,onChange,researchConse
  useEffect(()=>{
   if(autoTried.current||started||!ready||!hasTargets||directActive)return;
   if(researchConsent!==true)return;
-  autoTried.current=true;setConsent(true);setAutoStarted(true);setStarted(true);
+  autoTried.current=true;setRunning(true);setConsent(true);setAutoStarted(true);setStarted(true);
  },[ready,hasTargets,researchConsent]);
  const batches=Math.ceil(factual.length/RESEARCH_BATCH_CLAIMS);
  const waitReasons=analysis.mode!=='live'?[]:!cap?['기능 연결 상태를 확인하는 중입니다.']:[
@@ -53,7 +54,7 @@ export default function ReliabilityResearch({analysis,cap,onChange,researchConse
   ...(!cap.webFetch?['본문 취득을 허용한 공개 기사 출처 설정이 아직 준비되지 않았습니다.']:[]),
  ];
  const review=reliabilityReview(analysis,results,stage),cards=verifiedRecommendations(results,analysis);
- const busy=['planning','searching','fetching','waiting','comparing'].includes(stage);
+ const busy=running;
  useEffect(()=>{
   const terminal=started&&!busy&&['completed','partial','failed','cancelled'].includes(stage);
   if(!focusAfterTransition.current&&researchFocusChain.current&&terminal)focusAfterTransition.current='restart';
@@ -68,10 +69,10 @@ export default function ReliabilityResearch({analysis,cap,onChange,researchConse
   });
   return ()=>cancelAnimationFrame(frame);
  },[started,stage]);
- function start(){researchFocusChain.current=false;focusAfterTransition.current='cancel';setStarted(true);}
+ function start(){setRunning(true);researchFocusChain.current=false;focusAfterTransition.current='cancel';setStarted(true);}
  function settleCoverage(){setCoverage(prev=>Object.fromEntries(Object.entries(prev).map(([id,v])=>[id,v==='pending'||v==='reviewing'?'not_completed':v])) as Record<string,ClaimCoverage>);}
- function cancel(){researchFocusChain.current=false;focusAfterTransition.current='restart';control.current?.abort();settleCoverage();setStage('cancelled');setMessage('조사를 취소했어요. 이미 확인한 자료만 표시합니다.');callback.current(results,'cancelled');}
- function prepareRestart(){researchFocusChain.current=false;focusAfterTransition.current='consent';control.current?.abort();setStarted(false);setConsent(false);setAutoStarted(false);setStage('not_started');setMessage('');setResults([]);setCoverage({});setBatchInfo(null);callback.current([],'not_started');}
+ function cancel(){setRunning(false);researchFocusChain.current=false;focusAfterTransition.current='restart';control.current?.abort();settleCoverage();setStage('cancelled');setMessage('조사를 취소했어요. 이미 확인한 자료만 표시합니다.');callback.current(results,'cancelled');}
+ function prepareRestart(){setRunning(false);researchFocusChain.current=false;focusAfterTransition.current='consent';control.current?.abort();setStarted(false);setConsent(false);setAutoStarted(false);setStage('not_started');setMessage('');setResults([]);setCoverage({});setBatchInfo(null);callback.current([],'not_started');}
  return <><section className="report-section" aria-label="자동 신뢰성 조사">
   <div className="report-section-title"><h3><Search size={16}/> 03. 신뢰성</h3><span className="badge badge-purple">외부 자료 조사</span></div>
   <p className="section-description">{review.label}</p>
@@ -91,10 +92,11 @@ export default function ReliabilityResearch({analysis,cap,onChange,researchConse
    {busy&&<button ref={cancelRef} className="small-button" onClick={cancel}>조사 취소</button>}
    {started&&!busy&&['completed','partial','failed','cancelled'].includes(stage)&&<button ref={restartRef} className="small-button" onClick={prepareRestart}>새 조사 준비하기</button>}
   </>}
+  {!busy&&stage==='partial'&&Object.values(coverage).includes('no_evidence')&&<p className="topic-note">???? ??? ???? ?? ??? ???? ?? ??? ?? ?? ??? ? ???.</p>}
   {!!review.completedClaims&&<div className="stance-list"><span>뒷받침 {review.supported}</span><span>상충 {review.contradicted+review.conflicting}</span><span>불충분 {review.insufficient}</span></div>}
   {cards.length>0&&<><h4>참고할 관련 기사</h4>{cards.map(card=><article className="claim-relations" key={card.url}><span className="badge">{recommendationLabel(card)}</span><h4><a href={card.url} target="_blank" rel="noopener noreferrer">{card.title} <ArrowUpRight size={12}/></a></h4><p className="topic-note">{card.publisherDomain} · 본문 취득 · 인용 일치 확인</p><blockquote>“{card.quote.slice(0,280)}{card.quote.length>280?'…':''}”</blockquote><p>{card.reason}</p></article>)}</>}
   <p className="topic-note">{review.scopeNote} 자료가 없거나 접속에 실패했다고 거짓으로 분류하지 않습니다.</p>
  </section>
-  <DirectEvidence analysis={analysis} cap={cap} locked={started} onBusy={setDirectActive} onProgress={next=>{setStage(next);callback.current(results,next);}} onResult={result=>{const next=[...results,result];setResults(next);setStage('partial');callback.current(next,'partial');}}/>
+  <DirectEvidence analysis={analysis} cap={cap} locked={busy} onBusy={setDirectActive} onProgress={next=>{setStage(next);callback.current(results,next);}} onResult={result=>{const next=[...results,result];setResults(next);setStage('partial');callback.current(next,'partial');}}/>
  </>;
 }
