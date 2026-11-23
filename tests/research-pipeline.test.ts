@@ -12,12 +12,19 @@ import {clearResearchSearchCache} from '../lib/server/search-cache';
 import {verifiedRecommendations,reliabilityReview} from '../lib/reliability';
 import {makeSources} from '../lib/domain';
 import {AppError} from '../lib/server/errors';
+import {z} from 'zod/v4';
 const request=()=>new Request('https://site.test/api/research',{headers:{'cf-connecting-ip':'192.0.2.1'}});
 const config:RuntimeConfig={AI_PROVIDER:'groq',ENABLE_LIVE_ANALYSIS:'true',GROQ_API_KEY:'synthetic-only-not-real',GROQ_MODEL:'openai/gpt-oss-120b',GROQ_ELIGIBILITY_CONFIRMED:'true',GROQ_FREE_PLAN_CONFIRMED:'true',GROQ_CONSOLE_LIMITS_CONFIRMED:'true',GROQ_CONSOLE_RPD:'1000',GROQ_CONSOLE_TPD:'200000',ENABLE_NEWS_SEARCH:'true',NEWS_TERMS_APPROVED:'true',ALLOWED_RETRIEVAL_HOSTS:'news.example',DB:{} as D1Database};
 const input=():ResearchInput=>{const a=demoAnalysis('conflict');return {sources:a.sources,claims:a.claims.filter(c=>c.kind==='factual').slice(0,1),transmissionConsent:true,researchConsent:true};};
 afterEach(()=>{clearResearchSearchCache();vi.restoreAllMocks();});
 function planner(i:ResearchInput){return vi.spyOn(language,'structured').mockResolvedValue({queries:[{claimId:i.claims[0].id,label:'운영 시간',query:'school library closing time',purpose:'fact_check'}]});}
 describe('자동 조사 단계 연결 (모의 검색·모의 LLM, 실서비스 검증 아님)',()=>{
+ it('Groq 검색 계획은 단순 출력 스키마를 쓰고 정규 검색어 규칙은 서버에서 검증한다',async()=>{
+  const i=input(),llm=planner(i);await planResearch(request(),i,config,AbortSignal.timeout(1000));
+  const options=llm.mock.calls[0][5];
+  expect(JSON.stringify(z.toJSONSchema(options!.generationSchema!))).not.toMatch(/pattern|minLength|maxLength/);
+  expect(JSON.stringify(z.toJSONSchema(llm.mock.calls[0][1]))).toContain('pattern');
+ });
  it('같은 검색어의 다음 계획에 캐시 인덱스를 알려 주고 검색 예약을 추가하지 않는다',async()=>{
   const i=input();planner(i);
   const reserve=vi.spyOn(searchBudget,'reserveSearch').mockResolvedValue(undefined);
