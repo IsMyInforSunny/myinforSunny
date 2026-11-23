@@ -249,3 +249,10 @@
   .studio-metric-heading > strong { max-width: 100%; overflow-wrap: anywhere; }
   .studio-relative ol { padding-left: 20px; }
 }
+/* Descriptive composition is distinct from the pending cross-article bias score. */
+.studio-composition {margin:.55rem 0;padding:.55rem 0;border-top:1px solid #c8bd8c;}
+.studio-composition p {margin:.25rem 0;}
+.studio-composition-values {display:flex;flex-wrap:wrap;gap:.45rem 1rem;margin:.45rem 0;}
+.studio-composition-values span {display:flex;flex-direction:column;}
+.studio-composition-values small {font-size:.8rem;}
+.studio-composition details {font-size:.85rem;}

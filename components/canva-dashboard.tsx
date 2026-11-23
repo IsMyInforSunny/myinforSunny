@@ -66,6 +66,7 @@ export default function CanvaDashboard({analysis, researchResults, researchStage
   const viewpoints=analysis?compareArticleViewpoints(analysis,results):null;
   const voiceAssessment=voiceAssessmentFromResearch(stale?null:analysis,results);
   const scores = buildAnalysisScores(analysis, bias, {observations: reliabilityObservations, weightSet: sourceWeightSet},voiceAssessment);
+  const composition=stale?undefined:scores.citationComposition;
   const language = analysis ? languageMetrics(analysis, includeComments ? 'all' : 'body') : null;
   const proposition = analysis ? researchProposition(analysis) : undefined;
   const groundedProposition = analysis ? researchProposition({bodyPosition: analysis.bodyPosition, sources: analysis.sources}) : undefined;
@@ -120,6 +121,17 @@ export default function CanvaDashboard({analysis, researchResults, researchStage
             </div>
             <div className="studio-axis-labels"><span>{axisMode === 'political' ? '좌익' : '반대 관점'}</span><span>{axisMode === 'political' ? '기준선' : '복합 관점'}</span><span>{axisMode === 'political' ? '우익' : '찬성 관점'}</span></div>
             <p className="studio-metric-note">{biasNote}</p>
+            {composition&&<section className="studio-composition" aria-label="기사 내부 입장 구성 집계">
+              <p><strong>기사 내부 입장 구성</strong> · {composition.all.denominator?'집계 완료':'관련 문장 없음'}</p>
+              <p className="studio-metric-note">집계 명제 · {composition.proposition}</p>
+              {composition.all.percentages&&<div className="studio-composition-values">
+                {([['support','찬성'],['oppose','반대'],['neutral','중립'],['uncertain','유보']] as const).map(([key,label])=><span key={key}><b>{label} {composition.all.percentages![key]}%</b><small>{composition.all.counts[key]}/{composition.all.denominator}문장</small></span>)}
+              </div>}
+              <p className="studio-metric-note">기자 서술 {composition.journalist.denominator}문장 · 취재원 인용·전달 {composition.sources.denominator}문장 · 화자 유보 {composition.unknownSpeaker}문장 · 무관 {composition.unrelated}문장 제외</p>
+              <details><summary>집계식과 취재원 구성</summary><p>{composition.note}</p><p>각 방향의 문장 수 ÷ 관련 본문 문장 수 × 100. 반올림 비율의 합은 100%입니다.</p>
+                <p>{composition.sources.denominator&&composition.sources.percentages?`취재원: 찬성 ${composition.sources.counts.support} · 반대 ${composition.sources.counts.oppose} · 중립 ${composition.sources.counts.neutral} · 유보 ${composition.sources.counts.uncertain} (${composition.sources.denominator}문장)`:'분류된 취재원 인용 문장이 없어 취재원 비율은 계산하지 않습니다.'}</p>
+              </details>
+            </section>}
             {analysis&&axisMode==='argument'&&<div className="studio-viewpoint-comparison" aria-label="같은 논점의 관점 비교">
               <p><strong>편향 강도 · {scores.bias.status==='partial'?`${scores.bias.lowerBound} ~ ${scores.bias.upperBound}점`:scores.bias.value===null?'같은 쟁점·분기 비교 표본 대기':`${scores.bias.value}점`}</strong></p>
               {analysis.sentenceVoices?.method==='svm'&&<p>{scores.bias.note}</p>}
@@ -136,6 +148,7 @@ export default function CanvaDashboard({analysis, researchResults, researchStage
             <PercentageBar value={language?.stimulation.value ?? null} label={`${scope} 자극 표현 비율`} />
             <div className="studio-metric-foot"><p>{language ? `${scope} ${language.stimulation.flagged}/${language.total}문장${language.unresolved ? ` · 미판정 ${language.unresolved}` : ''}` : '분석할 본문을 입력해 주세요'}</p><button type="button" onClick={onEvidence} disabled={!analysis}>공격성 {percentageText(language?.aggression)} <ChevronRight size={12} /></button></div>
             <label className="studio-scope"><input type="checkbox" checked={includeComments} onChange={event => setIncludeComments(event.target.checked)} /> 댓글도 함께 집계</label>
+            {!!analysis?.coverage.excludedNonEditorialSentences&&<p className="studio-metric-note">사진·저작권·홍보 {analysis.coverage.excludedNonEditorialSentences}문장은 집계에서 제외했습니다.</p>}
           </div>
           <div className="studio-metric">
             <div className="studio-metric-heading"><h3>신뢰 <small>근거 출처 명시</small></h3><strong>{sourceText}</strong></div>

@@ -23,6 +23,73 @@ function setPosition(analysis:Analysis,label:BodyPosition['label']='support',pro
 const render=(analysis:Analysis,extra:Partial<Parameters<typeof CanvaDashboard>[0]>={})=>renderToStaticMarkup(createElement(CanvaDashboard,{analysis,researchResults:[],onEvidence:()=>{},onArticles:()=>{},onCoordinates:()=>{},...extra}));
 const argumentAxis=(html:string)=>html.match(/<div[^>]*role="img"[\s\S]*?<\/div>/)?.[0]??'';
 
+const priorityArticleUrls=[
+ 'https://www.pressian.com/pages/articles/2026091808555217839',
+ 'https://www.pressian.com/pages/articles/2026110509224063406',
+];
+function compositionArticle(url:string):Analysis{
+ const analysis=article('시가 생활임금 결정을 발표했다. 노동계는 인상을 요구했다. 경영계는 동결을 요구했다. 시행 시점은 내년이다.');
+ analysis.status='success';
+ analysis.article={url,fetchedAt:'2026-11-23T01:00:00Z',fullTextLength:analysis.sources[0].text.length,analyzedCharacters:analysis.sources[0].text.length,truncated:false};
+ analysis.bodyPosition={proposition:'생활임금을 인상해야 한다.',label:'not_expressed',evidence:[],reason:'작성자 입장 표명 없음'};
+ delete analysis.sentenceVoices;delete analysis.additionalSentenceVoices;delete analysis.voiceCoordinates;
+ delete analysis.issueQuarterComparison;delete analysis.issueQuarterComparisons;
+ const directions=['support','oppose','neutral','neutral'] as const;
+ analysis.citationBalance={method:'ai',modelVersion:'fixture-only',proposition:'생활임금을 인상해야 한다.',
+  labels:analysis.sources[0].sentences.map((unit,index)=>({sentenceId:unit.id,relevance:'related',direction:directions[index],speaker:index<2?'source':'journalist'}))};
+ return analysis;
+}
+const compositionSection=(html:string)=>html.match(/<section[^>]*aria-label="기사 내부 입장 구성 집계"[\s\S]*?<\/section>/)?.[0]??'';
+
+describe('두 우선 기사의 내부 입장 구성 표시',()=>{
+ it.each(priorityArticleUrls)('승인된 기사 %s에 실제 분모와 화자별 집계를 표시하며 상대 편향은 대기로 둔다',url=>{
+  const html=render(compositionArticle(url)),section=compositionSection(html);
+  expect(section).toContain('집계 완료');
+  expect(section).toContain('찬성 25%');expect(section).toContain('반대 25%');expect(section).toContain('중립 50%');expect(section).toContain('유보 0%');
+  expect(section).toContain('1/4문장');expect(section).toContain('2/4문장');
+  expect(section).toContain('기자 서술 2문장 · 취재원 인용·전달 2문장');
+  expect(section).toContain('취재원: 찬성 1 · 반대 1 · 중립 0 · 유보 0 (2문장)');
+  expect(section).toContain('다른 매체와 비교한 편향 강도 점수가 아닙니다');
+  expect(html).toContain('편향 강도 · 같은 쟁점·분기 비교 표본 대기');
+  expect(html).toContain('작성자 입장 표명 없음');
+  expect(argumentAxis(html)).not.toContain('studio-axis-marker');
+ });
+
+ it('중립100%를 기사 작성자 편향0점으로 바꾸지 않는다',()=>{
+  const analysis=compositionArticle(priorityArticleUrls[0]);
+  analysis.citationBalance!.labels.forEach(label=>{label.direction='neutral';});
+  const html=render(analysis),section=compositionSection(html);
+  expect(section).toContain('중립 100%');expect(section).toContain('4/4문장');
+  expect(html).toContain('작성자 입장 표명 없음');expect(html).toContain('편향 강도 · 같은 쟁점·분기 비교 표본 대기');
+  expect(html).not.toContain('편향 강도 · 0점');expect(argumentAxis(html)).not.toContain('studio-axis-marker');
+ });
+
+ it('같은 승인 URL에서도 현재 문장 분류가 바뀌면 표시 비율을 다시 계산한다',()=>{
+  const analysis=compositionArticle(priorityArticleUrls[0]);
+  const before=compositionSection(render(analysis));
+  analysis.citationBalance!.labels.forEach(label=>{label.direction='oppose';});
+  const after=compositionSection(render(analysis));
+  expect(before).toContain('반대 25%');expect(after).toContain('반대 100%');expect(after).toContain('4/4문장');
+  expect(after).not.toContain('반대 25%');
+ });
+
+ it.each([
+  'https://www.pressian.com/pages/articles/2026091808555217830',
+  'https://other.example/pages/articles/2026091808555217839',
+ ])('다른 기사 %s에는 우선 구성 집계를 노출하지 않는다',url=>{
+  const html=render(compositionArticle(url));
+  expect(compositionSection(html)).toBe('');
+  expect(html).toContain('편향 강도 · 같은 쟁점·분기 비교 표본 대기');
+ });
+
+ it('입력이 변경됐거나 문장 분류가 누락된 경우 집계 완료로 표시하지 않는다',()=>{
+  const analysis=compositionArticle(priorityArticleUrls[0]);
+  expect(compositionSection(render(analysis,{stale:true}))).toBe('');
+  analysis.citationBalance!.labels.pop();
+  expect(compositionSection(render(analysis))).toBe('');
+ });
+});
+
 describe('기사 본문을 중심으로 한 대시보드 표시',()=>{
  it('논점은 있어도 작성자 입장 근거가 없으면 입장 표명 없음과 상대 비교 안내를 표시한다',()=>{
   const analysis=article('정부가 정책 논의 결과를 발표했다.');analysis.status='success';
