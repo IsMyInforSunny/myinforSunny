@@ -12,6 +12,7 @@ registerHooks({resolve(s,c,n){try{return n(s,c);}catch(e){if(s.startsWith('.')&&
 }});
 const root=fs.realpathSync(process.cwd()),directory=path.join(root,'.sites-runtime/paired-voice-labels-20261116');
 const mode=process.argv[2]??'audit';
+const fillPairedGaps=mode==='groq'&&process.argv.includes('--fill-paired-gaps');
 if(!['audit','lightning','deepseek','groq','status'].includes(mode))throw Error('Use audit|lightning|deepseek|groq|status');
 const readText=p=>{for(let attempt=0;;attempt++){try{return fs.readFileSync(p,'utf8').replace(/^\uFEFF/,'');}catch(error){if(!['EPERM','EBUSY','EACCES'].includes(error.code)||attempt>=5)throw error;Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,100);}}};
 const json=p=>JSON.parse(readText(p));
@@ -58,9 +59,12 @@ if(fs.existsSync(lockPath)){const lock=json(lockPath);let alive=true;try{process
 fs.writeFileSync(lockPath,JSON.stringify({pid:process.pid,at:new Date().toISOString()}),{flag:'wx',mode:0o600});
 const oldProgress=readProgress(mode),progress={...oldProgress,pid:process.pid,startedAt:oldProgress.startedAt??new Date().toISOString(),runStartedAt:new Date().toISOString(),preservedCompleted:count(records),rateLimited:oldProgress.rateLimited??0,serviceUnavailable:oldProgress.serviceUnavailable??0,attempted:oldProgress.attempted??0,concurrency:mode==='lightning'?6:mode==='deepseek'?1:1,intervalMs:mode==='lightning'?5000:mode==='deepseek'?5000:2000,timeoutMs:mode==='deepseek'?600000:180000,consecutiveSuccesses:0,history:oldProgress.history??[]};
 const active=new Map(),controllers=new Set(),attemptCounts=new Map(),dispatched=new Set(),retryQueue=[];
-const attemptsUsed=record=>mode==='lightning'?(record?.recoveryVersion==='2026-11-18.1'?(record.recoveryAttempts??0):0):Number.isInteger(record?.optimizationAttempts)?record.optimizationAttempts:record&&Date.parse(record.createdAt)>=Date.parse(progress.startedAt)?Math.min(2,record.attempts??1):0;
+const lightningRecoveryVersion='2026-11-23.1';
+const pairedGapVersion='2026-11-23.1';
+const attemptsUsed=record=>fillPairedGaps?(record?.pairedGapVersion===pairedGapVersion?(record.pairedGapAttempts??0):0):mode==='lightning'?(record?.recoveryVersion===lightningRecoveryVersion?(record.recoveryAttempts??0):0):Number.isInteger(record?.optimizationAttempts)?record.optimizationAttempts:record&&Date.parse(record.createdAt)>=Date.parse(progress.startedAt)?Math.min(2,record.attempts??1):0;
 delete progress.fatal;delete progress.finishedAt;
-for(const item of manifest.articles){const record=records.get(item.id);if(record?.status!=='completed'&&attemptsUsed(record)===1){dispatched.add(item.id);retryQueue.push(item);}}
+const secondModelCanUse=item=>mode!=='groq'||(item.partition==='evaluation'&&getRecords('deepseek').get(item.id)?.status!=='completed'&&(!fillPairedGaps||getRecords('lightning').get(item.id)?.status==='completed'));
+for(const item of manifest.articles){const record=records.get(item.id);if(secondModelCanUse(item)&&record?.status!=='completed'&&attemptsUsed(record)===1){dispatched.add(item.id);retryQueue.push(item);}}
 progress.inheritedTrainingCounts=Object.fromEntries(topics.map(t=>[t,count(records,'training',t)]));
 progress.trainingBalancePolicy='Catch up inherited uneven counts using lowest topic first; admissions never exceed minimum eligible topic by5.';
 const maxConcurrency=mode==='lightning'?6:mode==='deepseek'?3:1;
@@ -99,7 +103,7 @@ function winnerCheck(){
  return false;
 }
 function choose(){
- const eligible=manifest.articles.filter(x=>(mode==='lightning'||x.partition==='evaluation')&&(mode!=='groq'||getRecords('deepseek').get(x.id)?.status!=='completed')&&records.get(x.id)?.status!=='completed'&&attemptsUsed(records.get(x.id))<2&&!dispatched.has(x.id)&&!active.has(x.id));
+ const eligible=manifest.articles.filter(x=>(mode==='lightning'||x.partition==='evaluation')&&secondModelCanUse(x)&&records.get(x.id)?.status!=='completed'&&attemptsUsed(records.get(x.id))<2&&!dispatched.has(x.id)&&!active.has(x.id));
  const evalPending=eligible.filter(x=>x.partition==='evaluation');
  const evalActive=[...active.values()].some(x=>x.partition==='evaluation');
  if(evalPending.length){for(let step=1;step<=3;step++){const idx=(lastTopic+step)%3,item=evalPending.find(x=>x.topic===topics[idx]);if(item){lastTopic=idx;return item;}}}
@@ -127,12 +131,16 @@ function parseLabels(output,p){
 const retryDelay=headers=>{const raw=headers.get('retry-after');if(!raw)return 60000;const seconds=Number(raw);return Number.isFinite(seconds)?Math.max(0,seconds*1000):Math.max(0,Date.parse(raw)-Date.now());};
 async function call(item,retry=false){
  const p=prepare(item),started=Date.now(),attempt=(attemptCounts.get(item.id)??0)+1;attemptCounts.set(item.id,attempt);
- const base={articleId:item.id,articleHash:item.bodyHash,topic:item.topic,issue:item.issue,partition:item.partition,publisher:item.publisher,model:models[mode],modelVersion:models[mode],voiceVersion:p.input.version,segmenter:p.input.segmenter,scopeCharacters:2000,labelSource:mode==='lightning'?'single Lightning model':models[mode],attempts:(records.get(item.id)?.attempts??0)+1,optimizationVersion:'2026-11-17.1',optimizationAttempts:attemptsUsed(records.get(item.id))+1,...(mode==='lightning'?{recoveryVersion:'2026-11-18.1',recoveryAttempts:attemptsUsed(records.get(item.id))+1}:{})};
+ const base={articleId:item.id,articleHash:item.bodyHash,topic:item.topic,issue:item.issue,partition:item.partition,publisher:item.publisher,model:models[mode],modelVersion:models[mode],voiceVersion:p.input.version,segmenter:p.input.segmenter,scopeCharacters:2000,labelSource:mode==='lightning'?'single Lightning model':models[mode],attempts:(records.get(item.id)?.attempts??0)+1,optimizationVersion:'2026-11-17.1',optimizationAttempts:attemptsUsed(records.get(item.id))+1,...(mode==='lightning'?{recoveryVersion:lightningRecoveryVersion,recoveryAttempts:attemptsUsed(records.get(item.id))+1}:{}),...(fillPairedGaps?{pairedGapVersion,pairedGapAttempts:attemptsUsed(records.get(item.id))+1}:{})};
+ progress.attempted++;progress.lastDispatchAt=started;progress.lastRequest={articleId:item.id,topic:item.topic,startedAt:new Date(started).toISOString(),retry};progress.inflightRequests??={};progress.inflightRequests[item.id]={startedAt:started,deadline:started+progress.timeoutMs};
+ try{await persist();}catch(error){delete progress.inflightRequests[item.id];throw error;}
  const controller=new AbortController();controllers.add(controller);const timer=setTimeout(()=>controller.abort(),progress.timeoutMs);
- progress.attempted++;progress.lastDispatchAt=started;progress.lastRequest={articleId:item.id,topic:item.topic,startedAt:new Date(started).toISOString(),retry};progress.inflightRequests??={};progress.inflightRequests[item.id]={startedAt:started,deadline:started+progress.timeoutMs};await persist();
  try{
   if(!p.sentences.length){return {...base,status:'completed',labels:p.input.sentences.map(x=>({sentenceId:x.sentenceId,issue:'none',direction:'neutral',speaker:'unknown',excluded:true})),rawLabels:[],durationMs:0,createdAt:new Date().toISOString()};}
-  const payload={model:models[mode],messages:p.messages,temperature:0,max_tokens:retry&&records.get(item.id)?.finishReason==='length'?p.sentences.length*40+200:p.maxTokens,stream:false,...(mode==='lightning'?{chat_template_kwargs:{enable_thinking:false}}:mode==='deepseek'?{reasoning_effort:'none'}:{reasoning_effort:'low'}),response_format:{type:'json_object'}};
+  const prior=records.get(item.id);
+  const budget=prior?.finishReason==='length'?p.sentences.length*40+200:p.maxTokens;
+  const messages=mode==='lightning'?[...p.messages.slice(0,1),{role:'system',content:'Use the literal English enum values for direction and speaker. Every row is a four-element array, not an object. Include every input sentence ID in its original order.'},p.messages[1]]:p.messages;
+  const payload={model:models[mode],messages,temperature:0,max_tokens:budget,stream:false,...(mode==='lightning'?{chat_template_kwargs:{enable_thinking:false}}:mode==='deepseek'?{reasoning_effort:'none'}:{reasoning_effort:'low'}),response_format:{type:'json_object'}};
   const response=await fetch(mode==='groq'?'https://api.groq.com/openai/v1/chat/completions':'https://integrate.api.nvidia.com/v1/chat/completions',{method:'POST',headers:{Authorization:'Bearer '+apiKey,'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal});
   if(!response.ok){const status=response.status,wait=retryDelay(response.headers);let diagnostic;
    try{const data=await response.json(),e=data.error??{};const safe=value=>typeof value==='string'&&/^[a-zA-Z0-9_.-]{1,80}$/.test(value)?value:undefined;
@@ -140,7 +148,7 @@ async function call(item,retry=false){
    }catch{await response.body?.cancel().catch(()=>{});}throw Object.assign(Error('PROVIDER_HTTP_'+status),{status,wait,code:'PROVIDER_HTTP_'+status,diagnostic});}
   const data=await response.json(),choice=data.choices?.[0];if(choice?.finish_reason!=='stop'||typeof choice.message?.content!=='string')throw Object.assign(Error('Incomplete output'),{code:choice?.finish_reason==='length'?'OUTPUT_LIMIT':'INCOMPLETE_OUTPUT',finishReason:choice?.finish_reason??null});
   const rawLabels=parseLabels(choice.message.content,p);const normalized=voice.validateVoiceDocument(p.article.text,{version:p.input.version,segmenter:p.input.segmenter,scopeCharacters:2000,topic:item.topic,method:'ai',modelVersion:models[mode],decisionPolicy:voice.VOICE_INDEPENDENT_NEUTRAL,issuePolicy:voice.VOICE_ARTICLE_ISSUE,articleIssue:item.issue,labels:rawLabels});
-  if(!normalized)throw Error('LABEL_VALIDATION_FAILED');
+  if(!normalized)throw Object.assign(Error('Invalid normalized labels'),{code:'LABEL_VALIDATION_FAILED',diagnostic:{category:'normalized_document_rejected'}});
   sessionSuccess.push(Date.now());progress.consecutiveSuccesses++;
   if(progress.consecutiveSuccesses>=20){progress.consecutiveSuccesses=0;progress.intervalMs=Math.max(5000,progress.intervalMs/2);progress.concurrency=Math.min(maxConcurrency,Math.max(progress.concurrency+1,progress.concurrency*2));progress.history.push({type:'recovery',at:new Date().toISOString(),intervalMs:progress.intervalMs,concurrency:progress.concurrency});}
   return {...base,status:'completed',rawLabels,labels:normalized.labels,usageTokens:data.usage?.total_tokens??null,inputTokens:p.inputTokens,maxTokens:p.maxTokens,durationMs:Date.now()-started,createdAt:new Date().toISOString()};

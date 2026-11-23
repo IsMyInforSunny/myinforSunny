@@ -63,8 +63,9 @@ def main():
     evaluation=[row for row in evaluation if row['id'] in lightning and (row['id'] in deepseek or row['id'] in groq)]
     paired_counts=Counter(row['topic'] for row in evaluation)
     winner='deepseek-preferred-groq-fallback'
-    if len(evaluation)<80 or any(paired_counts[topic]<25 for topic in TOPICS):
-        write(result_path,{'stage':args.stage,'status':'blocked','apiCalls':0,'blocker':'paired_evaluation_min80_topic25_required','pairedEvaluation':len(evaluation),'pairedByTopic':dict(paired_counts)})
+    evaluation_ready=len(evaluation)>=80 and all(paired_counts[topic]>=25 for topic in TOPICS)
+    if not evaluation:
+        write(result_path,{'stage':args.stage,'status':'blocked','apiCalls':0,'blocker':'no_paired_evaluation'})
         return
     selected={row['id']:deepseek.get(row['id']) or groq.get(row['id']) for row in evaluation}
     agreement={field:Counter(compared=0,agree=0) for field in FIELDS};topic_agreement={topic:{field:Counter(compared=0,agree=0) for field in FIELDS} for topic in TOPICS};annotations=[];second_sources=Counter()
@@ -103,12 +104,22 @@ def main():
             if progress.get('phase') not in ('completed','finished_with_failures'):raise ValueError('Final training requires a terminal Lightning checkpoint')
         # Validate each actual teacher separately, then compose known frozen partitions.
         train_rows,_=validate([corpus_by_id[item['id']] for item in selected_training],training_annotations);accepted=train_rows+consensus_rows
-    groups=connected_groups(accepted);eval_ids={item['id'] for item in evaluation};eval_groups={groups[i] for i,row in enumerate(accepted) if row['article']['id'] in eval_ids};sets={'train':[],'evaluation':[],'challenge':[]};records={};excluded=Counter()
+    groups=connected_groups(accepted)
+    eval_ids={item['id'] for item in evaluation}
+    semantic_texts=[natural_text(row['text']) for row in accepted]
+    eval_indices=[i for i,row in enumerate(accepted) if row['article']['id'] in eval_ids]
+    eval_groups={groups[i] for i in eval_indices}
+    eval_texts={semantic_texts[i] for i in eval_indices if semantic_texts[i]}
+    # The embedding normalizer can merge strings that the grouping normalizer
+    # kept apart. Exclude the whole training group to protect the held-out set.
+    excluded_groups=eval_groups|{groups[i] for i,text in enumerate(semantic_texts) if text in eval_texts}
+    sets={'train':[],'evaluation':[],'challenge':[]};records={};excluded=Counter()
     for i,row in enumerate(accepted):
         partition='evaluation' if row['article']['id'] in eval_ids else 'train'
-        if partition=='train' and groups[i] in eval_groups:excluded[row['topic']]+=1;continue
-        text=natural_text(row['text']);key=hashlib.sha256(text.encode()).hexdigest()
+        if partition=='train' and groups[i] in excluded_groups:excluded[row['topic']]+=1;continue
+        text=semantic_texts[i]
         if not text:continue
+        key=hashlib.sha256(text.encode()).hexdigest()
         if key in records and records[key]['partition']!=partition:raise ValueError('Semantic text crosses frozen partition')
         records.setdefault(key,{'key':key,'text':text,'partition':partition,'sourceIDs':[]})
         source={'articleId':row['article']['id'],'sentenceId':row['sentenceId'],'topic':row['topic']};records[key]['sourceIDs'].append(source)
@@ -121,7 +132,11 @@ def main():
         scores[topic]={'count':len(evaluated),'missingEmbeddings':sum(row['topic']==topic and row['key'] in missing for row in sets['evaluation'])}
         if model and evaluated:scores[topic]['runtime']=runtime_evaluation(evaluated,model['heads'],np.vstack([vectors[row['key']] for row in evaluated]),candidate.get('decisionPolicy'))
     write(out/'current-candidate-rescore.local.json',{'apiCalls':0,'candidateVersion':candidate['version'],'researchOnly':True,'humanEvaluationCount':0,'topics':scores,'vectorsProvenance':provenance})
-    result={'stage':args.stage,'status':'completed','apiCalls':0,'completedAt':datetime.now(timezone.utc).isoformat(),'evaluationArticles':len(evaluation),'currentCandidateVersion':candidate['version'],'missingEmbeddingCount':len(missing),'crossPartitionConnectedTrainingExcluded':dict(excluded),'humanEvaluationCount':0}
+    result={'stage':args.stage,'status':'completed','apiCalls':0,'completedAt':datetime.now(timezone.utc).isoformat(),'evaluationArticles':len(evaluation),'currentCandidateVersion':candidate['version'],'missingEmbeddingCount':len(missing),'crossPartitionConnectedTrainingExcluded':dict(excluded),'humanEvaluationCount':0,'evaluationGateMet':evaluation_ready,'pairedByTopic':dict(paired_counts)}
+    if not evaluation_ready and args.stage!='evaluation':
+        result.update(status='blocked',blocker='paired_evaluation_min80_topic25_required')
+        write(result_path,result)
+        return
     if args.stage!='evaluation':
         models={};reports={}
         for topic in TOPICS:
