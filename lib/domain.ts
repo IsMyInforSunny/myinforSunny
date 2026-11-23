@@ -1,9 +1,10 @@
 import { Analysis, BodyTopicAssignment, Check, InputSource, Ratio, Span, TextRequest } from './contracts';
 import { SEGMENTER, naturalSentenceCount, naturalSentences, sentences } from './segmentation';
+import {editorialSentences} from './editorial-sentences';
 
 export { SEGMENTER, FRAGMENT_LIMIT, naturalSentenceCount, naturalSentences, sentences } from './segmentation';
 export function makeSources(req:TextRequest):InputSource[]{
-  return [{id:'body',kind:'body' as const,text:req.body},...req.comments.map((c,i)=>({id:`comment_${i}`,clientId:c.id,kind:'comment' as const,text:c.text}))].map(s=>({...s,sentences:sentences(s.text,s.id)}));
+  return [{id:'body',kind:'body' as const,text:req.body},...req.comments.map((c,i)=>({id:`comment_${i}`,clientId:c.id,kind:'comment' as const,text:c.text}))].map(s=>({...s,sentences:s.kind==='body'?editorialSentences(s.text,s.id):sentences(s.text,s.id)}));
 }
 export function locate(sources:InputSource[],candidate:{sentenceId:string;quote:string}):Span|null{
   for(const source of sources){const sentence=source.sentences.find(s=>s.id===candidate.sentenceId);if(!sentence)continue;

@@ -11,6 +11,11 @@ function grounded(body:string,proposition='주택 공급을 확대해야 한다.
  return {sources,position:{proposition,label:'support' as const,attribution,evidence,reason:'모델 제안'}};
 }
 describe('본문 입장 고정 회귀 경계',()=>{
+ it('생활임금 결정과 의대 선정 재심사를 다른 정책 명제로 강제하지 않는다',()=>{
+  expect(canonicalStanceProposition('파주시가 생활임금을 인상했다. 최저임금의 118%를 고려했다.')).toBe('지방자치단체의 생활임금을 인상해야 한다.');
+  expect(canonicalStanceProposition('무안군의회가 국립의대 신설 대학 선정 기준 공개와 재심사를 촉구했다. 정부는 정원60명을 배정했다.')).toBe('국립의대 신설 대학의 선정 기준을 공개하고 선정 절차를 재검증해야 한다.');
+  expect(canonicalStanceProposition('정부가 의대 정원을 확대하기로 했다.')).toBe('의과대학 입학 정원을 확대해야 한다.');
+ });
  it.each(['전기요금을 올리기로 했다.','전기료가 오른다.','전기료를 내려야 한다.','전기요금 현실화에 찬성한다.'])('전기요금 일상 표현 %s',body=>{
   expect(canonicalStanceProposition(body)).toBe('전기요금을 인상해야 한다.');
  });

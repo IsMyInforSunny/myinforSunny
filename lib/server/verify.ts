@@ -3,6 +3,7 @@ import { Check, EvidenceRelation, MAX_ARTICLE_CHARACTERS, RUBRIC, Reference, Ver
 import { sentences, validSpan } from '../domain';
 import { RuntimeConfig, modelName } from './config';
 import { AppError } from './errors';
+import {editorialSentences} from '../editorial-sentences';
 import { structured } from './language';
 import type {ResearchVerification,SourcePerspective} from '../research-contract';
 import {assessSources,parseTargetPeriod} from '../source-quality';
@@ -11,7 +12,7 @@ const VERIFY_PROMPT=`한국어 정보 성분표 자료 대조 도구다. 입력 
 export function validateVerifyInput(req:VerifyTextRequest){
   const body=req.sources.filter(s=>s.kind==='body');const comments=req.sources.filter(s=>s.kind==='comment');
   if(body.length!==1||body[0].text.length>MAX_ARTICLE_CHARACTERS||comments.length>5||comments.some(s=>s.text.length>200)||new Set(req.sources.map(s=>s.id)).size!==req.sources.length||new Set(req.claims.map(s=>s.id)).size!==req.claims.length||new Set(req.references.map(s=>s.id)).size!==req.references.length)throw new AppError(422,'VALIDATION_ERROR','원문이나 자료의 식별자를 확인해 주세요.');
-  for(const source of req.sources){if(JSON.stringify(sentences(source.text,source.id))!==JSON.stringify(source.sentences))throw new AppError(422,'VALIDATION_ERROR','원문 문장 구간이 일치하지 않습니다. 다시 분석해 주세요.');}
+  for(const source of req.sources){const expected=source.kind==='body'?editorialSentences(source.text,source.id):sentences(source.text,source.id);if(JSON.stringify(expected)!==JSON.stringify(source.sentences))throw new AppError(422,'VALIDATION_ERROR','원문 문장 구간이 일치하지 않습니다. 다시 분석해 주세요.');}
   if(req.claims.some(c=>!c.origin.every(s=>validSpan(req.sources,s))))throw new AppError(422,'VALIDATION_ERROR','주장의 원문 인용이 일치하지 않습니다. 다시 분석해 주세요.');
 }
 export function buildChecks(raw:ReturnType<typeof rawVerificationSchema.parse>,claims:VerifyTextRequest['claims'],references:Reference[],positions?:ReadonlyMap<object,{start:number;end:number}>):{checks:Check[];damaged:boolean}{

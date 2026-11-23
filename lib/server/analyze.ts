@@ -5,9 +5,15 @@ import { Analysis, BodyTopicAssignment, RawAnalysis, RUBRIC, ANALYSIS_PROMPT_VER
 import { assertAnalysis, indicators, locate, makeSources, naturalSentenceCount, SEGMENTER } from '../domain';
 import { RuntimeConfig, modelName } from './config';
 import { AppError } from './errors';
-import { structured } from './language';
+import { structured,requestTokenBudget } from './language';
+import {minuteLimits} from './limits';
 import {compactAnalysisTransport,groqAnalysisTransport,COMPACT_ANALYZE_PROMPT,GROQ_COMPACT_ANALYZE_PROMPT} from './analysis-transport';
 import {canonicalStanceProposition} from '../stance-model';
+import {STANCE_PROPOSITIONS} from '../stance-model';
+import {editorialRange} from '../editorial-sentences';
+import {sentences} from '../segmentation';
+import {reviewCitedSources} from '../cited-sources';
+import {priorityScoreUrl} from '../citation-composition';
 import {classifyRelativeTopic} from '../relative-metrics';
 import {inferVoices,voiceSentences} from '../sentence-voice';
 import {releasedVoiceModel,attachVoiceCoordinates} from './voice-analysis';
@@ -93,7 +99,9 @@ export function assembleAnalysis(req:TextRequest,raw:RawAnalysis,requestId:strin
     const query=searchQuerySchema.safeParse(suggestion.query);
     return query.success?[{label:suggestion.label,query:query.data.normalize('NFC')}]:[];
   }).slice(0,2);
-  const a:Analysis={schemaVersion:'2.1',analysisId:crypto.randomUUID(),requestId,mode:'live',status:damaged?'partial':'success',versions:{rubric:RUBRIC,prompt:ANALYSIS_PROMPT_VERSION,model,segmenter:SEGMENTER},sources,proposition:req.proposition,...(bodyPosition?{bodyPosition}:{}),topics,topicAssignments,bodyTopicAssignments,stances,expressions,claims,perspectiveQuestions:questions,counterArguments,searchSuggestions,indicators:null as unknown as Analysis['indicators'],coverage:{totalSentences:expressions.length,naturalSentences:naturalSentenceCount(sources),factualClaimsExtracted:claims.filter(c=>c.kind==='factual').length,claimsMayBeOmitted:raw.claimsMayBeOmitted||claims.length===5||damaged,scopeNote:'제출한 자료 안에서 추출한 결과입니다. 아직 외부 자료와 대조하지 않았으며, 모든 주장을 빠짐없이 추출했다고 보장하지 않습니다.'},warnings,createdAt:new Date().toISOString()};a.indicators=indicators(a);assertAnalysis(a);return a;
+  const a:Analysis={schemaVersion:'2.1',analysisId:crypto.randomUUID(),requestId,mode:'live',status:damaged?'partial':'success',versions:{rubric:RUBRIC,prompt:ANALYSIS_PROMPT_VERSION,model,segmenter:SEGMENTER},sources,proposition:req.proposition,...(bodyPosition?{bodyPosition}:{}),topics,topicAssignments,bodyTopicAssignments,stances,expressions,claims,perspectiveQuestions:questions,counterArguments,searchSuggestions,indicators:null as unknown as Analysis['indicators'],coverage:{totalSentences:expressions.length,naturalSentences:naturalSentenceCount(sources),factualClaimsExtracted:claims.filter(c=>c.kind==='factual').length,claimsMayBeOmitted:raw.claimsMayBeOmitted||claims.length===5||damaged,scopeNote:'제출한 자료 안에서 추출한 결과입니다. 아직 외부 자료와 대조하지 않았으며, 모든 주장을 빠짐없이 추출했다고 보장하지 않습니다.'},warnings,createdAt:new Date().toISOString()};const excluded=naturalSentenceCount(sources.map(source=>({...source,sentences:sentences(source.text,source.id)})))-naturalSentenceCount(sources);
+  if(excluded>0){a.coverage.excludedNonEditorialSentences=excluded;a.coverage.scopeNote+=' '+excluded+' \uac1c\uc758 \uc0ac\uc9c4\u00b7\uc800\uc791\uad8c\u00b7\ud64d\ubcf4 \ubb38\uc7a5\uc740 \uc9d1\uacc4\uc5d0\uc11c \uc81c\uc678\ud588\uc2b5\ub2c8\ub2e4.';}
+  a.indicators=indicators(a);assertAnalysis(a);return a;
 }
 const SENTENCE_OUTPUT_BATCH=40;
 async function analyzeInSentenceBatches(config:RuntimeConfig,req:TextRequest,requestId:string,signal:AbortSignal,
@@ -130,16 +138,35 @@ async function analyzeInSentenceBatches(config:RuntimeConfig,req:TextRequest,req
  return {...core,clearSentenceIds,expressions,bodyAssigned,bodyOtherIds,bodyUndeterminedIds} as RawAnalysis;
 }
 const citationTuple=z.tuple([z.string().regex(/^[A-Za-z0-9_-]{1,64}$/),z.enum(['R','N','?']),z.enum(['+','-','0','?']),z.enum(['J','S','M','?'])]);
-async function analyzeCitationBalance(config:RuntimeConfig,body:string,requestedProposition:string|undefined,requestId:string,signal:AbortSignal){
- const units=voiceSentences(body),labels:ReturnType<typeof citationTuple.parse>[]=[];let proposition=requestedProposition,status:'completed'|'failed'='failed';
+async function analyzeCitationBalance(config:RuntimeConfig,body:string,requestedProposition:string|undefined,requestId:string,signal:AbortSignal,precedingGroqUsage=0){
+ const units=voiceSentences(body).filter(unit=>editorialRange(body,unit.start,unit.end)),labels:ReturnType<typeof citationTuple.parse>[]=[];let proposition=requestedProposition,status:'completed'|'failed'='failed';
  const startedAt=Date.now();
  try{
   for(let offset=0;offset<units.length;offset+=SENTENCE_OUTPUT_BATCH){
    const batch=units.slice(offset,offset+SENTENCE_OUTPUT_BATCH);
-   const schema=z.object({proposition:z.string().trim().min(1).max(160),labels:z.array(citationTuple).length(batch.length)}).strict();
-   const instructions='기사의 인용 균형만 분류한다. 각 labels 항목은 [sentenceId,relevance,direction,speaker]다. relevance R=명제 관련, N=무관, ?=불확실; direction +=명제 지지, -=명제 반대, 0=중립·사실 전달, ?=판단 유보; speaker J=기자 서술, S=취재원 발언·전달, M=복합, ?=불명확. 취재원 주장을 기사 작성자 입장으로 바꾸지 말고, 단순 사실 보도는 방향 0이다. 모든 입력 sentenceId를 정확히 한 번 포함한다. 원문·설명·별도 필드는 출력하지 않는다.'+
+   const schema=z.object({proposition:proposition?z.literal(proposition):z.string().trim().min(1).max(160),labels:z.array(citationTuple).length(batch.length)}).strict();
+   const groq=(config.AI_PROVIDER??'groq')==='groq';
+   const decision=z.string().regex(/^[RN?][+\-0?][JSM?]$/);
+   const keyedSchema=z.object({proposition:schema.shape.proposition,labels:z.object(Object.fromEntries(batch.map(unit=>[unit.sentenceId,decision]))).strict()}).strict();
+   const keyedResponse=z.preprocess(value=>{
+    const parsed=keyedSchema.safeParse(value);if(!parsed.success)return value;
+    return {proposition:parsed.data.proposition,labels:batch.map(unit=>{const entry=parsed.data.labels[unit.sentenceId];return [unit.sentenceId,entry[0],entry[1],entry[2]];})};
+   },schema);
+   const instructions='기사의 인용 균형만 분류한다. 각 labels 항목은 [sentenceId,relevance,direction,speaker]다. relevance R=명제 관련, N=무관, ?=불확실; direction +=명제 지지, -=명제 반대, 0=중립·사실 전달, ?=판단 유보; speaker J=기자 서술, S=취재원 발언·전달, M=복합, ?=불명확. 취재원 주장을 기사 작성자 입장으로 바꾸지 말고, 단순 사실 보도는 방향 0이다. 임금이 인상됐다는 수치·결정·시행 사실은 인상 찬성이 아니며 0이다. 공개·재심사를 촉구하거나 반대하는 주장은 해당 명제의 찬반으로 세되 그 주체가 군의회·정부·단체이면 S다. 기관의 발표를 인용·간접 전달하면 S이며 기자가 찬성했다고 바꾸지 않는다. 전체 문맥으로 대명사의 주체를 확인하고 여러 주체가 섞이면 M으로 유보한다. 모든 입력 sentenceId를 정확히 한 번 포함한다. 원문·설명·별도 필드는 출력하지 않는다.'+
     (proposition?` 비교 명제는 다음을 그대로 사용한다: ${proposition}`:' 비교 명제가 제공되지 않았다. 기사 중심 쟁점을 한 문장으로 proposition에 정하고 그에 따라 분류한다. 중심 쟁점이 없으면 "비교할 논점 없음"으로 쓴다.');
-   const response=await structured(config,schema,instructions,{proposition:proposition??null,sentences:batch.map(unit=>({sentenceId:unit.sentenceId,text:unit.text}))},signal,{requestId});
+   const prompt=instructions+(groq?' 전송 형식은 JSON Schema를 따른다. labels는 배열이 아니라 실제 sentenceId를 키로 갖는 객체다. 각 값은 관련성·방향·화자의 3글자 문자열이다. 예: R+S, R0J, N0J. 원문·설명 없이 모든 키를 빠짐없이 반환한다.':'');
+   const input={proposition:proposition??null,sentences:batch.map(unit=>({sentenceId:unit.sentenceId,text:unit.text}))};
+   if(groq&&config.GROQ_CONSOLE_LIMITS_CONFIRMED==='true'&&precedingGroqUsage>0){
+    const reservation=await requestTokenBudget(prompt,input,z.toJSONSchema(keyedSchema,{target:'draft-7',reused:'ref'}));
+    const tokens=minuteLimits(config).tokens,deficit=Math.max(0,precedingGroqUsage+reservation-tokens);
+    const waitMs=deficit?Math.ceil(deficit/tokens*60000)+2000:0;
+    if(waitMs){
+     console.info(JSON.stringify({type:'article_timing',stage:'citation_rate_spacing',waitMs,requestId}));
+     await new Promise<void>((resolve,reject)=>{const abort=()=>{clearTimeout(timer);reject(signal.reason);};const timer=setTimeout(()=>{signal.removeEventListener('abort',abort);resolve();},waitMs);signal.addEventListener('abort',abort,{once:true});if(signal.aborted)abort();});
+    }
+    precedingGroqUsage=0;
+   }
+   const response=await structured(config,groq?keyedResponse:schema,prompt,input,signal,{requestId,...(groq?{generationSchema:keyedSchema,maxCompletionTokens:Math.min(2000,batch.length*28+480)}:{})});
    if(proposition&&response.proposition.normalize('NFC').trim()!==proposition.normalize('NFC').trim())throw new AppError(502,'INVALID_MODEL_OUTPUT','인용 균형 분류의 비교 명제가 일치하지 않습니다.');
    proposition=response.proposition;labels.push(...response.labels);
   }
@@ -154,7 +181,8 @@ export async function analyze(req:TextRequest,config:RuntimeConfig,requestId:str
   const canonicalProposition=!req.proposition?canonicalStanceProposition(req.body):undefined;
   if(new Set(req.comments.map(c=>c.id)).size!==req.comments.length)throw new AppError(422,'VALIDATION_ERROR','댓글 ID가 중복되었습니다.');
   const sources=makeSources(req);if(!sources[0].sentences.length)throw new AppError(422,'VALIDATION_ERROR','분석할 수 있는 본문 문장을 입력해 주세요.');
-  const voiceTopic=classifyRelativeTopic(req.body,context.articleTitle);
+  const detectedVoiceTopic=classifyRelativeTopic(req.body,context.articleTitle);
+  const voiceTopic=detectedVoiceTopic&&(!canonicalProposition||canonicalProposition===STANCE_PROPOSITIONS[detectedVoiceTopic])?detectedVoiceTopic:null;
   const proposedArticleIssue=voiceTopic?selectArticleVoiceIssue(req.body,voiceTopic,req.proposition??canonicalProposition,context.articleTitle):null;
   const voiceModel=releasedVoiceModel;
   const localVoices=voiceModel&&voiceTopic?inferVoices(voiceModel,req.body,voiceTopic,proposedArticleIssue??undefined):null;
@@ -165,22 +193,24 @@ export async function analyze(req:TextRequest,config:RuntimeConfig,requestId:str
   // Research annotations remain offline until the sentence model passes release gates.
   const reportedFact=/\d+(?:\.\d+)?\s*(?:%|명|건|원|일|년)[\s\S]{0,100}(?:밝혔다|발표했다|집계됐다|조사됐다)/.test(req.body);
   const claimsRequired=!!context.article||reportedFact;
+  const requiredFactualSourceIds=[...new Set(reviewCitedSources({sources,claims:[]}).sources.filter(source=>source.signals.administrativeDecision&&source.signals.quantified).map(source=>source.sentenceId))];
   const sentenceIds=sources.flatMap(s=>s.sentences.map(t=>t.id));
-  const input={documentType:context.article?'news_article':'provided_text',requiredClaimCount:claimsRequired?'1..5':'0..5',proposition:req.proposition??null,requiredExpressionSentenceIds:sentenceIds,requiredTopicAssignmentSourceIds:sources.filter(s=>s.kind==='comment').map(s=>s.id),sources:sources.map(s=>({id:s.id,kind:s.kind,sentences:s.sentences.map(t=>({sentenceId:t.id,text:s.text.slice(t.start,t.end)}))}))};
+  const input={documentType:context.article?'news_article':'provided_text',requiredClaimCount:claimsRequired?'1..5':'0..5',...(requiredFactualSourceIds.length?{requiredFactualSourceIds}:{}),proposition:req.proposition??null,requiredExpressionSentenceIds:sentenceIds,requiredTopicAssignmentSourceIds:sources.filter(s=>s.kind==='comment').map(s=>s.id),sources:sources.map(s=>({id:s.id,kind:s.kind,sentences:s.sentences.map(t=>({sentenceId:t.id,text:s.text.slice(t.start,t.end)}))}))};
   const coverageInstructions=' 출력은 간결하게 작성한다. 자극적이지 않은 clear 문장은 ID만 clearSentenceIds에 넣고 expressions 객체는 만들지 않는다. flagged 또는 undetermined 문장만 expressions에 넣는다. 두 배열을 합쳐 requiredExpressionSentenceIds의 모든 ID가 정확히 한 번씩 있어야 한다. topicAssignments에는 requiredTopicAssignmentSourceIds의 댓글만 각 1개씩 반환하며 본문 body는 여기에 넣지 않는다. 댓글이 없어도 본문 body의 모든 문장 ID를 bodyAssigned({sentenceId,topicIds}: 해당 논점 있음)·bodyOtherIds(해당 논점 없음)·bodyUndeterminedIds(유보) 중 정확히 한 곳에 한 번씩 넣는다. topicIds는 topics의 id만 쓰며 여러 개 가능하다. topics 근거 인용은 예시일 뿐 분포에 쓰이지 않는다. stances는 proposition이 없으면 빈 배열이다.';
   const bodyPositionInstructions=' bodyPosition은 댓글을 제외한 기사 본문 자체의 입장이다. 과학·교육·경제·건강·소비·환경 등 모든 주제를 다루며 정치적 좌우로 강제하지 않는다. 사용자 proposition이 있으면 그대로 비교하고, 없으면 본문 중심의 찬반 가능한 명제를 긍정형으로 짧게 정한다. label은 그 명제에 대한 본문 입장 support/oppose/mixed/not_expressed/undetermined다. evidence에는 body 문장의 실제 인용만, reason에는 입장 판단 이유를 쓴다. 댓글 의견·취재원 인용을 기사 작성자의 지지로 바꾸지 않는다. 사실만 전달하고 입장을 드러내지 않으면 not_expressed로 두며, 비교할 논쟁이 없으면 proposition은 빈 문자열로 둔다. 수치 점수는 생성하지 않는다.';
   const compact=['nvidia','deepseek','groq'].includes(config.AI_PROVIDER??'groq');
   const groq=(config.AI_PROVIDER??'groq')==='groq';
-  const reduced=sentenceIds.length>25;
+  const reduced=sentenceIds.length>25||!!context.articleUrl&&priorityScoreUrl(context.articleUrl);
   const transport=compact&&sentenceIds.length<=SENTENCE_OUTPUT_BATCH
     ?(groq?groqAnalysisTransport:compactAnalysisTransport)(sources,!!req.proposition,claimsRequired,reduced,req.proposition??canonicalProposition):null;
   const articleInstructions=claimsRequired?' claims에 실제 원문에 있는 핵심 주장을 1~5개 반드시 추출한다. 사건·실험 결과·통계·연구진의 설명은 factual이다. 본문에 확인 가능한 사실이 있으면 factual을 최소 1개 포함한다. 수치나 내용을 새로 만들지 말고 실제 문장 ID에 연결한다. 사실이 없는 순수 의견 기사라면 opinion을 추출한다.':'';
   const attributionInstructions=' bodyPosition.attribution은 입장 근거의 발화 주체다: author(기사 작성자 자신의 명시적 평가·제안), reported_sources(취재원·단체·정부·연구진의 발언이나 요구만 전달), unclear(구분 불가). 한쪽 발언만 실렸거나 제목에 인용됐다는 이유로 author로 두지 않는다. 보도문에서 노동계·경영계 등의 요구를 전달하는 것은 reported_sources이며 label=not_expressed다. 사설·칼럼이라도 실제 작성자 평가 인용이 있어야 author다. not_expressed에서도 쟁점이 있으면 비교 명제는 유지한다.';
   const instructions=(groq&&transport?GROQ_COMPACT_ANALYZE_PROMPT:compact&&!groq?COMPACT_ANALYZE_PROMPT:ANALYZE_PROMPT+coverageInstructions+bodyPositionInstructions)
+    +(requiredFactualSourceIds.length?' requiredFactualSourceIds는 이름 있는 행정기관의 수치·결정 사실이 명시된 실제 문장이다. 해당 문장을 origin으로 factual 주장을 최소1개 반드시 추출한다. 기사에 요구·평가도 있으면 opinion과 factual을 구분하며 사실을 생략하지 않는다.':'')
     +(groq?(claimsRequired?' claims에는 원문에 있는 핵심 주장을 최소 1개 추출한다. 확인 가능한 사실은 factual이며 참이라는 뜻은 아니다.':''):articleInstructions)
     +(groq?' bodyPosition.attribution은 author/reported_sources/unclear다. 취재원 발언만 보도하면 reported_sources와 not_expressed를 쓴다. 작성자의 직접 평가 인용이 있을 때만 author다. not_expressed여도 비교 명제는 유지한다.':attributionInstructions)
     +(compact?' JSON은 들여쓰기와 빈 줄 없이 한 줄로 출력한다. 작성자 입장의 실제 근거가 없으면 bodyPosition.label=not_expressed, evidence=[], reason="작성자 입장 표명 없음"으로 반환한다. 실제 원문 인용을 만들지 않는다.':'')
-    +(reduced?' 이번 요청은 25문장 초과 축약 형식이다. 논점 최대 3개, 주장 최대 3개, perspectiveQuestions=[]와 counterArguments=[]로 반환한다. 모든 문장의 표현·논점 분류는 그대로 완성한다.':'')
+    +(reduced?' 이번 요청은 핵심 집계용 축약 형식이다. 논점 최대 3개, 주장 최대 3개, perspectiveQuestions=[]와 counterArguments=[]로 반환한다. 모든 문장의 표현·논점 분류는 그대로 완성한다.':'')
     +(compact?' 찬반 비교 명제는 당위·제안 형태로 쓴다. 사실·예보·사건 요약은 비교 명제가 아니며 찬반 논점이 없으면 빈 문자열로 둔다. 작성자의 직접적인 비판·비난·반대 논증도 oppose 근거다. 찬성·반대라는 단어가 없다는 이유만으로 not_expressed로 두지 않는다. 직접 평가와 취재원 인용이 섞인 글에서는 작성자의 직접 평가 문장을 evidence로 골라 판단한다. 본문 직접 입력도 확인 가능한 사건·발표·수치가 있으면 claims에 factual을 최소 1개 추출한다. 사실·의견이 함께 있으면 사실을 생략하지 않는다.':'')
     +(canonicalProposition?` 이번 공통 비교 명제(bodyPosition.proposition)는 반드시 다음 문장을 그대로 쓴다: ${canonicalProposition} 이 명제에 대한 본문 작성자의 입장을 분류한다. 사건의 사실 서술을 비교 명제로 바꾸지 않는다.`:'');
   const voiceController=new AbortController();
@@ -190,13 +220,16 @@ export async function analyze(req:TextRequest,config:RuntimeConfig,requestId:str
       .then(value=>({value,error:null}),error=>({value:null,error}))
     :null;
   const modelStarted=Date.now();
-  const mainWork=(transport?structured(config,transport.response,searchLanguagePrompt(instructions+' perspectiveQuestions와 counterArguments는 각각 최대 1개만 반환한다.',config),input,signal,{generationSchema:transport.generation,requestId})
-    :analyzeInSentenceBatches(config,req,requestId,signal,sources,instructions+' perspectiveQuestions와 counterArguments는 각각 최대 1개만 반환한다.',input,!!req.proposition))
+  let mainUsage=0,mainDispatched=false;
+  const mainConfig=groq?{...config,onDispatch:()=>{mainDispatched=true;config.onDispatch?.();},onUsage:(tokens:number)=>{mainUsage+=tokens;config.onUsage?.(tokens);}}:config;
+  const mainWork=(transport?structured(mainConfig,transport.response,searchLanguagePrompt(instructions+' perspectiveQuestions와 counterArguments는 각각 최대 1개만 반환한다.',config),input,signal,{generationSchema:transport.generation,requestId,...(groq&&context.articleUrl&&priorityScoreUrl(context.articleUrl)?{maxCompletionTokens:1400}:{})})
+    :analyzeInSentenceBatches(mainConfig,req,requestId,signal,sources,instructions+' perspectiveQuestions와 counterArguments는 각각 최대 1개만 반환한다.',input,!!req.proposition))
     .then(value=>({value:value as RawAnalysis,error:null as unknown}),error=>({value:null,error}));
   // Groq reserves output tokens per in-flight call. Avoid overlapping the main
   // and citation reservations against the confirmed 8,000 TPM account limit.
-  if(groq)await mainWork;
-  const citationWork=context.article?analyzeCitationBalance(config,req.body,req.proposition??canonicalProposition,requestId,signal)
+  const mainSettled=groq?await mainWork:null;
+  const rateStopped=mainSettled?.error instanceof AppError&&['RATE_LIMITED','API_QUOTA_EXHAUSTED'].includes(mainSettled.error.code);
+  const citationWork=rateStopped?Promise.resolve({value:null,error:mainSettled!.error}):context.article?analyzeCitationBalance(config,req.body,req.proposition??canonicalProposition,requestId,signal,mainDispatched?(mainUsage||6500):0)
     .then(value=>({value,error:null as unknown}),error=>({value:null,error})):Promise.resolve({value:null,error:null as unknown});
   const [mainOutcome,citationOutcome]=await Promise.all([mainWork,citationWork]);
   if(mainOutcome.error&&signal.aborted){voiceController.abort();await embeddingWork;throw mainOutcome.error;}
@@ -241,7 +274,7 @@ export async function analyze(req:TextRequest,config:RuntimeConfig,requestId:str
     }
     if(docs.length){result.sentenceVoices=docs[0];result.additionalSentenceVoices=docs.slice(1);}
   }
-  if(claimsRequired&&!result.claims.length){result.status='partial';result.coverage.claimsMayBeOmitted=true;result.warnings.push({code:'CLAIMS_UNAVAILABLE',message:'기사의 핵심 주장 추출이 누락되어 출처 명시 비율을 계산하지 못했습니다. 완성된 분석이 아닙니다.'});}
+  if(claimsRequired&&(!result.claims.length||requiredFactualSourceIds.length>0&&!result.claims.some(claim=>claim.kind==='factual'))){result.status='partial';result.coverage.claimsMayBeOmitted=true;result.warnings.push({code:'CLAIMS_UNAVAILABLE',message:'기사의 핵심 주장 추출이 누락되어 출처 명시 비율을 계산하지 못했습니다. 완성된 분석이 아닙니다.'});}
   if(overlaps.length){result.status='partial';result.warnings.push({code:'CLASSIFICATION_CONFLICT',message:'일부 문장이 정상 목록과 상세 검토에 중복되었습니다. 원문 근거가 있는 상세 결과를 우선 표시했으니 직접 확인해 주세요.'});}
   return attachVoiceCoordinates(result);
 }

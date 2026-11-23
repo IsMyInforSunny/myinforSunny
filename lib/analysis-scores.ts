@@ -4,6 +4,7 @@ import {expressionSummary,naturalSentences} from './domain';
 import {reviewCitedSources} from './cited-sources';
 import {assessWeightedClaimEvidence,type EvidenceObservation,type PublisherWeightSet} from './source-reliability';
 import type {VoiceAssessment} from './voice-model-adapter';
+import {citationComposition,priorityScoreArticle,type CitationComposition} from './citation-composition';
 
 export const ANALYSIS_SCORES_VERSION='descriptive-scores-2.0';
 export type Score={
@@ -18,7 +19,7 @@ export type Score={
   upperBound?:number;
   unresolvedCount?:number;
 };
-export type AnalysisScores={version:typeof ANALYSIS_SCORES_VERSION;bias:Score;stimulation:Score;reliability:Score;attribution:Score};
+export type AnalysisScores={version:typeof ANALYSIS_SCORES_VERSION;bias:Score;stimulation:Score;reliability:Score;attribution:Score;citationComposition?:CitationComposition};
 export type ScoreEvidence={observations:readonly EvidenceObservation[];weightSet:PublisherWeightSet|null;};
 const percent=(numerator:number,denominator:number)=>Math.round(numerator/denominator*100);
 const empty=(label:string,note:string,status:Score['status']='pending'):Score=>({label,value:null,status,scale:100,numerator:null,denominator:null,note});
@@ -32,6 +33,7 @@ export function buildAnalysisScores(analysis:Analysis|null,bias?:BiasAnalysisRes
     attribution:empty('근거 출처 명시 점수','전체 사실 주장 중 이름 있는 근거 출처가 연결된 주장 비율입니다. 출처의 실재·정확성·주장의 참일 확률은 별도 확인이 필요합니다. 신뢰 점수와 구분하는 보조 정보입니다.'),
   };
   if(!analysis)return scores;
+  if(priorityScoreArticle(analysis)){const composition=citationComposition(analysis);if(composition)scores.citationComposition=composition;}
   if(analysis.sentenceVoices?.method==='svm'){
     const quarter=analysis.issueQuarterComparison;
     const currentQuarter=quarter?.parentAnalysisId===analysis.analysisId&&quarter.modelVersion===analysis.sentenceVoices.modelVersion

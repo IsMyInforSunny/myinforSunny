@@ -24,6 +24,8 @@ export const groqProvider:StructuredProvider={id:'groq',async generate(request,c
     console.warn(JSON.stringify({type:'model_output_failure',provider:'groq',stage:'provider_response',reason,...(correlated?{requestId:correlated}:{})}));
   };
   const callSignal=AbortSignal.any([request.signal,AbortSignal.timeout(REQUEST_TIMEOUT_MS)]);
+  const completionTokens=request.maxCompletionTokens??MAX_COMPLETION_TOKENS;
+  if(!Number.isInteger(completionTokens)||completionTokens<1||completionTokens>MAX_COMPLETION_TOKENS)throw new AppError(422,'INVALID_TOKEN_LIMIT','분석 출력 한도가 유효하지 않습니다.');
   let response:Response;
   try{
     callSignal.throwIfAborted();
@@ -32,7 +34,7 @@ export const groqProvider:StructuredProvider={id:'groq',async generate(request,c
       method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${config.GROQ_API_KEY}`},
       body:JSON.stringify({model:request.model,messages:[{role:'system',content:request.instructions},{role:'user',content:JSON.stringify(request.input)}],
         response_format:{type:'json_schema',json_schema:{name:'information_ingredients',strict:true,schema:request.schema}},
-        max_completion_tokens:MAX_COMPLETION_TOKENS,reasoning_effort:'low',stream:false}),signal:callSignal,
+        max_completion_tokens:completionTokens,reasoning_effort:'low',stream:false}),signal:callSignal,
     });
   }catch(error){
     const failure=error as {name?:string;cause?:{code?:string}};

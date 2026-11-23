@@ -1,7 +1,7 @@
 import { z } from 'zod/v4';
 
 export const RUBRIC = 'rubric-4.0';
-export const ANALYSIS_PROMPT_VERSION='analysis-4.23-groq-compact';
+export const ANALYSIS_PROMPT_VERSION='analysis-4.24-editorial-issue';
 export const MAX_ARTICLE_CHARACTERS = 8000;
 const id = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 const text = (max: number) => z.string().min(1).max(max).refine(v => v.trim().length > 0, '내용을 입력해 주세요.');
@@ -59,7 +59,7 @@ export type Analysis = {
   expressions:Expression[]; claims:Claim[]; perspectiveQuestions:{text:string;basis:Span[]}[];
   counterArguments?:CounterArgument[];searchSuggestions?:SearchSuggestion[];
   indicators:{topics:{topicId:string;coverage:Ratio}[];expression:Ratio;expressionUndetermined:number;evidenceSupport:Ratio;verificationProgress:Ratio};
-  coverage:{totalSentences:number;naturalSentences?:number;factualClaimsExtracted:number;claimsMayBeOmitted:boolean;scopeNote:string};
+  coverage:{totalSentences:number;naturalSentences?:number;excludedNonEditorialSentences?:number;factualClaimsExtracted:number;claimsMayBeOmitted:boolean;scopeNote:string};
   warnings:{code:string;message:string}[];createdAt:string;
 };
 export const referenceInputSchema = z.object({ id, text:text(1500).optional(), url:z.string().url().max(2048).refine(v=>/^https?:\/\//.test(v),'HTTP/HTTPS 주소만 지원합니다.').optional() }).strict().refine(v=>v.text || v.url,'자료 본문 또는 주소가 필요합니다.');

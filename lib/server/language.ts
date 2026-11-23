@@ -25,7 +25,7 @@ function schemaFieldNames(node:unknown,names=new Set<string>()):Set<string>{
 }
 
 /** Shared analysis contract across Groq, NVIDIA NIM and direct DeepSeek API. */
-export async function structured<T>(config:RuntimeConfig,schema:z.ZodType<T>,instructions:string,input:unknown,signal:AbortSignal,options?:{generationSchema?:z.ZodType;requestId?:string}):Promise<T>{
+export async function structured<T>(config:RuntimeConfig,schema:z.ZodType<T>,instructions:string,input:unknown,signal:AbortSignal,options?:{generationSchema?:z.ZodType;requestId?:string;maxCompletionTokens?:number}):Promise<T>{
   if(!['groq','nvidia','deepseek'].includes(provider(config))){
     if(!paidProviderAllowed(config))throw new AppError(503,'PAID_PROVIDER_DISABLED','현재는 무료 제공자만 사용합니다. 유료 API는 명시적 전환 전까지 비활성입니다.');
     throw new AppError(503,'PROVIDER_NOT_CONFIGURED','유료 제공자 전환은 모델·예산·어댑터 검증을 먼저 완료해야 합니다.');
@@ -35,7 +35,7 @@ export async function structured<T>(config:RuntimeConfig,schema:z.ZodType<T>,ins
   const schemaJson=z.toJSONSchema(options?.generationSchema??schema,{target:'draft-7',reused:provider(config)==='groq'||provider(config)==='nvidia'&&modelName(config)===NVIDIA_FAST_MODEL?'ref':'inline'});
   if(provider(config)==='groq')await requestTokenBudget(instructions,input,schemaJson);
   const requestId=options?.requestId&&requestIdPattern.test(options.requestId)?options.requestId:undefined;
-  const call={model:modelName(config),instructions,input,schema:schemaJson,signal,requestId};
+  const call={model:modelName(config),instructions,input,schema:schemaJson,signal,requestId,...(options?.maxCompletionTokens?{maxCompletionTokens:options.maxCompletionTokens}:{})};
   const selected=provider(config)==='nvidia'?nvidiaProvider:provider(config)==='deepseek'?deepseekProvider:groqProvider;
   const output=await selected.generate(call,config);
   const invalid=()=>new AppError(502,'INVALID_MODEL_OUTPUT','AI 결과의 형식을 확인하지 못했습니다. 임의 결과로 대신하지 않습니다.');

@@ -78,6 +78,11 @@ export function stanceTopicRelevant(body:string,topic:StanceTopic):boolean{
 
 /** Fixed questions keep articles about the same policy comparable. */
 export function canonicalStanceProposition(body:string):string|undefined{
+  const text=articleTextPrefix(body,2000);
+  // Match the policy being debated before incidental mentions of a broader topic.
+  if(/생활\s*임금/.test(text))return '지방자치단체의 생활임금을 인상해야 한다.';
+  if(/(?:국립)?의대|의과대학/.test(text)&&/선정/.test(text)&&/평가\s*기준|공정성|재심사|재검증/.test(text))
+    return '국립의대 신설 대학의 선정 기준을 공개하고 선정 절차를 재검증해야 한다.';
   const topic=classifyRelativeTopic(body);
   if(topic&&stanceTopicRelevant(body,topic))return STANCE_PROPOSITIONS[topic];
   // A dominant unrelated topic must not be replaced by an incidental mention.
